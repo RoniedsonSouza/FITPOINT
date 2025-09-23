@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>FitPoint Fitness — Lanches proteicos & bebidas funcionais</title>
+    <meta name="description"
+        content="Lanches proteicos e bebidas funcionais para saúde, bem-estar e treino. Cardápio e receitas FitPoint." />
+    <meta property="og:title" content="FitPoint Fitness" />
+    <meta property="og:description" content="Cardápio e receitas FitPoint." />
+    <meta property="og:image" content="/assets/logo.png" />
+    <link rel="icon" type="image/png" href="/assets/logo.png">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        fp: {
+                            green: '#1D6B3A',
+                            green2: '#2F9D57',
+                            orange: '#F57C00',
+                            ink: '#0E1F16',
+                            fog: '#F5F3EE'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui'],
+                        display: ['Poppins', 'Inter']
+                    },
+                    boxShadow: {
+                        soft: '0 6px 24px rgba(0,0,0,.06)'
+                    },
+                    borderRadius: { xl2: '1.25rem' }
+                }
+            }
+        }
+    </script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        :root {
+            --fp-green: #1D6B3A;
+            --fp-green2: #2F9D57;
+            --fp-orange: #F57C00;
+            --fp-ink: #0E1F16;
+            --fp-fog: #F5F3EE;
+            --shadow: 0 6px 24px rgba(0, 0, 0, .06);
+            --radius: 20px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+            padding: .75rem 1.25rem;
+            border-radius: var(--radius);
+            background: var(--fp-green);
+            color: #fff;
+            font-weight: 600;
+            transition: .2s ease;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            opacity: .95
+        }
+
+        .btn:active {
+            opacity: .9
+        }
+
+        .btn-outline {
+            background: #fff;
+            color: var(--fp-green);
+            border: 1px solid var(--fp-green);
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            padding: .35rem .7rem;
+            border-radius: 999px;
+            font-size: .75rem;
+            font-weight: 600;
+            background: rgba(29, 107, 58, .10);
+            color: var(--fp-green);
+        }
+
+        .container-edge {
+            max-width: 72rem;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            transition: .2s ease;
+        }
+    </style>
+
+</head>
+
+<body class="bg-fp-fog text-fp-ink font-sans">
+    <!-- Header -->
+    <header class="bg-white/80 backdrop-blur sticky top-0 z-50 border-b border-black/5">
+        <div class="container-edge flex items-center justify-between h-16">
+            <a href="/" class="flex items-center gap-3">
+                <img src="/assets/logo.png" alt="FitPoint Fitness" class="h-10 w-30  rounded-full" />
+                <span class="font-display text-xl font-bold tracking-tight">FitPoint <span
+                        class="text-fp-green">Fitness</span></span>
+            </a>
+            <nav class="hidden md:flex items-center gap-6 text-sm">
+                <a href="/cardapio.html" class="hover:text-fp-green flex items-center gap-1">
+                     Cardápio
+                </a>
+                <a href="/receitas.html" class="hover:text-fp-green flex items-center gap-1">
+                     Receitas
+                </a>
+                <a href="/sobre.html" class="hover:text-fp-green flex items-center gap-1">
+                     Sobre
+                </a>
+                <a href="/contato.html" class="hover:text-fp-green flex items-center gap-1">
+                     Contato
+                </a>
+                <a href="/cardapio.html" class="btn"><i data-lucide="shopping-bag"></i> Ver Cardápio</a>
+            </nav>
+
+            <a href="/cardapio.html" class="md:hidden btn">Cardápio</a>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="container-edge py-14 md:py-20 grid md:grid-cols-2 gap-10 items-center">
+        <div>
+            <div class="chip mb-4">Saúde • Bem-estar • Treino</div>
+            <h1 class="font-display text-4xl md:text-5xl font-bold leading-tight">
+                Lanches proteicos & bebidas funcionais
+                <span class="text-fp-green">para seu dia</span>
+            </h1>
+            <p class="mt-4 text-lg text-black/70">
+                Energia, praticidade e sabor. Conheça nossos hits como <b>Hype Drink</b> e <b>Sunset Detox</b>.
+            </p>
+            <div class="mt-8 flex flex-wrap gap-3">
+                <a class="btn" href="/cardapio.html">
+                    <i data-lucide="utensils"></i> Ver Cardápio
+                </a>
+                <a class="btn btn-outline" href="/receitas.html">
+                    <i data-lucide="book-open"></i> Receitas
+                </a>
+            </div>
+
+        </div>
+        <div class="relative">
+            <img src="/assets/banner-cardapio.png" alt="Bebidas e lanches FitPoint"
+                class="rounded-xl2 shadow-soft w-full max-w-[408px] h-auto mx-auto md:mx-0" />
+            <div class="absolute -bottom-4 -left-4 bg-white rounded-2xl shadow-soft p-4">
+                <p class="font-display text-lg">Mais vendidos</p>
+                <div id="home-best" class="mt-2 text-sm text-black/70">Carregando…</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Benefícios -->
+    <section class="bg-white border-y border-black/5">
+        <div class="container-edge py-12 grid md:grid-cols-3 gap-8">
+            <div class="p-6 rounded-2xl" style="background:rgba(29,107,58,.08)">
+                <p class="font-display text-lg flex items-center gap-2">
+                    <i data-lucide="dumbbell"></i> Proteína de qualidade
+                </p>
+                <p class="text-black/70 mt-2">Opções para saciedade e recuperação muscular.</p>
+            </div>
+            <div class="p-6 rounded-2xl" style="background:rgba(245,124,0,.08)">
+                <p class="font-display text-lg flex items-center gap-2">
+                    <i data-lucide="bolt"></i> Energia inteligente
+                </p>
+                <p class="text-black/70 mt-2">Cafeína na medida certa e bons ingredientes.</p>
+            </div>
+            <div class="card p-6">
+                <p class="font-display text-lg flex items-center gap-2">
+                    <i data-lucide="clock"></i> Praticidade
+                </p>
+                <p class="text-black/70 mt-2">Pronto pra levar e incluir na rotina.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Receitas -->
+    <section class="container-edge py-14 text-center">
+        <h2 class="font-display text-3xl font-bold">Receitas FitPoint</h2>
+        <p class="text-black/70 mt-2">Passo a passo simples, fotos e dicas.</p>
+        <a class="btn mt-6" href="/receitas.html">Ver receitas</a>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-black/5">
+        <div class="container-edge py-8 flex flex-col md:flex-row items-center justify-between gap-4">
+            <p class="text-sm">© <span id="y"></span> FitPoint Fitness — saúde & bem-estar</p>
+            <div class="flex gap-4 text-sm">
+                <a class="hover:text-fp-green" href="/cardapio.html">Cardápio</a>
+                <a class="hover:text-fp-green" href="/sobre.html">Sobre</a>
+                <a class="hover:text-fp-green" href="/contato.html">Contato</a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="/js/app.js"></script>
+    <script>document.getElementById('y').textContent = new Date().getFullYear();</script>
+</body>
+
+</html>
+

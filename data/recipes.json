@@ -1,0 +1,85 @@
+[
+  {
+    "slug": "escondidinho-de-frango-fit",
+    "title": "Escondidinho de Frango Fit",
+    "image": "/assets/escondidinho.jpg",
+    "time": 25,
+    "servings": 1,
+    "kcal": 290,
+    "protein_g": 30,
+    "steps": [
+      "Pré-aqueça a Air Fryer.",
+      "Leve por 25 min e sirva."
+    ],
+    "tips": [
+      "Pode marcar a gente no Instagram!"
+    ]
+  },
+  {
+    "slug": "hype-drink",
+    "title": "Hype Drink",
+    "image": "/assets/hype.png",
+    "time": 5,
+    "servings": 1,
+    "kcal": 15,
+    "protein_g": 0,
+    "steps": [
+      "Misture os ingredientes e sirva gelado."
+    ],
+    "tips": [
+      "Consumir pela manhã para mais energia."
+    ]
+  },
+  {
+    "slug": "bolo-de-pote",
+    "title": "Bolo de pote Proteico",
+    "image": "/assets/bolo-de-pote.png",
+    "time": 25,
+    "servings": 1,
+    "kcal": 240,
+    "protein_g": 28,
+    "steps": [],
+    "tips": [
+      "Pode marcar a gente no Instagram!"
+    ]
+  },
+  {
+    "slug": "pao-de-mel",
+    "title": "Pão de Mel Proteico",
+    "image": "/assets/pao-de-mel.png",
+    "time": 40,
+    "servings": 1,
+    "kcal": 30,
+    "protein_g": 8,
+    "steps": [],
+    "tips": [
+      "Pode marcar a gente no Instagram!"
+    ]
+  },
+  {
+    "slug": "trufas-fit",
+    "title": "Trufa",
+    "image": "/assets/trufa.png",
+    "time": 30,
+    "servings": 4,
+    "kcal": 90,
+    "protein_g": 6,
+    "steps": [],
+    "tips": [
+      "Pode marcar a gente no Instagram!"
+    ]
+  },
+  {
+    "slug": "pizza-fit",
+    "title": "Pizza Fit",
+    "image": "/assets/pizza.png",
+    "time": 25,
+    "servings": 1,
+    "kcal": 180,
+    "protein_g": 22,
+    "steps": [],
+    "tips": [
+      "Pode marcar a gente no Instagram!"
+    ]
+  }
+]

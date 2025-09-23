@@ -1,0 +1,74 @@
+[
+  {
+    "id": "hype-1",
+    "name": "Hype Drink (1L)",
+    "price": 25.00,
+    "category": "Bebida",
+    "tags": ["Mais vendido","Energia"],
+    "image": "/assets/hype.png",
+    "active": true
+  },
+  {
+    "id": "sunset-1",
+    "name": "Sunset Detox (1L)",
+    "price": 23.00,
+    "category": "Bebida",
+    "tags": ["Detox", "Fibras"],
+    "image": "/assets/sunset.png",
+    "active": true
+  },
+  {
+    "id": "sanduiche-1",
+    "name": "Sanduíche FitPoint",
+    "price": 6.00,
+    "category": "Lanche",
+    "tags": ["Proteico", "Baixa Caloria"],
+    "image": "/assets/sanduiche.png",
+    "active": true
+  },
+  {
+    "id": "pizza-1",
+    "name": "Pizza",
+    "price": 21.00,
+    "category": "Lanche",
+    "tags": ["Proteico", "Vitaminas", "Baixa Caloria"],
+    "image": "/assets/pizza.png",
+    "active": true
+  },
+  {
+    "id": "bolo-de-pote-1",
+    "name": "Bolo de Pote",
+    "price": 17.00,
+    "category": "Lanche",
+    "tags": ["Proteico", "Vitaminas", "Baixa Caloria"],
+    "image": "/assets/bolo-de-pote.png",
+    "active": true
+  },
+  {
+    "id": "trufa-1",
+    "name": "Kit 4 Trufas Point",
+    "price": 10.00,
+    "category": "Lanche",
+    "tags": ["Proteico", "Baixa Caloria"],
+    "image": "/assets/trufa.png",
+    "active": true
+  },
+  {
+    "id": "sanduba-1",
+    "name": "Sanduba Natural",
+    "price": 8.50,
+    "category": "Lanche",
+    "tags": ["Proteico", "Baixa Caloria"],
+    "image": "/assets/sanduba.png",
+    "active": true
+  },
+  {
+    "id": "pao-de-mel-1",
+    "name": "Pão de Mel Proteico",
+    "price": 4.50,
+    "category": "Lanche",
+    "tags": ["Proteico", "Baixa Caloria"],
+    "image": "/assets/pao-de-mel.png",
+    "active": true
+  }
+]

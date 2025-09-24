@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Localização — FitPoint Fitness</title>
+    <link rel="icon" type="image/png" href="/assets/logo.png">
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+ <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        fp: {
+                            green: '#1D6B3A',
+                            green2: '#2F9D57',
+                            orange: '#F57C00',
+                            ink: '#0E1F16',
+                            fog: '#F5F3EE'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui'],
+                        display: ['Poppins', 'Inter']
+                    },
+                    boxShadow: {
+                        soft: '0 6px 24px rgba(0,0,0,.06)'
+                    },
+                    borderRadius: { xl2: '1.25rem' }
+                }
+            }
+        }
+    </script>
+
+  <!-- Ícones -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+     :root {
+            --fp-green: #1D6B3A;
+            --fp-green2: #2F9D57;
+            --fp-orange: #F57C00;
+            --fp-ink: #0E1F16;
+            --fp-fog: #F5F3EE;
+            --shadow: 0 6px 24px rgba(0, 0, 0, .06);
+            --radius: 20px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+            padding: .75rem 1.25rem;
+            border-radius: var(--radius);
+            background: var(--fp-green);
+            color: #fff;
+            font-weight: 600;
+            transition: .2s ease;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            opacity: .95
+        }
+
+        .btn:active {
+            opacity: .9
+        }
+
+        .btn-outline {
+            background: #fff;
+            color: var(--fp-green);
+            border: 1px solid var(--fp-green);
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            padding: .35rem .7rem;
+            border-radius: 999px;
+            font-size: .75rem;
+            font-weight: 600;
+            background: rgba(29, 107, 58, .10);
+            color: var(--fp-green);
+        }
+
+        .container-edge {
+            max-width: 72rem;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            transition: .2s ease;
+        }
+    #map{ width:100%; height:420px; border-radius:var(--radius); }
+    @media (min-width:1024px){ #map{ height:520px; } }
+  </style>
+</head>
+<body class="bg-fp-fog text-fp-ink font-sans">
+  <!-- Header simples -->
+ <header class="bg-white/80 backdrop-blur sticky top-0 z-50 border-b border-black/5">
+  <div class="container-edge flex items-center justify-between h-16">
+    <a href="/" class="flex items-center gap-3">
+      <img src="/assets/logo.png" alt="FitPoint Fitness" class="h-10 w-30  rounded-full" />
+      <span class="font-display text-xl font-bold tracking-tight">FitPoint <span class="text-fp-green">Fitness</span></span>
+    </a>
+    <nav class="hidden md:flex items-center gap-6 text-sm">
+      <a href="/" class="hover:text-fp-green flex items-center gap-1" data-nav="home">
+                    Inicio
+                </a>
+                 <!-- <a href="/cardapio.html" class="hover:text-fp-green flex items-center gap-1" data-nav="menu">
+                    Cardápio
+                </a> -->
+      <a href="/receitas.html" class="hover:text-fp-green flex items-center gap-1" data-nav="recipes">
+        Receitas
+      </a>
+      <a href="/sobre.html" class="hover:text-fp-green flex items-center gap-1" data-nav="about">
+        Sobre
+      </a>
+      <a href="/contato.html" class="hover:text-fp-green flex items-center gap-1" data-nav="contact">
+        Contato
+      </a>
+      <a href="/cardapio.html" class="btn"><i data-lucide="shopping-bag"></i> Ver Cardápio</a>
+    </nav>
+    <div class="flex items-center gap-2 md:hidden">
+      <button id="mobile-menu-toggle" type="button" class="inline-flex items-center justify-center h-11 w-11 rounded-full border border-black/10 bg-white text-fp-ink shadow-soft" aria-label="Abrir menu" aria-controls="mobile-menu" aria-expanded="false">
+        <i data-lucide="menu"></i>
+      </button>
+    </div>
+  </div>
+</header>
+<div id="mobile-menu" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-200" data-menu-overlay data-menu-close></div>
+  <nav class="absolute top-0 right-0 h-full w-72 max-w-[80vw] bg-white shadow-soft p-6 flex flex-col gap-6 translate-x-full transition-transform duration-200" data-menu-panel aria-label="Menu mobile">
+    <div class="flex items-center justify-between">
+      <span class="font-display text-xl font-bold text-fp-ink">Menu</span>
+      <button type="button" class="inline-flex items-center justify-center h-9 w-9 rounded-full border border-black/10 bg-white text-fp-ink" data-menu-close aria-label="Fechar menu">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+    <div class="flex flex-col gap-4 text-base text-fp-ink">
+      <a href="/" class="flex items-center gap-2" data-menu-close data-nav="home">
+        Início
+      </a>
+      <a href="/cardapio.html" class="flex items-center gap-2" data-menu-close data-nav="menu">
+        Cardápio
+      </a>
+      <a href="/receitas.html" class="flex items-center gap-2" data-menu-close data-nav="recipes">
+        Receitas
+      </a>
+      <a href="/sobre.html" class="flex items-center gap-2" data-menu-close data-nav="about">
+        Sobre
+      </a>
+      <a href="/contato.html" class="flex items-center gap-2" data-menu-close data-nav="contact">
+        Contato
+      </a>
+    </div>
+  </nav>
+</div>
+
+  <!-- Conteúdo -->
+  <main class="max-w-6xl mx-auto px-4 py-10 space-y-8">
+    <section class="space-y-2">
+      <h1 class="font-display text-3xl font-bold flex items-center gap-2">
+        <i data-lucide="map-pin"></i> Localização
+      </h1>
+      <p class="text-black/70">Veja nossas unidades no mapa e trace a rota até a mais próxima.</p>
+    </section>
+
+    <!-- Mapa -->
+    <section class="card overflow-hidden">
+      <div id="map"></div>
+    </section>
+
+    <!-- Lista de unidades (CTA “Como chegar”) -->
+    <section class="grid md:grid-cols-2 gap-6">
+      <article class="card p-5">
+        <h2 class="font-semibold text-lg flex items-center gap-2">
+          <i data-lucide="building-2"></i> Fit Point Fitness - Vila Bethania
+        </h2>
+        <p class="text-sm text-black/70 mt-1">R. Cel. Nunes Ferreira, 84 — Vila Bethania, Viana/ES</p>
+        <div class="mt-4 flex flex-wrap gap-3">
+          <a id="btn-route-1" class="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-fp-green text-white font-medium" target="_blank">
+            <i data-lucide="route"></i> Como chegar
+          </a>
+          <a id="btn-view-1"  class="inline-flex items-center gap-2 px-4 py-2 rounded-2xl border border-fp-green text-fp-green font-medium" target="_blank">
+            <i data-lucide="map"></i> Ver no Maps
+          </a>
+        </div>
+      </article>
+
+      <article class="card p-5">
+        <h2 class="font-semibold text-lg flex items-center gap-2">
+          <i data-lucide="building-2"></i> Fit Point Fitness - Vista Dourada
+        </h2>
+        <p class="text-sm text-black/70 mt-1">Av. Moxuara, 2549 — Vista Dourada, Cariacica/ES</p>
+        <div class="mt-4 flex flex-wrap gap-3">
+          <a id="btn-route-2" class="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-fp-green text-white font-medium" target="_blank">
+            <i data-lucide="route"></i> Como chegar
+          </a>
+          <a id="btn-view-2"  class="inline-flex items-center gap-2 px-4 py-2 rounded-2xl border border-fp-green text-fp-green font-medium" target="_blank">
+            <i data-lucide="map"></i> Ver no Maps
+          </a>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <footer class="bg-white border-t border-black/5">
+    <div class="max-w-6xl mx-auto px-4 py-8 text-sm">© <span id="y"></span> FitPoint Fitness</div>
+  </footer>
+
+  <!-- Script da página -->
+  <script>
+    // 1) Cadastre aqui as coordenadas (lat, lng) e place_id (opcional) de cada unidade.
+    //    Dica: no Google Maps, clique com botão direito no ponto e copie as coordenadas.
+    const LOCATIONS = [
+      {
+        name: 'Fit Point Fitness - Vila Bethania', 
+        lat: -20.360618, lng: -40.405477, // EXEMPLO: ajuste para sua unidade
+        placeId: null,                 // opcional: "ChIJxxxxxxxxxxxx"
+        addr: 'R. Cel. Nunes Ferreira, 84 — Vila Bethania, Viana/ES',
+        routeBtn: 'btn-route-1',
+        viewBtn: 'btn-view-1'
+      },
+      {
+        name: 'Fit Point Fitness - Vista Dourada',
+        lat: -20.332230, lng: -40.426799, // EXEMPLO: ajuste para sua unidade
+        placeId: null,
+        addr: 'Av. Moxuara, 2549 — Vista Dourada, Cariacica/ES',
+        routeBtn: 'btn-route-2',
+        viewBtn: 'btn-view-2'
+      }
+    ];
+
+    // 2) Estilo do mapa combinando a paleta FitPoint (opcional)
+    const MAP_STYLE = [
+      { elementType: 'geometry', stylers: [{color: '#ebe3cd'}] },
+      { elementType: 'labels.text.fill', stylers: [{color: '#523735'}] },
+      { elementType: 'labels.text.stroke', stylers: [{color: '#f5f1e6'}] },
+      { featureType: 'poi.park', elementType: 'geometry', stylers: [{color: '#e6f2ea'}] },
+      { featureType: 'water', elementType: 'geometry.fill', stylers: [{color: '#c9e7e4'}] },
+      { featureType: 'road', elementType: 'geometry', stylers: [{color: '#f5f1e6'}] },
+      { featureType: 'road.arterial', elementType: 'geometry', stylers: [{color: '#fdfcf8'}] },
+      { featureType: 'poi.business', stylers: [{visibility:'off'}] }
+    ];
+
+    // 3) Inicializa o mapa (chamada pelo callback do script do Google)
+    function initMap(){
+      const bounds = new google.maps.LatLngBounds();
+      const map = new google.maps.Map(document.getElementById('map'), {
+        center: {lat: LOCATIONS[0].lat, lng: LOCATIONS[0].lng},
+        zoom: 13,
+        styles: MAP_STYLE,
+        mapTypeControl: false,
+        streetViewControl: false
+      });
+
+      const info = new google.maps.InfoWindow();
+
+      LOCATIONS.forEach((loc, i) => {
+        const marker = new google.maps.Marker({
+          position: {lat: loc.lat, lng: loc.lng},
+          map,
+          title: loc.name,
+          // Ícone com cor verde FitPoint (SVG)
+          icon: {
+            url: 'data:image/svg+xml;utf8,' + encodeURIComponent(`
+              <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40">
+                <path fill="#1D6B3A" d="M20 0C11.16 0 4 7.16 4 16c0 11.2 16 24 16 24s16-12.8 16-24C36 7.16 28.84 0 20 0z"/>
+                <circle cx="20" cy="16" r="6" fill="#fff"/>
+              </svg>
+            `),
+            scaledSize: new google.maps.Size(36, 36),
+            anchor: new google.maps.Point(18, 36)
+          }
+        });
+
+        marker.addListener('click', () => {
+          info.setContent(`
+            <div style="font-family:Inter,system-ui">
+              <strong>${loc.name}</strong><br/>
+              <small>${loc.addr || ''}</small><br/>
+              <a href="https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}" target="_blank">Como chegar</a>
+            </div>
+          `);
+          info.open(map, marker);
+        });
+
+        bounds.extend(marker.getPosition());
+
+        // Botões “Como chegar” e “Ver no Maps”
+        const route = document.getElementById(loc.routeBtn);
+        if(route){
+          route.href = `https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`;
+        }
+        const view = document.getElementById(loc.viewBtn);
+        if(view){
+          view.href = loc.placeId
+            ? `https://www.google.com/maps/place/?q=place_id:${loc.placeId}`
+            : `https://www.google.com/maps/search/?api=1&query=${loc.lat},${loc.lng}`;
+        }
+      });
+
+      // Ajusta o zoom para mostrar todos os marcadores
+      map.fitBounds(bounds);
+    }
+
+    // Exponha o initMap no escopo global (necessário para o callback do Google)
+    window.initMap = initMap;
+
+    // Atualiza ícones Lucide
+    document.addEventListener('DOMContentLoaded', () => {
+      try{ window.lucide && window.lucide.createIcons(); }catch(e){}
+      document.getElementById('y').textContent = new Date().getFullYear();
+    });
+  </script>
+
+  <!-- Google Maps JS API
+       SUBSTITUA "YOUR_API_KEY" pela sua chave (restringida por domínio).
+       Libraries opcionais (places) caso use Place Details depois. -->
+  <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCZg1y5LghtaMY5ZL44Jkouy4P2skJMVDc&callback=initMap">
+  </script>
+</body>
+</html>

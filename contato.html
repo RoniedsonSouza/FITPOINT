@@ -1,36 +1,39 @@
 <!doctype html>
 <html lang="pt-BR">
+
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Contato — FitPoint Fitness</title>
-    <link rel="icon" type="image/png" href="/assets/logo.png">
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Contato — FitPoint Fitness</title>
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500&display=swap"
+    rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        fp: {
-                            green: '#1D6B3A',
-                            green2: '#2F9D57',
-                            orange: '#F57C00',
-                            ink: '#0E1F16',
-                            fog: '#F5F3EE'
-                        }
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'system-ui'],
-                        display: ['Poppins', 'Inter']
-                    },
-                    boxShadow: {
-                        soft: '0 6px 24px rgba(0,0,0,.06)'
-                    },
-                    borderRadius: { xl2: '1.25rem' }
-                }
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            fp: {
+              green: '#1D6B3A',
+              green2: '#2F9D57',
+              orange: '#F57C00',
+              ink: '#0E1F16',
+              fog: '#F5F3EE'
             }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui'],
+            display: ['Poppins', 'Inter']
+          },
+          boxShadow: {
+            soft: '0 6px 24px rgba(0,0,0,.06)'
+          },
+          borderRadius: { xl2: '1.25rem' }
         }
-    </script>
+      }
+    }
+  </script>
   <style>
     :root {
       --fp-green: #1D6B3A;
@@ -103,54 +106,137 @@
     }
   </style>
 </head>
-<body class="bg-fp-fog text-fp-ink font-sans">
 
-      <header class="bg-white/80 backdrop-blur sticky top-0 z-50 border-b border-black/5">
-        <div class="container-edge flex items-center justify-between h-16">
-            <a href="/" class="flex items-center gap-3">
-                <img src="/assets/logo.png" alt="FitPoint Fitness" class="h-10 w-30  rounded-full" />
-                <span class="font-display text-xl font-bold tracking-tight">FitPoint <span
-                        class="text-fp-green">Fitness</span></span>
-            </a>
-            <nav class="hidden md:flex items-center gap-6 text-sm">
-                <a href="/cardapio.html" class="hover:text-fp-green flex items-center gap-1">
-                     Cardápio
-                </a>
-                <a href="/receitas.html" class="hover:text-fp-green flex items-center gap-1">
-                     Receitas
-                </a>
-                <a href="/sobre.html" class="hover:text-fp-green flex items-center gap-1">
-                     Sobre
-                </a>
-                <a href="/contato.html" class="hover:text-fp-green flex items-center gap-1">
-                     Contato
-                </a>
-                <a href="/cardapio.html" class="btn"><i data-lucide="shopping-bag"></i> Ver Cardápio</a>
-            </nav>
+<body class="bg-fp-fog text-fp-ink font-sans" data-page="contact">
 
-            <a href="/cardapio.html" class="md:hidden btn">Cardápio</a>
-        </div>
-    </header>
+  <header class="bg-white/80 backdrop-blur sticky top-0 z-50 border-b border-black/5">
+    <div class="container-edge flex items-center justify-between h-16">
+      <a href="/" class="flex items-center gap-3">
+        <img src="/assets/logo.png" alt="FitPoint Fitness" class="h-10 w-30  rounded-full" />
+        <span class="font-display text-xl font-bold tracking-tight">FitPoint <span
+            class="text-fp-green">Fitness</span></span>
+      </a>
+      <nav class="hidden md:flex items-center gap-6 text-sm">
+        <a href="/cardapio.html" class="hover:text-fp-green flex items-center gap-1" data-nav="menu">
+          Cardápio
+        </a>
+        <a href="/receitas.html" class="hover:text-fp-green flex items-center gap-1" data-nav="recipes">
+          Receitas
+        </a>
+        <a href="/sobre.html" class="hover:text-fp-green flex items-center gap-1" data-nav="about">
+          Sobre
+        </a>
+        <a href="/contato.html" class="hover:text-fp-green flex items-center gap-1" data-nav="contact">
+          Contato
+        </a>
+        <a href="/cardapio.html" class="btn"><i data-lucide="shopping-bag"></i> Ver Cardápio</a>
+      </nav>
+      <div class="flex items-center gap-2 md:hidden">
+        <button id="mobile-menu-toggle" type="button"
+          class="inline-flex items-center justify-center h-11 w-11 rounded-full border border-black/10 bg-white text-fp-ink shadow-soft"
+          aria-label="Abrir menu" aria-controls="mobile-menu" aria-expanded="false">
+          <i data-lucide="menu"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+  <div id="mobile-menu" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-200" data-menu-overlay
+      data-menu-close></div>
+    <nav
+      class="absolute top-0 right-0 h-full w-72 max-w-[80vw] bg-white shadow-soft p-6 flex flex-col gap-6 translate-x-full transition-transform duration-200"
+      data-menu-panel aria-label="Menu mobile">
+      <div class="flex items-center justify-between">
+        <span class="font-display text-xl font-bold text-fp-ink">Menu</span>
+        <button type="button"
+          class="inline-flex items-center justify-center h-9 w-9 rounded-full border border-black/10 bg-white text-fp-ink"
+          data-menu-close aria-label="Fechar menu">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="flex flex-col gap-4 text-base text-fp-ink">
+        <a href="/" class="flex items-center gap-2" data-menu-close data-nav="home">
+          Início
+        </a>
+        <a href="/cardapio.html" class="flex items-center gap-2" data-menu-close data-nav="menu">
+          Cardápio
+        </a>
+        <a href="/receitas.html" class="flex items-center gap-2" data-menu-close data-nav="recipes">
+          Receitas
+        </a>
+        <a href="/sobre.html" class="flex items-center gap-2" data-menu-close data-nav="about">
+          Sobre
+        </a>
+        <a href="/contato.html" class="flex items-center gap-2" data-menu-close data-nav="contact">
+          Contato
+        </a>
+      </div>
+    </nav>
+  </div>
 
 
-  
+
   <main class="max-w-xl mx-auto px-4 py-16 text-center space-y-4">
     <img src="/assets/logo.png" class="h-16 mx-auto" alt="">
     <h1 class="text-3xl font-bold">Fale com a gente</h1>
-    <a class="inline-block px-5 py-3 rounded-2xl bg-[#1D6B3A] text-white" href="https://wa.me/5527992865962" target="_blank">WhatsApp</a>
-    <a class="inline-block px-5 py-3 rounded-2xl border border-[#1D6B3A] text-[#1D6B3A]" href="https://instagram.com/f_itpoint" target="_blank">Instagram</a>
+    <a class="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#1D6B3A] text-white"
+      href="https://wa.me/5527992865962" target="_blank"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
+        fill="currentColor" viewBox="0 0 448 512">
+        <path d="M380.9 97.1C339 55.1 283.2 32 224.6 32c-118.7 0-215 96.2-215 215 
+  0 37.9 9.9 74.8 28.6 107.1L0 480l129.5-37.2c31.3 17.1 66.7 26.1 103.1 
+  26.1h.1c118.6 0 214.8-96.2 214.8-215 0-58.6-23-114.4-66-157.5zm-156.3 
+  341.5c-30.9 0-61.1-8.2-87.5-23.7l-6.3-3.7-76.8 22.1 
+  22.9-74.8-4.1-6.4c-18-28.5-27.5-61.4-27.5-95.3 
+  0-98.1 79.8-177.9 177.9-177.9 47.5 0 92.1 18.5 
+  125.6 52s52 78 52 125.6c0 98.1-79.8 177.9-177.9 
+  177.9zm97.2-133.1c-5.3-2.6-31.4-15.4-36.3-17.1-4.9-1.8-8.4-2.6-12 
+  2.6s-13.7 17.1-16.8 20.6c-3.1 3.5-6.2 3.9-11.5 
+  1.3-31.4-15.7-52-28-73-63.6-5.5-9.5 5.5-8.8 
+  15.7-29.4 1.8-3.5.9-6.6-.4-9.2-1.3-2.6-12-28.9-16.5-39.6-4.3-10.3-8.7-8.9-12-9.1-3.1-.2-6.6-.2-10.1-.2s-9.2 
+  1.3-14 6.6c-4.8 5.3-18.3 17.8-18.3 43.4s18.7 
+  50.3 21.3 53.8c2.6 3.5 36.6 55.9 88.7 
+  78.4 12.4 5.4 22.1 8.6 29.6 11 12.4 3.9 
+  23.7 3.4 32.6 2.1 10-1.5 31.4-12.8 
+  35.8-25.2 4.4-12.4 4.4-23 3.1-25.2-1.3-2.1-4.9-3.5-10.2-6.1z" />
+      </svg>
+      WhatsApp</a>
+    <a class="inline-flex items-center gap-2 px-4 py-2 rounded-2xl border border-[#1D6B3A] text-[#1D6B3A]"
+      href="https://instagram.com/f_itpoint" target="_blank"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
+        fill="currentColor" viewBox="0 0 448 512">
+        <path d="M224.1 141c-63.6 0-114.9 51.3-114.9 
+  114.9S160.5 370.8 224.1 370.8 
+  339 319.5 339 255.9 287.7 141 
+  224.1 141zm0 190.7c-41.9 
+  0-75.8-33.9-75.8-75.8s33.9-75.8 
+  75.8-75.8 75.8 33.9 75.8 
+  75.8-33.9 75.8-75.8 75.8zm146.4-194.3c0 
+  14.9-12 26.8-26.8 
+  26.8-14.9 0-26.8-12-26.8-26.8 
+  s12-26.8 26.8-26.8c14.8 
+  0 26.8 12 26.8 26.8zm76.1 
+  27.2c-1.7-35.9-9.9-67.7-36.2-93.9S360.5 
+  7.4 324.6 5.7c-35.9-1.7-143.5-1.7-179.4 
+  0-35.9 1.7-67.7 9.9-93.9 
+  36.2S7.4 119.5 5.7 155.4c-1.7 
+  35.9-1.7 143.5 0 179.4 1.7 
+  35.9 9.9 67.7 36.2 93.9s58 34.5 
+  93.9 36.2c35.9 1.7 143.5 1.7 
+  179.4 0 35.9-1.7 67.7-9.9 93.9-36.2 
+  26.3-26.2 34.5-58 36.2-93.9 
+  1.7-35.9 1.7-143.5 0-179.4zM398.8 
+  388c-7.8 19.6-22.9 34.7-42.6 
+  42.6-29.5 11.7-99.5 9-132.1 
+  9s-102.7 2.6-132.1-9c-19.6-7.8-34.7-22.9-42.6-42.6-11.7-29.5-9-99.5-9-132.1s-2.6-102.7 
+  9-132.1c7.8-19.6 22.9-34.7 42.6-42.6 
+  29.5-11.7 99.5-9 132.1-9s102.7-2.6 
+  132.1 9c19.6 7.8 34.7 22.9 42.6 
+  42.6 11.7 29.5 9 99.5 9 
+  132.1s2.7 102.7-9 132.1z" />
+      </svg>
+      Instagram</a>
     <!-- <p class="text-sm text-black/60">Endereço e horário (estático) aqui.</p> -->
   </main>
   <script src="/js/app.js"></script>
 </body>
+
 </html>
-
-
-
-
-
-
-
-
-
-

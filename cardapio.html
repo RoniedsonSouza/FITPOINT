@@ -111,31 +111,64 @@
 
 <body class="bg-fp-fog text-fp-ink font-sans" data-page="menu">
   <header class="bg-white/80 backdrop-blur sticky top-0 z-50 border-b border-black/5">
-    <div class="container-edge flex items-center justify-between h-16">
-      <a href="/" class="flex items-center gap-3">
-        <img src="/assets/logo.png" alt="FitPoint Fitness" class="h-10 w-30  rounded-full" />
-        <span class="font-display text-xl font-bold tracking-tight">FitPoint <span
-            class="text-fp-green">Fitness</span></span>
+  <div class="container-edge flex items-center justify-between h-16">
+    <a href="/" class="flex items-center gap-3">
+      <img src="/assets/logo.png" alt="FitPoint Fitness" class="h-10 w-30  rounded-full" />
+      <span class="font-display text-xl font-bold tracking-tight">FitPoint <span class="text-fp-green">Fitness</span></span>
+    </a>
+    <nav class="hidden md:flex items-center gap-6 text-sm">
+      <a href="/" class="hover:text-fp-green flex items-center gap-1" data-nav="home">
+                    Inicio
+                </a>
+                 <!-- <a href="/cardapio.html" class="hover:text-fp-green flex items-center gap-1" data-nav="menu">
+                    Cardápio
+                </a> -->
+      <a href="/receitas.html" class="hover:text-fp-green flex items-center gap-1" data-nav="recipes">
+        Receitas
       </a>
-      <nav class="hidden md:flex items-center gap-6 text-sm">
-        <a href="/cardapio.html" class="hover:text-fp-green flex items-center gap-1">
-          Cardápio
-        </a>
-        <a href="/receitas.html" class="hover:text-fp-green flex items-center gap-1">
-          Receitas
-        </a>
-        <a href="/sobre.html" class="hover:text-fp-green flex items-center gap-1">
-          Sobre
-        </a>
-        <a href="/contato.html" class="hover:text-fp-green flex items-center gap-1">
-          Contato
-        </a>
-        <a href="/cardapio.html" class="btn"><i data-lucide="shopping-bag"></i> Ver Cardápio</a>
-      </nav>
-
-      <a href="/cardapio.html" class="md:hidden btn">Cardápio</a>
+      <a href="/sobre.html" class="hover:text-fp-green flex items-center gap-1" data-nav="about">
+        Sobre
+      </a>
+      <a href="/contato.html" class="hover:text-fp-green flex items-center gap-1" data-nav="contact">
+        Contato
+      </a>
+      <a href="/cardapio.html" class="btn"><i data-lucide="shopping-bag"></i> Ver Cardápio</a>
+    </nav>
+    <div class="flex items-center gap-2 md:hidden">
+      <button id="mobile-menu-toggle" type="button" class="inline-flex items-center justify-center h-11 w-11 rounded-full border border-black/10 bg-white text-fp-ink shadow-soft" aria-label="Abrir menu" aria-controls="mobile-menu" aria-expanded="false">
+        <i data-lucide="menu"></i>
+      </button>
     </div>
-  </header>
+  </div>
+</header>
+<div id="mobile-menu" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-200" data-menu-overlay data-menu-close></div>
+  <nav class="absolute top-0 right-0 h-full w-72 max-w-[80vw] bg-white shadow-soft p-6 flex flex-col gap-6 translate-x-full transition-transform duration-200" data-menu-panel aria-label="Menu mobile">
+    <div class="flex items-center justify-between">
+      <span class="font-display text-xl font-bold text-fp-ink">Menu</span>
+      <button type="button" class="inline-flex items-center justify-center h-9 w-9 rounded-full border border-black/10 bg-white text-fp-ink" data-menu-close aria-label="Fechar menu">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+    <div class="flex flex-col gap-4 text-base text-fp-ink">
+      <a href="/" class="flex items-center gap-2" data-menu-close data-nav="home">
+        Início
+      </a>
+      <a href="/cardapio.html" class="flex items-center gap-2" data-menu-close data-nav="menu">
+        Cardápio
+      </a>
+      <a href="/receitas.html" class="flex items-center gap-2" data-menu-close data-nav="recipes">
+        Receitas
+      </a>
+      <a href="/sobre.html" class="flex items-center gap-2" data-menu-close data-nav="about">
+        Sobre
+      </a>
+      <a href="/contato.html" class="flex items-center gap-2" data-menu-close data-nav="contact">
+        Contato
+      </a>
+    </div>
+  </nav>
+</div>
 
 
   <main class="max-w-6xl mx-auto px-4 py-10">
@@ -164,3 +197,4 @@
 </body>
 
 </html>
+

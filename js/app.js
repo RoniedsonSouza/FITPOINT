@@ -25,6 +25,106 @@ async function loadJSON(path) {
     if (!res.ok) throw new Error(`Falha ao carregar ${path}`);
     return res.json();
 }
+function initMobileMenu(){
+  const toggle = document.getElementById('mobile-menu-toggle');
+  const drawer = document.getElementById('mobile-menu');
+  if (!toggle || !drawer) return;
+  const panel = drawer.querySelector('[data-menu-panel]');
+  const overlay = drawer.querySelector('[data-menu-overlay]');
+  const closers = drawer.querySelectorAll('[data-menu-close]');
+  let isOpen = false;
+  let lastFocused = null;
+  let closeTimeoutId = null;
+
+  const handleKeydown = (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeMenu();
+    }
+  };
+
+  const openMenu = () => {
+    if (isOpen) return;
+    if (closeTimeoutId) {
+      clearTimeout(closeTimeoutId);
+      closeTimeoutId = null;
+    }
+    isOpen = true;
+    lastFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    drawer.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
+    toggle.setAttribute('aria-expanded', 'true');
+    requestAnimationFrame(() => {
+      if (panel) panel.classList.remove('translate-x-full');
+      if (overlay) {
+        overlay.classList.remove('opacity-0');
+        overlay.classList.add('opacity-100');
+      }
+    });
+    const firstFocusable = panel ? panel.querySelector('a,button') : null;
+    if (firstFocusable instanceof HTMLElement) {
+      setTimeout(() => firstFocusable.focus(), 150);
+    }
+    document.addEventListener('keydown', handleKeydown);
+  };
+
+  const finalizeClose = () => {
+    drawer.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
+    if (lastFocused instanceof HTMLElement && document.contains(lastFocused)) {
+      lastFocused.focus({ preventScroll: true });
+    } else {
+      toggle.focus({ preventScroll: true });
+    }
+    lastFocused = null;
+    closeTimeoutId = null;
+  };
+
+  const closeMenu = () => {
+    if (!isOpen) return;
+    isOpen = false;
+    toggle.setAttribute('aria-expanded', 'false');
+    if (panel) panel.classList.add('translate-x-full');
+    if (overlay) {
+      overlay.classList.remove('opacity-100');
+      overlay.classList.add('opacity-0');
+    }
+    document.removeEventListener('keydown', handleKeydown);
+
+    if (panel) {
+      const fallback = setTimeout(() => {
+        finalizeClose();
+      }, 220);
+      closeTimeoutId = fallback;
+      const onTransitionEnd = (event) => {
+        if (event.propertyName !== 'transform') return;
+        clearTimeout(fallback);
+        panel.removeEventListener('transitionend', onTransitionEnd);
+        finalizeClose();
+      };
+      panel.addEventListener('transitionend', onTransitionEnd, { once: true });
+    } else {
+      finalizeClose();
+    }
+  };
+  toggle.addEventListener('click', () => (isOpen ? closeMenu() : openMenu()));
+  closers.forEach(el => el.addEventListener('click', closeMenu));
+}
+
+function highlightActiveNav(){
+  const page = document.body.dataset.page;
+  if (!page) return;
+  $$('[data-nav]').forEach(link => {
+    const isActive = link.dataset.nav === page;
+    link.classList.toggle('text-fp-green', isActive);
+    link.classList.toggle('font-semibold', isActive);
+    if (isActive) {
+      link.setAttribute('aria-current', 'page');
+    } else {
+      link.removeAttribute('aria-current');
+    }
+  });
+}
 
 function renderProductCard(p){
   const image = (p.image && p.image.trim()) ? p.image : FALLBACK_IMAGE;
@@ -132,11 +232,5 @@ async function initRecipes() {
     refreshIcons();
 }
 
-initHome(); initMenu(); initRecipes(); refreshIcons();
-
-
-
-
-
-
+initMobileMenu(); highlightActiveNav(); initHome(); initMenu(); initRecipes(); refreshIcons();
 

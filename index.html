@@ -428,12 +428,30 @@
         });
     </script>
 
-    <!-- Google Maps JS API
-       SUBSTITUA "YOUR_API_KEY" pela sua chave (restringida por domínio).
-       Libraries opcionais (places) caso use Place Details depois. -->
-    <script async defer
-        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCZg1y5LghtaMY5ZL44Jkouy4P2skJMVDc&callback=initMap">
-        </script>
+    <!-- Google Maps JS API - Carregado dinamicamente via API -->
+    <script>
+        // Carrega a chave do Google Maps do backend e inicializa o script
+        (function() {
+            fetch('/api/config/google-maps-key')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.key) {
+                        const script = document.createElement('script');
+                        script.async = true;
+                        script.defer = true;
+                        script.src = `https://maps.googleapis.com/maps/api/js?key=${data.key}&callback=initMap`;
+                        document.head.appendChild(script);
+                    } else {
+                        console.error('Erro ao carregar Google Maps API Key:', data.error);
+                        document.getElementById('map').innerHTML = '<p class="p-4 text-red-600">Erro ao carregar o mapa. Verifique a configuração da API.</p>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar Google Maps API Key:', error);
+                    document.getElementById('map').innerHTML = '<p class="p-4 text-red-600">Erro ao carregar o mapa.</p>';
+                });
+        })();
+    </script>
     <script src="/js/config.js"></script>
     <script src="/js/database.js"></script>
     <script src="/js/app.js"></script>

@@ -106,6 +106,92 @@
       display: block;
       height: auto;
     }
+
+    /* Estilos modernos para inputs, textareas e selects */
+    input:not([type="checkbox"]):not([type="hidden"]), 
+    textarea, 
+    select {
+      width: 100%;
+      padding: 0.875rem 1rem;
+      border: 2px solid #e5e7eb;
+      border-radius: 0.75rem;
+      font-size: 0.9375rem;
+      font-family: inherit;
+      background-color: #ffffff;
+      color: var(--fp-ink);
+      transition: all 0.2s ease;
+      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    }
+
+    input:not([type="checkbox"]):not([type="hidden"]):hover,
+    textarea:hover,
+    select:hover {
+      border-color: #d1d5db;
+      box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.08);
+    }
+
+    input:not([type="checkbox"]):not([type="hidden"]):focus, 
+    textarea:focus, 
+    select:focus {
+      outline: none;
+      border-color: var(--fp-green);
+      box-shadow: 0 0 0 3px rgba(29, 107, 58, 0.1), 0 2px 4px 0 rgba(0, 0, 0, 0.08);
+      background-color: #ffffff;
+    }
+
+    input::placeholder {
+      color: #9ca3af;
+      opacity: 1;
+    }
+
+    /* Select melhorado e moderno */
+    select {
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background-color: #ffffff;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6L8 10L12 6' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-position: right 1.125rem center;
+      background-repeat: no-repeat;
+      background-size: 1rem 1rem;
+      padding: 0.875rem 3rem 0.875rem 1rem;
+      position: relative;
+      min-height: 3rem;
+      font-weight: 500;
+    }
+
+    select:hover {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6L8 10L12 6' stroke='%231D6B3A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      border-color: #d1d5db;
+    }
+
+    select:focus {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6L8 10L12 6' stroke='%231D6B3A' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      border-color: var(--fp-green);
+      box-shadow: 0 0 0 3px rgba(29, 107, 58, 0.1), 0 2px 4px 0 rgba(0, 0, 0, 0.08);
+    }
+
+    /* Opções do select */
+    select option {
+      padding: 0.875rem 1rem;
+      background-color: #ffffff;
+      color: var(--fp-ink);
+      font-weight: 500;
+      border-radius: 0.5rem;
+    }
+
+    select option:first-child {
+      color: #9ca3af;
+      font-weight: 400;
+    }
+
+    select option:checked,
+    select option:focus {
+      background: linear-gradient(to right, rgba(29, 107, 58, 0.1), rgba(29, 107, 58, 0.05));
+      color: var(--fp-green);
+      font-weight: 600;
+    }
   </style>
 </head>
 
@@ -178,10 +264,10 @@
         <p class="text-black/70">Filtre por categoria ou busque pelo nome.</p>
       </div>
       <div class="flex gap-2">
-        <select id="filter-category" class="border rounded-xl px-3 py-2 bg-white">
+        <select id="filter-category">
           <option value="">Todas categorias</option>
         </select>
-        <input id="search" type="search" placeholder="Buscar..." class="border rounded-xl px-3 py-2 bg-white w-56" />
+        <input id="search" type="search" placeholder="Buscar produtos..." style="width: 16rem;" />
       </div>
     </div>
 
@@ -192,6 +278,8 @@
     <div class="max-w-6xl mx-auto px-4 py-8 text-sm">© <span id="y"></span> FitPoint</div>
   </footer>
 
+  <script src="/js/config.js"></script>
+  <script src="/js/database.js"></script>
   <script src="/js/app.js"></script>
   <script>document.getElementById('y').textContent = new Date().getFullYear();</script>
 </body>

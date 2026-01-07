@@ -43,22 +43,18 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Rota para obter Google Maps API Key
+app.get('/api/config/google-maps-key', (req, res) => {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: 'Google Maps API Key não configurada' });
+  }
+  res.json({ key: apiKey });
+});
+
 // Rota raiz
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// Rota para arquivos de extensões do navegador (ignorar erros 404)
-app.get('/static/js/bundle.js', (req, res) => {
-  res.status(204).send(); // No Content - ignora requisição
-});
-
-app.get('/assets/image/favicon-96x96.png', (req, res) => {
-  res.redirect('/assets/logo.png');
-});
-
-app.get('/assets/image/favicon.svg', (req, res) => {
-  res.redirect('/assets/logo.png');
 });
 
 // Rotas para ignorar erros de extensões do navegador

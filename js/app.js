@@ -25,6 +25,34 @@ async function loadJSON(path) {
     if (!res.ok) throw new Error(`Falha ao carregar ${path}`);
     return res.json();
 }
+
+// Função auxiliar para carregar produtos (API REST ou JSON)
+async function loadProductsData() {
+    // Tenta usar API REST primeiro
+    if (typeof DB !== 'undefined') {
+        try {
+            return await DB.getProducts();
+        } catch (e) {
+            console.warn('Erro ao carregar produtos da API, usando JSON', e);
+        }
+    }
+    // Fallback para JSON
+    return await loadJSON('/data/products.json');
+}
+
+// Função auxiliar para carregar receitas (API REST ou JSON)
+async function loadRecipesData() {
+    // Tenta usar API REST primeiro
+    if (typeof DB !== 'undefined') {
+        try {
+            return await DB.getRecipes();
+        } catch (e) {
+            console.warn('Erro ao carregar receitas da API, usando JSON', e);
+        }
+    }
+    // Fallback para JSON
+    return await loadJSON('/data/recipes.json');
+}
 function initMobileMenu(){
   const toggle = document.getElementById('mobile-menu-toggle');
   const drawer = document.getElementById('mobile-menu');
@@ -191,8 +219,8 @@ function refreshIcons() {
 async function initHome() {
     const box = document.getElementById('home-best');
     if (!box) return;
-    const data = await loadJSON('/data/products.json');
-    const best = data.filter(p => p.active).slice(0, 4).map(p => p.name).join(' · ');
+    const data = await loadProductsData();
+    const best = data.filter(p => p.active !== false).slice(0, 4).map(p => p.name).join(' · ');
     box.textContent = best || 'Em breve novidades';
     refreshIcons();
 }
@@ -203,8 +231,9 @@ async function initMenu() {
     const sel = document.querySelector('#filter-category');
     const search = document.querySelector('#search');
 
-    const data = (await loadJSON('/data/products.json')).filter(p => p.active);
-    [...new Set(data.map(p => p.category))].forEach(c => {
+    const data = (await loadProductsData()).filter(p => p.active !== false);
+    const categories = [...new Set(data.map(p => p.category))];
+    categories.forEach(c => {
         sel.insertAdjacentHTML('beforeend', `<option value="${c}">${c}</option>`);
     });
 
@@ -227,7 +256,7 @@ async function initMenu() {
 async function initRecipes() {
     if (document.body.dataset.page !== 'recipes') return;
     const grid = document.querySelector('#recipes-grid');
-    const data = await loadJSON('/data/recipes.json');
+    const data = await loadRecipesData();
     grid.innerHTML = data.map(renderRecipeCard).join('');
     refreshIcons();
 }

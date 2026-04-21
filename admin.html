@@ -520,22 +520,10 @@
     <div class="mb-6 flex justify-between items-center">
       <div>
         <h1 class="font-display text-3xl font-bold mt-5">Painel Administrativo</h1>
-        <p class="text-black/70 mt-2">Gerencie produtos e receitas do cardápio</p>
+        <p class="text-black/70 mt-2">Gerencie produtos, preços e promoções do cardápio</p>
       </div>
       <button onclick="logout()" class="btn btn-secondary">
         <i data-lucide="log-out"></i> Sair
-      </button>
-    </div>
-
-    <!-- Tabs -->
-    <div class="flex gap-2 mb-6 border-b border-black/10">
-      <button onclick="showTab('products')" id="tab-products"
-        class="px-4 py-2 font-semibold border-b-2 border-fp-green text-fp-green">
-        <i data-lucide="package"></i> Produtos
-      </button>
-      <button onclick="showTab('recipes')" id="tab-recipes"
-        class="px-4 py-2 font-semibold border-b-2 border-transparent hover:text-fp-green">
-        <i data-lucide="chef-hat"></i> Receitas
       </button>
     </div>
 
@@ -551,19 +539,6 @@
         <p>Carregando...</p>
       </div>
     </div>
-
-    <!-- Receitas Section -->
-    <div id="section-recipes" style="display: none;">
-      <div class="flex justify-between items-center mb-4">
-        <h2 class="font-display text-2xl font-bold">Receitas</h2>
-        <button onclick="openRecipeModal()" class="btn">
-          <i data-lucide="plus"></i> Adicionar Receita
-        </button>
-      </div>
-      <div id="recipes-list" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <p>Carregando...</p>
-      </div>
-    </div>
   </main>
 
   <!-- Modal Produto -->
@@ -574,11 +549,7 @@
         <button onclick="closeProductModal()" class="text-2xl">&times;</button>
       </div>
       <form id="product-form" onsubmit="saveProduct(event)">
-        <input type="hidden" id="product-id">
-        <div class="form-group">
-          <label>ID (identificador único)</label>
-          <input type="text" id="product-id-input" required pattern="[a-z0-9-]+">
-        </div>
+        <input type="hidden" id="product-id-input" autocomplete="off">
         <div class="form-group">
           <label>Nome</label>
           <input type="text" id="product-name" required>
@@ -588,19 +559,37 @@
           <input type="number" id="product-price" step="0.01" min="0" required>
         </div>
         <div class="form-group">
+          <label>Preço promocional (opcional)</label>
+          <input type="number" id="product-promo-price" step="0.01" min="0" placeholder="Ex.: 5,90">
+          <p class="text-xs text-black/50 mt-1">Se preenchido e menor que o preço normal, o produto entra em promoção no site e no carrinho usa este valor.</p>
+        </div>
+        <div class="form-group">
           <label>Categoria</label>
-          <select id="product-category" required>
+          <select id="product-category" class="px-2" required>
             <option value="Bebida">Bebida</option>
             <option value="Lanche">Lanche</option>
           </select>
+        </div>
+        <div class="form-group">
+          <label class="flex items-start gap-2 cursor-pointer">
+            <input type="checkbox" id="product-is-kit" class="mt-1 shrink-0">
+            <span>Este produto é um <strong>Kit</strong> (combinação de itens)</span>
+          </label>
+          <p class="text-xs text-black/50 mt-1 ml-7">No site, aparece um selo “Kit” na foto do produto.</p>
         </div>
         <div class="form-group">
           <label>Tags (separadas por vírgula)</label>
           <input type="text" id="product-tags" placeholder="Mais vendido, Energia, Proteico">
         </div>
         <div class="form-group">
-          <label>URL da Imagem</label>
-          <input type="text" id="product-image" placeholder="/assets/imagem.png">
+          <label>Imagem do produto</label>
+          <input type="file" id="product-image-file" accept="image/jpeg,image/png,image/webp,image/gif">
+          <p class="text-xs text-black/50 mt-1">JPG, PNG, WebP ou GIF · máx. 5 MB</p>
+          <div class="mt-3">
+            <img id="product-image-preview" alt="Pré-visualização" class="hidden max-h-48 w-full max-w-xs rounded-lg object-cover border border-black/10 bg-black/5">
+          </div>
+          <label class="block mt-3 text-sm text-black/60">URL da imagem (opcional, se preferir link externo)</label>
+          <input type="text" id="product-image" placeholder="/uploads/products/… ou https://…">
         </div>
         <div class="form-group">
           <label>
@@ -609,63 +598,6 @@
         </div>
         <div class="flex gap-2 justify-end">
           <button type="button" onclick="closeProductModal()" class="btn btn-secondary">Cancelar</button>
-          <button type="submit" class="btn">Salvar</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Modal Receita -->
-  <div id="recipe-modal" class="modal">
-    <div class="modal-content">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="font-display text-2xl font-bold" id="recipe-modal-title">Adicionar Receita</h3>
-        <button onclick="closeRecipeModal()" class="text-2xl">&times;</button>
-      </div>
-      <form id="recipe-form" onsubmit="saveRecipe(event)">
-        <input type="hidden" id="recipe-slug-input">
-        <div class="form-group">
-          <label>Slug (identificador único, ex: nome-da-receita)</label>
-          <input type="text" id="recipe-slug" required pattern="[a-z0-9-]+">
-        </div>
-        <div class="form-group">
-          <label>Título</label>
-          <input type="text" id="recipe-title" required>
-        </div>
-        <div class="form-group">
-          <label>URL da Imagem</label>
-          <input type="text" id="recipe-image" placeholder="/assets/imagem.png">
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div class="form-group">
-            <label>Tempo (minutos)</label>
-            <input type="number" id="recipe-time" min="0">
-          </div>
-          <div class="form-group">
-            <label>Porções</label>
-            <input type="number" id="recipe-servings" min="1" value="1">
-          </div>
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div class="form-group">
-            <label>Calorias (kcal)</label>
-            <input type="number" id="recipe-kcal" min="0">
-          </div>
-          <div class="form-group">
-            <label>Proteína (g)</label>
-            <input type="number" id="recipe-protein" min="0" value="0">
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Passos (um por linha)</label>
-          <textarea id="recipe-steps" rows="4" placeholder="Passo 1&#10;Passo 2&#10;Passo 3"></textarea>
-        </div>
-        <div class="form-group">
-          <label>Dicas (uma por linha)</label>
-          <textarea id="recipe-tips" rows="3" placeholder="Dica 1&#10;Dica 2"></textarea>
-        </div>
-        <div class="flex gap-2 justify-end">
-          <button type="button" onclick="closeRecipeModal()" class="btn btn-secondary">Cancelar</button>
           <button type="submit" class="btn">Salvar</button>
         </div>
       </form>
@@ -712,10 +644,9 @@
         return;
       }
       
-      if (Auth.isAuthenticated()) {
+        if (Auth.isAuthenticated()) {
         showAdminPanel();
         if (typeof loadProducts === 'function') await loadProducts();
-        if (typeof loadRecipes === 'function') await loadRecipes();
       } else {
         showLoginScreen();
       }
@@ -748,7 +679,6 @@
         await Auth.login(username, password);
         showAdminPanel();
         if (typeof loadProducts === 'function') await loadProducts();
-        if (typeof loadRecipes === 'function') await loadRecipes();
       } catch (error) {
         errorDiv.textContent = error.message;
         errorDiv.style.display = 'block';

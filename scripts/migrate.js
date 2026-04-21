@@ -6,10 +6,10 @@ const bcrypt = require('bcryptjs');
 
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
+  port: Number(process.env.DB_PORT) || 5432,
   database: process.env.DB_NAME || 'nimu_pwa_db',
   user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD,
+  password: process.env.DB_PASSWORD != null ? String(process.env.DB_PASSWORD) : '',
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
 });
 
@@ -46,6 +46,16 @@ async function migrate() {
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       )
+    `);
+
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.products
+      ADD COLUMN IF NOT EXISTS promo_price DECIMAL(10,2)
+    `);
+
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.products
+      ADD COLUMN IF NOT EXISTS is_kit BOOLEAN DEFAULT false
     `);
 
     await client.query(`
@@ -108,9 +118,14 @@ async function migrate() {
         );
 
         if (existing.rows.length === 0) {
+          const promo =
+            product.promo_price != null && product.promo_price !== ''
+              ? Number(product.promo_price)
+              : null;
+          const isKit = product.is_kit === true;
           await client.query(
-            `INSERT INTO ${SCHEMA}.products (id, name, price, category, tags, image, active, created_at, updated_at) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
+            `INSERT INTO ${SCHEMA}.products (id, name, price, category, tags, image, active, promo_price, is_kit, created_at, updated_at) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())`,
             [
               product.id,
               product.name,
@@ -118,7 +133,9 @@ async function migrate() {
               product.category,
               JSON.stringify(product.tags || []),
               product.image || null,
-              product.active !== false
+              product.active !== false,
+              promo != null && !Number.isNaN(promo) ? promo : null,
+              isKit
             ]
           );
           console.log(`  ✅ ${product.name}`);

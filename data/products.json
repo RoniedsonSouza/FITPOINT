@@ -3,6 +3,7 @@
     "id": "hype-1",
     "name": "Hype Drink (1L)",
     "price": 25.00,
+    "promo_price": 19.9,
     "category": "Bebida",
     "tags": ["Mais vendido","Energia"],
     "image": "/assets/hype.png",

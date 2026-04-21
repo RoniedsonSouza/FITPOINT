@@ -27,3 +27,6 @@ Thumbs.db
 # Build
 dist/
 build/
+
+# Imagens enviadas pelo admin (geradas em runtime)
+uploads/

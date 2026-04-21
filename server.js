@@ -2,11 +2,14 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const bodyParser = require('body-parser');
+
+const uploadsDir = path.join(__dirname, 'uploads', 'products');
+fs.mkdirSync(uploadsDir, { recursive: true });
 
 // Routes
 const productsRoutes = require('./routes/products');
-const recipesRoutes = require('./routes/recipes');
 const authRoutes = require('./routes/auth');
 
 const app = express();
@@ -26,12 +29,14 @@ app.use((req, res, next) => {
   next();
 });
 
+// Uploads (imagens de produtos)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Servir arquivos estáticos (frontend)
 app.use(express.static(path.join(__dirname)));
 
 // Rotas da API (públicas para leitura, autenticadas para escrita)
 app.use('/api/products', productsRoutes);
-app.use('/api/recipes', recipesRoutes);
 app.use('/api/auth', authRoutes);
 
 // Rota de health check
@@ -89,11 +94,19 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Erro interno do servidor' });
 });
 
-// Iniciar servidor
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor FitPoint rodando na porta ${PORT}`);
-  console.log(`📱 Frontend: http://localhost:${PORT}`);
-  console.log(`🔧 API: http://localhost:${PORT}/api`);
-  console.log(`🔐 Admin: http://localhost:${PORT}/admin.html`);
-  console.log(`📊 Health: http://localhost:${PORT}/api/health`);
-});
+const { ensureDatabase } = require('./config/database');
+
+ensureDatabase()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`🚀 Servidor FitPoint rodando na porta ${PORT}`);
+      console.log(`📱 Frontend: http://localhost:${PORT}`);
+      console.log(`🔧 API: http://localhost:${PORT}/api`);
+      console.log(`🔐 Admin: http://localhost:${PORT}/admin.html`);
+      console.log(`📊 Health: http://localhost:${PORT}/api/health`);
+    });
+  })
+  .catch((err) => {
+    console.error('Falha ao preparar o banco (ensureDatabase):', err.message);
+    process.exit(1);
+  });

@@ -192,7 +192,73 @@
       color: var(--fp-green);
       font-weight: 600;
     }
+
+    /* Filtros do cardápio: compactos e alinhados (select + busca) */
+    .menu-filters select,
+    .menu-filters input[type="search"] {
+      padding: 0.5rem 0.65rem;
+      min-height: 2.625rem;
+      font-size: 0.8125rem;
+      border-radius: 0.625rem;
+      border-width: 1px;
+      line-height: 1.25;
+    }
+
+    .menu-filters select {
+      padding-right: 2.125rem;
+      background-position: right 0.55rem center;
+      background-size: 0.875rem 0.875rem;
+      font-weight: 500;
+    }
+
+    @media (min-width: 640px) {
+
+      .menu-filters select,
+      .menu-filters input[type="search"] {
+        padding: 0.625rem 0.875rem;
+        min-height: 2.875rem;
+        font-size: 0.875rem;
+        border-radius: 0.75rem;
+        border-width: 2px;
+      }
+
+      .menu-filters select {
+        padding-right: 2.5rem;
+        background-position: right 0.75rem center;
+        background-size: 1rem 1rem;
+      }
+    }
+
+    #menu-grid h3 svg.lucide {
+      width: 0.875rem;
+      height: 0.875rem;
+      flex-shrink: 0;
+    }
+
+    @media (min-width: 640px) {
+      #menu-grid h3 svg.lucide {
+        width: 1rem;
+        height: 1rem;
+      }
+    }
+
+    /* Lista 2 colunas no mobile: chips menores */
+    @media (max-width: 639px) {
+      #menu-grid .chip {
+        font-size: 0.625rem;
+        padding: 0.2rem 0.45rem;
+        gap: 0.2rem;
+      }
+
+      #menu-grid .chip i[data-lucide],
+      #menu-grid .chip svg.lucide {
+        width: 0.65rem;
+        height: 0.65rem;
+      }
+    }
   </style>
+  <link rel="stylesheet" href="/css/product-chips.css">
+  <link rel="stylesheet" href="/css/promo-badge.css">
 </head>
 
 <body class="bg-fp-fog text-fp-ink font-sans" data-page="menu">
@@ -209,8 +275,8 @@
                  <!-- <a href="/cardapio.html" class="hover:text-fp-green flex items-center gap-1" data-nav="menu">
                     Cardápio
                 </a> -->
-      <a href="/receitas.html" class="hover:text-fp-green flex items-center gap-1" data-nav="recipes">
-        Receitas
+      <a href="/promocoes.html" class="hover:text-fp-green flex items-center gap-1" data-nav="promos">
+        Promoções
       </a>
       <a href="/sobre.html" class="hover:text-fp-green flex items-center gap-1" data-nav="about">
         Sobre
@@ -243,8 +309,8 @@
       <a href="/cardapio.html" class="flex items-center gap-2" data-menu-close data-nav="menu">
         Cardápio
       </a>
-      <a href="/receitas.html" class="flex items-center gap-2" data-menu-close data-nav="recipes">
-        Receitas
+      <a href="/promocoes.html" class="flex items-center gap-2" data-menu-close data-nav="promos">
+        Promoções
       </a>
       <a href="/sobre.html" class="flex items-center gap-2" data-menu-close data-nav="about">
         Sobre
@@ -257,22 +323,98 @@
 </div>
 
 
-  <main class="max-w-6xl mx-auto px-4 py-10">
-    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-      <div>
-        <h1 class="font-display text-3xl font-bold">Cardápio</h1>
-        <p class="text-black/70">Filtre por categoria ou busque pelo nome.</p>
+  <main class="max-w-6xl mx-auto px-3 sm:px-4 py-6 md:py-10">
+    <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between md:gap-6">
+      <div class="min-w-0">
+        <h1 class="font-display text-2xl sm:text-3xl font-bold tracking-tight">Cardápio</h1>
+        <p class="text-sm sm:text-base text-black/70 mt-0.5">Filtre por categoria ou busque pelo nome.</p>
       </div>
-      <div class="flex gap-2">
-        <select id="filter-category">
-          <option value="">Todas categorias</option>
-        </select>
-        <input id="search" type="search" placeholder="Buscar produtos..." style="width: 16rem;" />
+      <div class="menu-filters w-full md:max-w-md lg:max-w-lg shrink-0">
+        <div class="grid grid-cols-2 gap-2 sm:gap-3">
+          <select id="filter-category" class="min-w-0 w-full" aria-label="Categoria">
+            <option value="">Todas categorias</option>
+          </select>
+          <input id="search" type="search" class="min-w-0 w-full" placeholder="Buscar…" autocomplete="off" enterkeyhint="search" inputmode="search" aria-label="Buscar produtos" />
+        </div>
       </div>
     </div>
 
-    <div id="menu-grid" class="mt-8 grid sm:grid-cols-2 lg:grid-cols-3 gap-6">Carregando…</div>
+    <div id="menu-grid" class="mt-5 sm:mt-8 grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4 lg:gap-6 items-stretch">Carregando…</div>
   </main>
+
+  <div id="cart-backdrop" class="hidden fixed inset-0 z-[55] bg-black/40 transition-opacity" aria-hidden="true"></div>
+
+  <div id="cart-root"
+    class="fixed z-[60] pointer-events-none bottom-0 left-0 right-0 flex flex-col items-stretch gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-0 md:inset-auto md:bottom-6 md:right-6 md:left-auto md:w-auto md:items-end md:gap-3 md:px-0 md:pb-0">
+    <div id="cart-panel"
+      class="hidden pointer-events-auto w-full max-w-lg mx-auto md:mx-0 md:w-[min(92vw,26rem)] lg:w-[min(92vw,28rem)] h-[min(92dvh,720px)] md:h-[min(86vh,700px)] flex flex-col rounded-t-2xl md:rounded-2xl bg-white shadow-2xl border border-black/10 overflow-hidden"
+      role="dialog" aria-modal="true" aria-labelledby="cart-title" aria-hidden="true">
+      <div class="flex items-center justify-between p-4 sm:p-4 border-b border-black/5 shrink-0 bg-white">
+        <h2 id="cart-title" class="font-display font-bold text-lg text-fp-ink">Seu pedido</h2>
+        <button type="button" id="cart-close"
+          class="h-9 w-9 inline-flex items-center justify-center rounded-full border border-black/10 bg-white text-fp-ink hover:bg-black/5"
+          aria-label="Fechar pedido">
+          <span class="text-xl leading-none" aria-hidden="true">×</span>
+        </button>
+      </div>
+      <div id="cart-lines" class="flex-1 overflow-y-auto min-h-0 p-4 sm:p-4"></div>
+      <div class="px-4 py-3 sm:px-4 shrink-0 bg-fp-fog/80 border-t border-black/5 space-y-3">
+        <div>
+          <label for="cart-payment" class="text-xs font-medium text-black/60">Forma de pagamento</label>
+          <select id="cart-payment"
+            class="mt-1 w-full text-sm rounded-xl border border-black/15 bg-white py-2 px-2.5 text-fp-ink focus:outline-none focus:ring-2 focus:ring-fp-green/25 focus:border-fp-green">
+            <option value="">Selecione…</option>
+            <option value="pix">Pix</option>
+            <option value="dinheiro">Dinheiro</option>
+            <option value="credito">Cartão de crédito</option>
+            <option value="debito">Cartão de débito</option>
+            <option value="vale">Vale-refeição / Vale-alimentação</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div>
+          <label for="cart-fulfillment" class="text-xs font-medium text-black/60">Como receber o pedido</label>
+          <select id="cart-fulfillment"
+            class="mt-1 w-full text-sm rounded-xl border border-black/15 bg-white py-2 px-2.5 text-fp-ink focus:outline-none focus:ring-2 focus:ring-fp-green/25 focus:border-fp-green">
+            <option value="retirada">Retirada na loja</option>
+            <option value="entrega">Entrega no endereço</option>
+          </select>
+        </div>
+        <div>
+          <label for="cart-notes" class="text-xs font-medium text-black/60">Endereço e observações</label>
+          <p class="text-[11px] text-black/45 mt-0.5 leading-snug">Para entrega, informe endereço completo. Horário, referência ou restrições alimentares também vão aqui.</p>
+          <textarea id="cart-notes" rows="3"
+            class="mt-1 w-full text-sm rounded-xl border border-black/15 bg-white resize-none py-2 px-2.5 text-fp-ink placeholder:text-black/35 focus:outline-none focus:ring-2 focus:ring-fp-green/25 focus:border-fp-green"
+            placeholder="Ex.: Rua, número, bairro, CEP, ponto de referência…"></textarea>
+        </div>
+      </div>
+      <div class="flex items-center justify-between gap-2 px-4 py-2.5 sm:px-4 border-t border-black/5 bg-white shrink-0">
+        <button type="button" id="cart-clear" class="text-sm font-medium text-black/50 hover:text-fp-green">
+          Limpar
+        </button>
+        <p class="text-sm text-fp-ink">Total <span id="cart-total-value" class="font-bold text-fp-green">R$&nbsp;0,00</span></p>
+      </div>
+      <div class="p-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white shrink-0 md:pb-4">
+        <button type="button" id="cart-whatsapp"
+          class="btn w-full justify-center gap-2 shadow-soft disabled:opacity-45 disabled:pointer-events-none min-h-[3rem] text-[0.95rem]" disabled>
+          Enviar pedido no WhatsApp
+        </button>
+      </div>
+    </div>
+    <button type="button" id="cart-fab"
+      class="pointer-events-auto self-end h-14 w-14 shrink-0 rounded-full bg-fp-green text-white shadow-lg flex items-center justify-center relative hover:opacity-95 transition-opacity md:self-end"
+      aria-label="Ver pedido" aria-haspopup="dialog" aria-expanded="false">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        aria-hidden="true">
+        <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+        <path d="M3 6h18" />
+        <path d="M16 10a4 4 0 0 1-8 0" />
+      </svg>
+      <span id="cart-fab-count"
+        class="hidden absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 rounded-full bg-fp-orange text-white text-xs font-bold flex items-center justify-center">0</span>
+    </button>
+  </div>
 
   <footer class="bg-white border-t border-black/5">
     <div class="max-w-6xl mx-auto px-4 py-8 text-sm">© <span id="y"></span> FitPoint</div>
@@ -280,6 +422,7 @@
 
   <script src="/js/config.js"></script>
   <script src="/js/database.js"></script>
+  <script src="/js/cart.js"></script>
   <script src="/js/app.js"></script>
   <script>document.getElementById('y').textContent = new Date().getFullYear();</script>
 </body>

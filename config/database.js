@@ -3,10 +3,11 @@ const { Pool } = require('pg');
 
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
+  port: Number(process.env.DB_PORT) || 5432,
   database: process.env.DB_NAME || 'nimu_pwa_db',
   user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD,
+  // pg + SCRAM exige string; undefined dispara "client password must be a string"
+  password: process.env.DB_PASSWORD != null ? String(process.env.DB_PASSWORD) : '',
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
   max: 20,
   idleTimeoutMillis: 30000,
@@ -16,17 +17,32 @@ const pool = new Pool({
 // Schema padrão
 const SCHEMA = process.env.DB_SCHEMA || 'fitpoint';
 
-// Garantir que o schema existe na inicialização
-(async () => {
+/** Schema + coluna promo_price em bases antigas. Chamar antes de app.listen. */
+async function ensureDatabase() {
+  const client = await pool.connect();
   try {
-    const client = await pool.connect();
     await client.query(`CREATE SCHEMA IF NOT EXISTS ${SCHEMA}`);
-    client.release();
-    console.log(`✅ Schema "${SCHEMA}" garantido no banco ${process.env.DB_NAME}`);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.products
+      ADD COLUMN IF NOT EXISTS promo_price DECIMAL(10,2)
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.products
+      ADD COLUMN IF NOT EXISTS is_kit BOOLEAN DEFAULT false
+    `);
+    console.log(`✅ Schema "${SCHEMA}" e colunas products (promo_price, is_kit) verificadas`);
   } catch (error) {
-    console.error('Erro ao garantir schema:', error);
+    if (error.code === '42P01') {
+      console.warn(
+        `⚠️ Tabela ${SCHEMA}.products não existe. Execute: node scripts/migrate.js`
+      );
+    } else {
+      throw error;
+    }
+  } finally {
+    client.release();
   }
-})();
+}
 
 pool.on('error', (err) => {
   console.error('❌ Erro inesperado no cliente PostgreSQL:', err);
@@ -77,5 +93,6 @@ module.exports = {
   query,
   getClient,
   SCHEMA,
-  table
+  table,
+  ensureDatabase
 };

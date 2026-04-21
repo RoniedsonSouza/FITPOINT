@@ -1,32 +1,19 @@
 // Script da página de administração
 
-let currentTab = 'products';
 let editingProductId = null;
-let editingRecipeSlug = null;
 
-// Função para alternar entre tabs
-function showTab(tab) {
-  currentTab = tab;
-  const productsSection = document.getElementById('section-products');
-  const recipesSection = document.getElementById('section-recipes');
-  const tabProducts = document.getElementById('tab-products');
-  const tabRecipes = document.getElementById('tab-recipes');
-
-  if (tab === 'products') {
-    productsSection.style.display = 'block';
-    recipesSection.style.display = 'none';
-    tabProducts.classList.add('border-fp-green', 'text-fp-green');
-    tabProducts.classList.remove('border-transparent');
-    tabRecipes.classList.remove('border-fp-green', 'text-fp-green');
-    tabRecipes.classList.add('border-transparent');
+/** ID único para API (apenas a-z, 0-9 e hífen) */
+function generateProductId() {
+  const time = Date.now().toString(36);
+  let suffix = '';
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const buf = new Uint8Array(5);
+    crypto.getRandomValues(buf);
+    suffix = Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
   } else {
-    productsSection.style.display = 'none';
-    recipesSection.style.display = 'block';
-    tabRecipes.classList.add('border-fp-green', 'text-fp-green');
-    tabRecipes.classList.remove('border-transparent');
-    tabProducts.classList.remove('border-fp-green', 'text-fp-green');
-    tabProducts.classList.add('border-transparent');
+    suffix = Math.random().toString(36).slice(2, 12);
   }
+  return `p-${time}-${suffix}`;
 }
 
 // === PRODUTOS ===
@@ -50,11 +37,18 @@ async function loadProducts() {
       return;
     }
 
-    container.innerHTML = products.map(product => `
+    container.innerHTML = products.map(product => {
+      const promo = product.promo_price != null && product.promo_price !== '' ? Number(product.promo_price) : null;
+      const hasPromo = promo != null && !Number.isNaN(promo) && promo < Number(product.price);
+      const priceHtml = hasPromo
+        ? `<span class="text-right leading-tight"><span class="block text-black/45 line-through text-sm font-normal">R$ ${Number(product.price).toFixed(2)}</span><span class="text-fp-green font-bold">R$ ${promo.toFixed(2)}</span></span>`
+        : `<span class="text-fp-green font-bold">R$ ${Number(product.price).toFixed(2)}</span>`;
+      return `
       <div class="card">
-        <div class="flex items-start justify-between mb-2">
+        ${product.image ? `<div class="mb-3 h-36 rounded-lg overflow-hidden border border-black/10 bg-black/5"><img src="${product.image}" alt="" class="w-full h-full object-cover" loading="lazy"></div>` : ''}
+        <div class="flex items-start justify-between mb-2 gap-2">
           <h3 class="font-semibold text-lg">${product.name}</h3>
-          <span class="text-fp-green font-bold">R$ ${product.price.toFixed(2)}</span>
+          ${priceHtml}
         </div>
         <p class="text-sm text-black/60 mb-2">ID: ${product.id}</p>
         <p class="text-sm text-black/60 mb-2">Categoria: ${product.category}</p>
@@ -69,9 +63,11 @@ async function loadProducts() {
             <i data-lucide="trash"></i> Excluir
           </button>
         </div>
+        ${product.is_kit ? '<span class="chip" style="background: rgba(79, 70, 229, 0.12); color: #4338ca; margin-top: 0.35rem;">Kit</span>' : ''}
         ${!product.active ? '<span class="chip" style="background: #fee2e2; color: #dc2626; margin-top: 0.5rem;">Inativo</span>' : ''}
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     if (window.lucide) window.lucide.createIcons();
   } catch (error) {
@@ -95,15 +91,30 @@ async function openProductModal(productId = null) {
         return;
       }
       title.textContent = 'Editar Produto';
-      document.getElementById('product-id').value = product.id;
       document.getElementById('product-id-input').value = product.id;
-      document.getElementById('product-id-input').disabled = true;
       document.getElementById('product-name').value = product.name;
       document.getElementById('product-price').value = product.price;
+      document.getElementById('product-promo-price').value =
+        product.promo_price != null && product.promo_price !== '' ? product.promo_price : '';
       document.getElementById('product-category').value = product.category;
       document.getElementById('product-tags').value = (product.tags || []).join(', ');
       document.getElementById('product-image').value = product.image || '';
+      const prevImg = document.getElementById('product-image-preview');
+      const fileIn = document.getElementById('product-image-file');
+      if (fileIn) fileIn.value = '';
+      if (prevImg) {
+        if (prevImg.src && prevImg.src.startsWith('blob:')) URL.revokeObjectURL(prevImg.src);
+        if (product.image) {
+          prevImg.src = product.image;
+          prevImg.classList.remove('hidden');
+        } else {
+          prevImg.removeAttribute('src');
+          prevImg.classList.add('hidden');
+        }
+      }
       document.getElementById('product-active').checked = product.active !== false;
+      document.getElementById('product-is-kit').checked =
+        product.is_kit === true || product.is_kit === 1 || product.is_kit === 'true';
     } catch (error) {
       alert('Erro ao carregar produto: ' + error.message);
       return;
@@ -112,15 +123,28 @@ async function openProductModal(productId = null) {
     // Modo criação
     title.textContent = 'Adicionar Produto';
     form.reset();
-    document.getElementById('product-id').value = '';
-    document.getElementById('product-id-input').disabled = false;
+    document.getElementById('product-id-input').value = generateProductId();
     document.getElementById('product-active').checked = true;
+    document.getElementById('product-is-kit').checked = false;
+    document.getElementById('product-promo-price').value = '';
+    const prevImg = document.getElementById('product-image-preview');
+    const fileIn = document.getElementById('product-image-file');
+    if (fileIn) fileIn.value = '';
+    if (prevImg) {
+      if (prevImg.src && prevImg.src.startsWith('blob:')) URL.revokeObjectURL(prevImg.src);
+      prevImg.removeAttribute('src');
+      prevImg.classList.add('hidden');
+    }
   }
 
   modal.classList.add('active');
 }
 
 function closeProductModal() {
+  const prevImg = document.getElementById('product-image-preview');
+  if (prevImg && prevImg.src && prevImg.src.startsWith('blob:')) {
+    URL.revokeObjectURL(prevImg.src);
+  }
   const modal = document.getElementById('product-modal');
   modal.classList.remove('active');
   editingProductId = null;
@@ -130,20 +154,53 @@ async function saveProduct(event) {
   event.preventDefault();
 
   const idInput = document.getElementById('product-id-input');
-  const id = editingProductId || idInput.value.trim();
+  let id = editingProductId || idInput.value.trim();
+  if (!editingProductId && !id) {
+    id = generateProductId();
+    idInput.value = id;
+  }
   const name = document.getElementById('product-name').value.trim();
   const price = parseFloat(document.getElementById('product-price').value);
+  const promoRaw = document.getElementById('product-promo-price').value.trim();
+  let promo_price = null;
+  if (promoRaw !== '') {
+    const pr = parseFloat(promoRaw);
+    if (Number.isNaN(pr) || pr < 0) {
+      alert('Preço promocional inválido.');
+      return;
+    }
+    if (pr >= price) {
+      alert('O preço promocional deve ser menor que o preço normal.');
+      return;
+    }
+    promo_price = pr;
+  }
   const category = document.getElementById('product-category').value;
   const tagsInput = document.getElementById('product-tags').value.trim();
-  const image = document.getElementById('product-image').value.trim();
+  let image = document.getElementById('product-image').value.trim();
   const active = document.getElementById('product-active').checked;
+  const is_kit = document.getElementById('product-is-kit').checked;
 
   const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(t => t) : [];
+
+  const fileInput = document.getElementById('product-image-file');
+  if (fileInput && fileInput.files && fileInput.files[0]) {
+    try {
+      const { url } = await DB.uploadProductImage(fileInput.files[0]);
+      image = url;
+      document.getElementById('product-image').value = url;
+    } catch (err) {
+      alert('Erro no envio da imagem: ' + (err.message || err));
+      return;
+    }
+  }
 
   const productData = {
     id,
     name,
     price,
+    promo_price,
+    is_kit,
     category,
     tags,
     image: image || undefined,
@@ -193,172 +250,18 @@ async function deleteProduct(id) {
   }
 }
 
-// === RECEITAS ===
-
-async function loadRecipes() {
-  if (typeof DB === 'undefined') {
-    console.error('DB não está definido');
-    const container = document.getElementById('recipes-list');
-    container.innerHTML = '<p class="text-red-600">Erro: Módulo DB não carregado. Recarregue a página.</p>';
-    return;
-  }
-  
-  const container = document.getElementById('recipes-list');
-  container.innerHTML = '<p class="text-black/60">Carregando...</p>';
-
-  try {
-    const recipes = await DB.getRecipes();
-
-    if (recipes.length === 0) {
-      container.innerHTML = '<p class="text-black/60">Nenhuma receita cadastrada. Clique em "Adicionar Receita" para começar.</p>';
-      return;
+document.addEventListener('DOMContentLoaded', () => {
+  const fileInput = document.getElementById('product-image-file');
+  const preview = document.getElementById('product-image-preview');
+  if (!fileInput || !preview) return;
+  fileInput.addEventListener('change', () => {
+    const f = fileInput.files && fileInput.files[0];
+    if (preview.src && preview.src.startsWith('blob:')) {
+      URL.revokeObjectURL(preview.src);
     }
-
-    container.innerHTML = recipes.map(recipe => `
-      <div class="card">
-        <h3 class="font-semibold text-lg mb-2">${recipe.title}</h3>
-        <p class="text-sm text-black/60 mb-2">Slug: ${recipe.slug}</p>
-        <div class="text-sm text-black/70 mb-3">
-          ${recipe.time ? `<span class="chip"><i data-lucide="timer"></i> ${recipe.time} min</span>` : ''}
-          ${recipe.servings ? `<span class="chip"><i data-lucide="users"></i> ${recipe.servings} porções</span>` : ''}
-          ${recipe.kcal ? `<span class="chip"><i data-lucide="flame"></i> ${recipe.kcal} kcal</span>` : ''}
-          ${recipe.protein_g ? `<span class="chip"><i data-lucide="beef"></i> ${recipe.protein_g}g proteína</span>` : ''}
-        </div>
-        <div class="flex gap-2">
-          <button onclick="editRecipe('${recipe.slug}')" class="btn btn-outline" style="padding: 0.5rem 1rem;">
-            <i data-lucide="edit"></i> Editar
-          </button>
-          <button onclick="deleteRecipe('${recipe.slug}')" class="btn btn-danger" style="padding: 0.5rem 1rem;">
-            <i data-lucide="trash"></i> Excluir
-          </button>
-        </div>
-      </div>
-    `).join('');
-
-    if (window.lucide) window.lucide.createIcons();
-  } catch (error) {
-    console.error('Erro ao carregar receitas:', error);
-    container.innerHTML = '<p class="text-red-600">Erro ao carregar receitas. Verifique se o servidor está rodando.</p>';
-  }
-}
-
-async function openRecipeModal(recipeSlug = null) {
-  editingRecipeSlug = recipeSlug;
-  const modal = document.getElementById('recipe-modal');
-  const form = document.getElementById('recipe-form');
-  const title = document.getElementById('recipe-modal-title');
-
-  if (recipeSlug) {
-    // Modo edição
-    try {
-      const recipe = await DB.getRecipe(recipeSlug);
-      if (!recipe) {
-        alert('Receita não encontrada');
-        return;
-      }
-      title.textContent = 'Editar Receita';
-      document.getElementById('recipe-slug-input').value = recipe.slug;
-      document.getElementById('recipe-slug').value = recipe.slug;
-      document.getElementById('recipe-slug').disabled = true;
-      document.getElementById('recipe-title').value = recipe.title;
-      document.getElementById('recipe-image').value = recipe.image || '';
-      document.getElementById('recipe-time').value = recipe.time || '';
-      document.getElementById('recipe-servings').value = recipe.servings || 1;
-      document.getElementById('recipe-kcal').value = recipe.kcal || '';
-      document.getElementById('recipe-protein').value = recipe.protein_g || 0;
-      document.getElementById('recipe-steps').value = (recipe.steps || []).join('\n');
-      document.getElementById('recipe-tips').value = (recipe.tips || []).join('\n');
-    } catch (error) {
-      alert('Erro ao carregar receita: ' + error.message);
-      return;
+    if (f) {
+      preview.src = URL.createObjectURL(f);
+      preview.classList.remove('hidden');
     }
-  } else {
-    // Modo criação
-    title.textContent = 'Adicionar Receita';
-    form.reset();
-    document.getElementById('recipe-slug-input').value = '';
-    document.getElementById('recipe-slug').disabled = false;
-    document.getElementById('recipe-servings').value = 1;
-    document.getElementById('recipe-protein').value = 0;
-  }
-
-  modal.classList.add('active');
-}
-
-function closeRecipeModal() {
-  const modal = document.getElementById('recipe-modal');
-  modal.classList.remove('active');
-  editingRecipeSlug = null;
-}
-
-async function saveRecipe(event) {
-  event.preventDefault();
-
-  const slugInput = document.getElementById('recipe-slug');
-  const slug = editingRecipeSlug || slugInput.value.trim();
-  const title = document.getElementById('recipe-title').value.trim();
-  const image = document.getElementById('recipe-image').value.trim();
-  const time = parseInt(document.getElementById('recipe-time').value) || undefined;
-  const servings = parseInt(document.getElementById('recipe-servings').value) || 1;
-  const kcal = parseInt(document.getElementById('recipe-kcal').value) || undefined;
-  const protein_g = parseInt(document.getElementById('recipe-protein').value) || 0;
-  const stepsInput = document.getElementById('recipe-steps').value.trim();
-  const tipsInput = document.getElementById('recipe-tips').value.trim();
-
-  const steps = stepsInput ? stepsInput.split('\n').map(s => s.trim()).filter(s => s) : [];
-  const tips = tipsInput ? tipsInput.split('\n').map(t => t.trim()).filter(t => t) : [];
-
-  const recipeData = {
-    slug,
-    title,
-    image: image || undefined,
-    time,
-    servings,
-    kcal,
-    protein_g,
-    steps,
-    tips
-  };
-
-  try {
-    if (editingRecipeSlug) {
-      await DB.updateRecipe(editingRecipeSlug, recipeData);
-      alert('Receita atualizada com sucesso!');
-    } else {
-      await DB.addRecipe(recipeData);
-      alert('Receita adicionada com sucesso!');
-    }
-    closeRecipeModal();
-    await loadRecipes();
-  } catch (error) {
-    if (error.message.includes('401') || error.message.includes('403')) {
-      alert('Sessão expirada. Por favor, faça login novamente.');
-      if (typeof logout === 'function') logout();
-    } else {
-      alert('Erro: ' + error.message);
-    }
-  }
-}
-
-function editRecipe(slug) {
-  openRecipeModal(slug);
-}
-
-async function deleteRecipe(slug) {
-  if (!confirm('Tem certeza que deseja excluir esta receita?')) {
-    return;
-  }
-
-  try {
-    await DB.deleteRecipe(slug);
-    alert('Receita excluída com sucesso!');
-    await loadRecipes();
-  } catch (error) {
-    if (error.message.includes('401') || error.message.includes('403')) {
-      alert('Sessão expirada. Por favor, faça login novamente.');
-      if (typeof logout === 'function') logout();
-    } else {
-      alert('Erro: ' + error.message);
-    }
-  }
-}
+  });
+});

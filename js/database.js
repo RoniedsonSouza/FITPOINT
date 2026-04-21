@@ -17,6 +17,15 @@ function getAuthHeaders() {
   return headers;
 }
 
+function getAuthHeadersMultipart() {
+  const token = localStorage.getItem('fitpoint_admin_token');
+  const headers = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 const DB = {
   // === PRODUTOS ===
 
@@ -52,6 +61,26 @@ const DB = {
       console.error('Erro ao buscar produto:', error);
       return null;
     }
+  },
+
+  // Envia imagem do produto (multipart); retorna { url: '/uploads/products/...' }
+  async uploadProductImage(file) {
+    const formData = new FormData();
+    formData.append('image', file);
+    const response = await fetch(`${getApiBaseUrl()}/products/upload-image`, {
+      method: 'POST',
+      headers: getAuthHeadersMultipart(),
+      body: formData
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      const errorMsg = err.error || 'Erro ao enviar imagem';
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(`401: ${errorMsg}`);
+      }
+      throw new Error(errorMsg);
+    }
+    return response.json();
   },
 
   // Adiciona um novo produto
@@ -130,121 +159,6 @@ const DB = {
       }
     } catch (error) {
       console.error('Erro ao deletar produto:', error);
-      throw error;
-    }
-  },
-
-  // === RECEITAS ===
-
-  // Obtém todas as receitas
-  async getRecipes() {
-    try {
-      const response = await fetch(`${getApiBaseUrl()}/recipes`);
-      if (!response.ok) throw new Error('Erro ao buscar receitas');
-      return await response.json();
-    } catch (error) {
-      console.error('Erro ao buscar receitas:', error);
-      // Fallback para JSON estático se API não estiver disponível
-      try {
-        const res = await fetch('/data/recipes.json');
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.warn('Fallback para JSON também falhou:', e);
-      }
-      return [];
-    }
-  },
-
-  // Obtém uma receita por slug
-  async getRecipe(slug) {
-    try {
-      const response = await fetch(`${getApiBaseUrl()}/recipes/${slug}`);
-      if (!response.ok) {
-        if (response.status === 404) return null;
-        throw new Error('Erro ao buscar receita');
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Erro ao buscar receita:', error);
-      return null;
-    }
-  },
-
-  // Adiciona uma nova receita
-  async addRecipe(recipe) {
-    try {
-      const response = await fetch(`${getApiBaseUrl()}/recipes`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(recipe)
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        const errorMsg = error.error || 'Erro ao criar receita';
-        if (response.status === 401 || response.status === 403) {
-          throw new Error(`401: ${errorMsg}`);
-        }
-        throw new Error(errorMsg);
-      }
-      
-      return recipe;
-    } catch (error) {
-      console.error('Erro ao adicionar receita:', error);
-      throw error;
-    }
-  },
-
-  // Atualiza uma receita existente
-  async updateRecipe(slug, updates) {
-    try {
-      const response = await fetch(`${getApiBaseUrl()}/recipes/${slug}`, {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(updates)
-      });
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error(`Receita com slug "${slug}" não encontrada`);
-        }
-        const error = await response.json();
-        const errorMsg = error.error || 'Erro ao atualizar receita';
-        if (response.status === 401 || response.status === 403) {
-          throw new Error(`401: ${errorMsg}`);
-        }
-        throw new Error(errorMsg);
-      }
-      
-      const updatedRecipe = await this.getRecipe(slug);
-      return updatedRecipe;
-    } catch (error) {
-      console.error('Erro ao atualizar receita:', error);
-      throw error;
-    }
-  },
-
-  // Remove uma receita
-  async deleteRecipe(slug) {
-    try {
-      const response = await fetch(`${getApiBaseUrl()}/recipes/${slug}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-      });
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error(`Receita com slug "${slug}" não encontrada`);
-        }
-        const error = await response.json();
-        const errorMsg = error.error || 'Erro ao deletar receita';
-        if (response.status === 401 || response.status === 403) {
-          throw new Error(`401: ${errorMsg}`);
-        }
-        throw new Error(errorMsg);
-      }
-    } catch (error) {
-      console.error('Erro ao deletar receita:', error);
       throw error;
     }
   }

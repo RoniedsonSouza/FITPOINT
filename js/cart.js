@@ -167,18 +167,204 @@
     var cfg = window.FitPointConfig || {};
     var num = cfg.WHATSAPP_E164 || '';
     if (!num || lines.length === 0) return;
-    var meta = getCartFormValues();
-    if (!meta.paymentVal) {
-      window.alert('Selecione a forma de pagamento antes de enviar o pedido.');
-      return;
-    }
-    if (meta.fulfillmentVal === 'entrega' && !meta.notes) {
-      window.alert('Para entrega, preencha o endereço completo em "Endereço e observações".');
-      return;
-    }
+    if (isWhatsAppUnavailable()) return;
+    if (!validateCartForSend()) return;
     var text = buildMessage();
     var url = 'https://wa.me/' + num + '?text=' + encodeURIComponent(text);
     window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  function isWhatsAppUnavailable() {
+    return true;
+  }
+
+  function decorateWhatsAppUnavailable(btn) {
+    if (!btn) return;
+    btn.disabled = true;
+    btn.classList.add('cursor-not-allowed');
+    btn.classList.remove('opacity-75');
+    if (btn.dataset.unavailableDecorated === '1') return;
+    btn.dataset.unavailableDecorated = '1';
+
+    var flag = document.createElement('span');
+    flag.className = 'pointer-events-none absolute -top-2 right-1 inline-flex items-center rounded-full border border-fp-orange/45 bg-fp-orange text-white px-2.5 py-1 text-[0.62rem] font-extrabold uppercase tracking-[0.08em] shadow-md';
+    flag.textContent = 'temporariamente indisponivel';
+
+    var wrap = btn.parentNode;
+    if (wrap) {
+      wrap.classList.add('relative');
+      wrap.insertBefore(flag, btn.nextSibling);
+    }
+  }
+
+  /** Mesmas regras do WhatsApp / Instagram antes de enviar */
+  function validateCartForSend() {
+    if (lines.length === 0) return false;
+    var meta = getCartFormValues();
+    if (!meta.paymentVal) {
+      window.alert('Selecione a forma de pagamento antes de enviar o pedido.');
+      return false;
+    }
+    if (meta.fulfillmentVal === 'entrega' && !meta.notes) {
+      window.alert('Para entrega, preencha o endereço completo em "Endereço e observações".');
+      return false;
+    }
+    return true;
+  }
+
+  var igModalOpen = false;
+  var igModalLastFocus = null;
+
+  function getInstagramBranches() {
+    var cfg = window.FitPointConfig || {};
+    var list = cfg.INSTAGRAM_BRANCHES;
+    if (Array.isArray(list) && list.length) return list;
+    return [
+      { city: 'Cariacica', handle: 'fitpointitaciba' },
+      { city: 'Viana', handle: 'f_itpoint' }
+    ];
+  }
+
+  function ensureInstagramModal() {
+    if (document.getElementById('fp-ig-branch-modal')) return;
+
+    var root = document.createElement('div');
+    root.id = 'fp-ig-branch-modal';
+    root.className = 'fixed inset-0 z-[70] hidden flex items-end md:items-center justify-center p-3 md:p-4';
+    root.setAttribute('aria-hidden', 'true');
+
+    var backdrop = document.createElement('div');
+    backdrop.className = 'absolute inset-0 bg-black/50';
+    backdrop.setAttribute('aria-hidden', 'true');
+
+    var panel = document.createElement('div');
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-labelledby', 'fp-ig-branch-title');
+    panel.className = 'relative w-full max-w-md rounded-2xl bg-white shadow-2xl border border-black/10 p-5 sm:p-6 max-h-[min(90dvh,520px)] overflow-y-auto';
+
+    var title = document.createElement('h3');
+    title.id = 'fp-ig-branch-title';
+    title.className = 'font-display font-bold text-lg text-fp-ink';
+    title.textContent = 'Qual loja no Instagram?';
+
+    var hint = document.createElement('p');
+    hint.className = 'text-sm text-black/65 mt-2 leading-snug';
+    hint.textContent = 'Escolha a filial para abrir o chat da loja. O texto do pedido será copiado para você colar na conversa (o Instagram não preenche a mensagem automaticamente).';
+
+    var listEl = document.createElement('div');
+    listEl.className = 'mt-5 flex flex-col gap-2';
+
+    getInstagramBranches().forEach(function (b) {
+      var h = String(b.handle || '').replace(/^@/, '');
+      if (!h) return;
+      var city = escapeHtml(String(b.city || b.place || 'Loja'));
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'w-full text-left rounded-xl border border-black/12 bg-white hover:bg-fp-fog/80 px-4 py-3.5 transition-colors focus:outline-none focus:ring-2 focus:ring-fp-green/30 focus:border-fp-green';
+      btn.setAttribute('data-ig-handle', h);
+      btn.innerHTML =
+        '<span class="block font-semibold text-fp-ink">' + city + '</span>' +
+        '<span class="block text-sm text-black/55 mt-0.5">@' + escapeHtml(h) + '</span>';
+      listEl.appendChild(btn);
+    });
+
+    var cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'mt-4 w-full text-sm font-medium text-black/50 hover:text-fp-green py-2';
+    cancel.setAttribute('data-ig-dismiss', '1');
+    cancel.textContent = 'Cancelar';
+
+    panel.appendChild(title);
+    panel.appendChild(hint);
+    panel.appendChild(listEl);
+    panel.appendChild(cancel);
+    root.appendChild(backdrop);
+    root.appendChild(panel);
+    document.body.appendChild(root);
+
+    function close() {
+      closeInstagramModal();
+    }
+
+    backdrop.addEventListener('click', close);
+    cancel.addEventListener('click', close);
+    listEl.addEventListener('click', function (e) {
+      var t = e.target;
+      if (!(t instanceof HTMLElement)) return;
+      var row = t.closest('[data-ig-handle]');
+      if (!row || !listEl.contains(row)) return;
+      var handle = row.getAttribute('data-ig-handle');
+      if (handle) openInstagramChat(handle);
+    });
+  }
+
+  function openInstagramModal() {
+    ensureInstagramModal();
+    var root = document.getElementById('fp-ig-branch-modal');
+    if (!root) return;
+    igModalLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    igModalOpen = true;
+    root.classList.remove('hidden');
+    root.setAttribute('aria-hidden', 'false');
+    var first = root.querySelector('[data-ig-handle]');
+    if (first instanceof HTMLElement) {
+      setTimeout(function () { first.focus(); }, 50);
+    }
+  }
+
+  function closeInstagramModal() {
+    var root = document.getElementById('fp-ig-branch-modal');
+    if (root) {
+      root.classList.add('hidden');
+      root.setAttribute('aria-hidden', 'true');
+    }
+    igModalOpen = false;
+    if (igModalLastFocus && document.contains(igModalLastFocus)) {
+      igModalLastFocus.focus({ preventScroll: true });
+    }
+    igModalLastFocus = null;
+  }
+
+  function showToast(message) {
+    var existing = document.getElementById('fp-toast');
+    if (existing) existing.remove();
+
+    var toast = document.createElement('div');
+    toast.id = 'fp-toast';
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+    toast.className = 'fixed left-1/2 -translate-x-1/2 bottom-5 z-[80] rounded-xl bg-fp-ink text-white px-4 py-3 text-sm font-medium shadow-2xl';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    window.setTimeout(function () {
+      if (toast.parentNode) toast.remove();
+    }, 2600);
+  }
+
+  function openInstagramChat(handle) {
+    var text = buildMessage();
+    var url = 'https://ig.me/m/' + encodeURIComponent(handle);
+    closeInstagramModal();
+
+    function go() {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard.writeText(text).then(function () {
+        showToast('Pedido copiado para a area de transferencia.');
+        go();
+      }).catch(go);
+    } else {
+      go();
+    }
+  }
+
+  function openInstagramPicker() {
+    if (!validateCartForSend()) return;
+    openInstagramModal();
   }
 
   var drawerOpen = false;
@@ -228,7 +414,7 @@
     } else {
       linesEl.innerHTML = lines.map(function (l) {
         return (
-          '<div class="flex flex-wrap items-start gap-2 py-3 border-b border-black/5 last:border-0">' +
+          '<div class="flex flex-wrap items-center gap-2 py-3 border-b border-black/5 last:border-0">' +
             '<div class="min-w-0 flex-1 basis-[40%]">' +
               '<p class="font-medium text-sm">' + escapeHtml(l.name) + '</p>' +
               '<p class="text-xs text-black/50">' + currency(l.price) + ' un.</p>' +
@@ -248,14 +434,48 @@
     if (totalEl) totalEl.textContent = currency(totalMoney());
 
     var waBtn = document.getElementById('cart-whatsapp');
-    if (waBtn) waBtn.disabled = lines.length === 0;
+    var igBtn = document.getElementById('cart-instagram');
+    var disabled = lines.length === 0;
+    if (waBtn) {
+      if (isWhatsAppUnavailable()) {
+        decorateWhatsAppUnavailable(waBtn);
+      } else {
+        waBtn.disabled = disabled;
+      }
+    }
+    if (igBtn) igBtn.disabled = disabled;
   }
 
   function onKeydown(e) {
-    if (e.key === 'Escape' && drawerOpen) {
+    if (e.key !== 'Escape') return;
+    if (igModalOpen) {
+      e.preventDefault();
+      closeInstagramModal();
+      return;
+    }
+    if (drawerOpen) {
       e.preventDefault();
       closeDrawer();
     }
+  }
+
+  function injectInstagramButton() {
+    var waBtn = document.getElementById('cart-whatsapp');
+    if (!waBtn || document.getElementById('cart-instagram')) return;
+    var wrap = waBtn.parentNode;
+    if (wrap) wrap.classList.add('flex', 'flex-col', 'gap-2');
+    var igBtn = document.createElement('button');
+    igBtn.id = 'cart-instagram';
+    igBtn.type = 'button';
+    igBtn.disabled = true;
+    igBtn.className =
+      'btn btn-outline w-full justify-center gap-2 min-h-[3rem] text-[0.95rem] disabled:opacity-45 disabled:pointer-events-none';
+    igBtn.setAttribute('aria-haspopup', 'dialog');
+    igBtn.innerHTML =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>' +
+      '<span>Pedir pelo Instagram</span>';
+    waBtn.parentNode.insertBefore(igBtn, waBtn.nextSibling);
+    igBtn.addEventListener('click', function () { openInstagramPicker(); });
   }
 
   function bind() {
@@ -268,10 +488,13 @@
 
     if (!linesEl) return;
 
+    injectInstagramButton();
+
     if (fab) fab.addEventListener('click', function () { toggleDrawer(); });
     if (backdrop) backdrop.addEventListener('click', function () { closeDrawer(); });
     if (closeBtn) closeBtn.addEventListener('click', function () { closeDrawer(); });
     if (clearBtn) clearBtn.addEventListener('click', function () { clear(); });
+    if (waBtn && isWhatsAppUnavailable()) decorateWhatsAppUnavailable(waBtn);
     if (waBtn) waBtn.addEventListener('click', function () { openWhatsApp(); });
 
     if (linesEl) {

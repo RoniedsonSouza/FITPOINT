@@ -274,11 +274,11 @@ function renderMenuProductCard(p){
           </h3>
           ${priceBlock}
         </div>
-        <div class="mt-1.5 sm:mt-2 flex flex-wrap gap-1 sm:gap-2">
+        <div class="my-2 sm:mt-2 flex flex-wrap gap-1 sm:gap-2">
           <span class="chip chip-tag chip-cat--${cat.mod}"><i data-lucide="${cat.icon}"></i>${escapeHtml(p.category)}</span>
           ${tags}
         </div>
-        <button type="button" class="btn mt-2 pt-2.5 w-full justify-center text-xs sm:text-sm py-2 sm:py-2.5 leading-tight" data-add-to-cart data-product-id="${idAttr}">
+        <button type="button" class="btn mt-auto pt-2.5 w-full justify-center text-xs sm:text-sm py-2 sm:py-2.5 leading-tight" data-add-to-cart data-product-id="${idAttr}">
           <span class="sm:hidden">Adicionar</span><span class="hidden sm:inline">Adicionar ao carrinho</span>
         </button>
       </div>

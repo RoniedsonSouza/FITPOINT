@@ -48,7 +48,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Rota para obter Google Maps API Key
+// Chave da Maps JavaScript API (mapa nas páginas index / location)
 app.get('/api/config/google-maps-key', (req, res) => {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {

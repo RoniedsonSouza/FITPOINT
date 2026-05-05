@@ -63,6 +63,18 @@
       opacity: .9;
     }
 
+    .btn.btn--sm {
+      padding: .45rem .875rem;
+      font-size: .8125rem;
+      gap: .35rem;
+    }
+
+    .btn.btn--sm svg {
+      width: 0.875rem;
+      height: 0.875rem;
+      flex-shrink: 0;
+    }
+
     .btn-outline {
       background: #fff;
       color: var(--fp-green);
@@ -88,22 +100,100 @@
     }
 
     .card {
-      background: #fff;
+      background: linear-gradient(165deg, #ffffff 0%, #fbfdfb 100%);
       border-radius: var(--radius);
-      box-shadow: var(--shadow);
+      box-shadow: 0 12px 30px rgba(14, 31, 22, .08);
+      border: 1px solid rgba(29, 107, 58, .08);
       overflow: hidden;
-      transition: .2s ease;
+      transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
       display: flex;
       flex-direction: column;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 18px 36px rgba(14, 31, 22, .12);
+      border-color: rgba(29, 107, 58, .22);
     }
 
     .card img {
       display: block;
       height: auto;
     }
+
+    .section-title {
+      font-family: Poppins, Inter, system-ui, sans-serif;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .metric {
+      font-family: Poppins, Inter, system-ui, sans-serif;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+
+    .icon-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 999px;
+      background: rgba(29, 107, 58, .12);
+      color: var(--fp-green);
+      border: 1px solid rgba(29, 107, 58, .14);
+    }
+
+    /* Mobile: foto maior; desktop: coluna estreita (sticky) */
+    .kit-aside {
+      width: 100%;
+      max-width: min(22rem, 100%);
+      margin-inline: auto;
+    }
+
+    @media (min-width: 1024px) {
+      .kit-aside {
+        max-width: 12.5rem;
+        margin-inline: 0;
+      }
+    }
+
+    .kit-photo-slot {
+      aspect-ratio: 1;
+      width: 100%;
+      max-width: min(22rem, 92vw);
+      margin-inline: auto;
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid rgba(29, 107, 58, .12);
+      background: linear-gradient(145deg, #f3faf6, #fff);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .6);
+    }
+
+    @media (min-width: 1024px) {
+      .kit-photo-slot {
+        max-width: 12.5rem;
+      }
+    }
+
+    .kit-photo-slot img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center;
+      image-rendering: auto;
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
+      transform: translateZ(0);
+    }
   </style>
+  <link rel="stylesheet" href="/css/page-bg.css">
 </head>
-<body class="bg-fp-fog text-fp-ink font-sans" data-page="about">
+<body class="page-bg text-fp-ink font-sans" data-page="about">
       <header class="bg-white/80 backdrop-blur sticky top-0 z-50 border-b border-black/5">
   <div class="container-edge flex items-center justify-between h-16">
     <a href="/" class="flex items-center gap-3">
@@ -164,10 +254,176 @@
   </nav>
 </div>
 
-  <main class="max-w-5xl mx-auto px-4 py-10 space-y-6">
-    <h1 class="text-3xl font-bold">Nossa proposta</h1>
-    <p>Saúde, bem-estar e desempenho com praticidade. Lanches proteicos e bebidas funcionais pensados para o dia a dia.</p>
-    <p>Trabalhamos com ingredientes de qualidade, equilíbrio nutricional e muito sabor.</p>
+  <main class="container-edge py-10 md:py-14 space-y-14 md:space-y-16">
+    <section class="grid lg:grid-cols-2 gap-8 items-stretch">
+      <article class="space-y-5">
+        <span class="chip">Topo</span>
+        <h1 class="section-title text-3xl md:text-5xl text-fp-ink">FITPOINT FITNESS</h1>
+        <h2 class="text-xl md:text-2xl font-semibold text-fp-green">Sua marca de produtos saudáveis, pronta para vender</h2>
+        <p class="text-base md:text-lg text-black/75">Monte seu próprio negócio fitness com produtos premium e lucro imediato.</p>
+        <ul class="space-y-2 text-black/80">
+          <li class="flex items-center gap-2"><span class="icon-badge"><i data-lucide="check"></i></span> Sem estoque alto</li>
+          <li class="flex items-center gap-2"><span class="icon-badge"><i data-lucide="flask-conical"></i></span> Sem precisar criar fórmula</li>
+          <li class="flex items-center gap-2"><span class="icon-badge"><i data-lucide="shield-check"></i></span> Produtos testados e aprovados</li>
+          <li class="flex items-center gap-2"><span class="icon-badge"><i data-lucide="badge-dollar-sign"></i></span> Margem real de lucro</li>
+        </ul>
+        <a class="btn" href="https://wa.me/5527992865962?text=Ol%C3%A1%2C%20quero%20come%C3%A7ar%20com%20minha%20marca%20white%20label%20FITPOINT." target="_blank" rel="noopener">
+          <i data-lucide="rocket"></i>
+          Comece hoje com sua própria marca
+        </a>
+      </article>
+      <aside class="card p-6 md:p-8 bg-gradient-to-b from-white to-[#eef7f1]">
+        <span class="chip mb-4"><i data-lucide="lightbulb"></i> Oportunidade</span>
+        <p class="text-black/75 mb-4">Hoje o mercado fitness cresce absurdo, mas a maioria trava nestes 3 pontos:</p>
+        <div class="grid gap-3">
+          <div class="rounded-2xl border border-black/10 bg-white p-4 flex items-center gap-3"><i data-lucide="search-x" class="text-fp-green"></i> Nao sabe o que vender</div>
+          <div class="rounded-2xl border border-black/10 bg-white p-4 flex items-center gap-3"><i data-lucide="truck" class="text-fp-green"></i> Nao tem fornecedor confiavel</div>
+          <div class="rounded-2xl border border-black/10 bg-white p-4 flex items-center gap-3"><i data-lucide="calculator" class="text-fp-green"></i> Nao sabe calcular lucro</div>
+        </div>
+        <p class="mt-5 font-semibold text-fp-green">A FITPOINT resolve isso pra voce.</p>
+      </aside>
+    </section>
+
+    <section class="card p-6 md:p-8 space-y-5">
+      <h3 class="section-title text-2xl md:text-3xl flex items-center gap-2"><i data-lucide="briefcase-business" class="text-fp-green"></i> Voce entra com</h3>
+      <div class="grid md:grid-cols-3 gap-4">
+        <div class="rounded-2xl bg-fp-fog p-4 border border-black/5 flex items-center gap-3"><i data-lucide="tag" class="text-fp-green"></i> Marca propria (ou usa a nossa)</div>
+        <div class="rounded-2xl bg-fp-fog p-4 border border-black/5 flex items-center gap-3"><i data-lucide="package-check" class="text-fp-green"></i> Produtos prontos (Herbalife base)</div>
+        <div class="rounded-2xl bg-fp-fog p-4 border border-black/5 flex items-center gap-3"><i data-lucide="line-chart" class="text-fp-green"></i> Estrutura validada de vendas</div>
+      </div>
+    </section>
+
+    <section class="space-y-5">
+      <span class="chip"><i data-lucide="package"></i> Kit em destaque</span>
+      <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <h3 class="section-title text-2xl md:text-3xl">METABOLIC +</h3>
+        <p class="inline-flex items-center gap-2 rounded-full bg-fp-green text-white text-sm font-semibold px-4 py-2 w-fit">Preço recomendado de revenda: R$ 55</p>
+      </div>
+      <p class="text-black/75 max-w-3xl">Kit para você revender com apoio da FITPOINT. Os números abaixo são um <strong>exemplo de escala</strong> (preço de venda ao cliente final <strong>recomendado: R$ 55</strong> por kit). Valores de compra e montagem do lote combinamos direto com você.</p>
+
+      <div class="grid lg:grid-cols-[1fr_auto] gap-6 items-start">
+        <div class="space-y-5 min-w-0 order-2 lg:order-1">
+          <article class="card p-6 space-y-3">
+            <h4 class="font-semibold text-fp-green flex items-center gap-2"><i data-lucide="info"></i> Em resumo</h4>
+            <p class="text-black/80 text-sm">Dependendo de como você monta o lote, é possível chegar a <strong>71 kits</strong> ou a <strong>66 kits</strong> por rodada. A FITPOINT orienta o melhor caminho para você.</p>
+          </article>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <article class="card p-6 space-y-3 border-t-4 border-t-fp-green">
+              <h4 class="font-semibold text-fp-green flex items-center gap-2"><i data-lucide="package"></i> Lote completo</h4>
+              <p class="text-sm text-black/75">Ate <strong>71 kits</strong> METABOLIC + na rodada.</p>
+              <ul class="text-sm text-black/80 space-y-2">
+                <li><strong>Investimento estimado:</strong> R$ 1.843,64</li>
+                <li><strong>Faturamento (71 x R$ 55):</strong> R$ 3.905,00</li>
+                <li><strong>Lucro estimado:</strong> R$ 2.061,36</li>
+              </ul>
+            </article>
+            <article class="card p-6 space-y-3 border-t-4 border-t-fp-orange">
+              <h4 class="font-semibold text-fp-green flex items-center gap-2"><i data-lucide="package-minus"></i> Lote enxuto</h4>
+              <p class="text-sm text-black/75">Ate <strong>66 kits</strong> METABOLIC + na rodada.</p>
+              <ul class="text-sm text-black/80 space-y-2">
+                <li><strong>Investimento estimado:</strong> R$ 1.707,65</li>
+                <li><strong>Faturamento (66 x R$ 55):</strong> R$ 3.630,00</li>
+                <li><strong>Lucro estimado:</strong> R$ 1.922,35</li>
+              </ul>
+            </article>
+          </div>
+
+          <article class="card p-5 bg-[#f3faf6] border border-fp-green/20">
+            <p class="text-sm text-black/80 flex items-start gap-2"><i data-lucide="piggy-bank" class="text-fp-green shrink-0 mt-0.5"></i> <span>Quer <strong>comecar com valores menores</strong> (a partir de R$ 500)? Fale com a gente: montamos o melhor mix sem complicar.</span></p>
+            <a class="btn btn--sm mt-3 w-fit shrink-0" href="https://wa.me/5527992865962?text=Ol%C3%A1%2C%20quero%20saber%20mais%20sobre%20o%20METABOLIC%20%2B%20%28pre%C3%A7o%20recomendado%20R%24%2055%29%20e%20entradas%20menores." target="_blank" rel="noopener"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i> Falar no WhatsApp</a>
+          </article>
+        </div>
+
+        <aside class="kit-aside card p-4 order-1 lg:order-2 lg:sticky lg:top-24 shrink-0">
+          <p class="text-xs font-semibold text-fp-green text-center mb-2">METABOLIC +</p>
+          <div class="kit-photo-slot" aria-hidden="true">
+            <img
+              src="/assets/metabolic-plus-kit.jpg"
+              alt="Foto do kit METABOLIC +"
+              width="756"
+              height="1008"
+              sizes="(max-width: 1023px) 92vw, 200px"
+              loading="lazy"
+              decoding="async"
+              fetchpriority="low"
+              onerror="this.style.display='none'; this.parentElement.querySelector('.kit-photo-fallback').style.display='flex';">
+            <span class="kit-photo-fallback hidden text-center text-xs text-black/45 px-2">Coloque a imagem em <code class="text-[10px]">/assets/metabolic-plus-kit.jpg</code></span>
+          </div>
+          <p class="text-[10px] text-black/50 text-center mt-2">R$ 55 · preço recomendado</p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="space-y-4">
+      <span class="chip"><i data-lucide="sparkles"></i> Diferencial</span>
+      <h3 class="section-title text-2xl md:text-3xl">Modelo de negócio</h3>
+      <div class="grid md:grid-cols-2 gap-4">
+        <article class="card p-6">
+          <h4 class="font-semibold text-fp-green mb-3 flex items-center gap-2"><i data-lucide="badge-check"></i> Opcao 1 - Marca propria</h4>
+          <ul class="space-y-1 text-black/80">
+            <li>Seu nome</li>
+            <li>Seu Instagram</li>
+            <li>Seu publico</li>
+          </ul>
+        </article>
+        <article class="card p-6">
+          <h4 class="font-semibold text-fp-green mb-3 flex items-center gap-2"><i data-lucide="zap"></i> Opcao 2 - Usar FITPOINT</h4>
+          <ul class="space-y-1 text-black/80">
+            <li>Modelo pronto</li>
+            <li>Artes, cardapios e marketing</li>
+            <li>Mais rapido pra comecar</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="card p-6 md:p-8 space-y-4">
+      <span class="chip self-start w-fit max-w-full shrink-0"><i data-lucide="workflow"></i> Passo a passo</span>
+      <h3 class="section-title text-2xl md:text-3xl">Como funciona</h3>
+      <div class="grid md:grid-cols-5 gap-3 text-sm">
+        <div class="rounded-xl bg-fp-fog p-3 border border-black/5"><strong>1.</strong> Escolhe os produtos</div>
+        <div class="rounded-xl bg-fp-fog p-3 border border-black/5"><strong>2.</strong> Monta seus kits</div>
+        <div class="rounded-xl bg-fp-fog p-3 border border-black/5"><strong>3.</strong> Preço recomendado do kit (R$ 55)</div>
+        <div class="rounded-xl bg-fp-fog p-3 border border-black/5"><strong>4.</strong> Vende no Instagram / WhatsApp</div>
+        <div class="rounded-xl bg-fp-fog p-3 border border-black/5"><strong>5.</strong> Recompra com desconto progressivo</div>
+      </div>
+    </section>
+
+    <section class="space-y-4">
+      <h3 class="section-title text-2xl md:text-3xl flex items-center gap-2"><i data-lucide="star" class="text-fp-green"></i> Produtos que mais vendem</h3>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="card p-4"><p class="font-medium flex items-center gap-2"><i data-lucide="cup-soda" class="text-fp-green"></i> Herbal Concentrate Cha</p></div>
+        <div class="card p-4"><p class="font-medium flex items-center gap-2"><i data-lucide="apple" class="text-fp-green"></i> Fiber Concentrate</p></div>
+        <div class="card p-4"><p class="font-medium flex items-center gap-2"><i data-lucide="battery-charging" class="text-fp-green"></i> Liftoff</p></div>
+        <div class="card p-4"><p class="font-medium flex items-center gap-2"><i data-lucide="flame" class="text-fp-green"></i> N-R-G Herbalife</p></div>
+      </div>
+      <p class="text-black/70">Esses giram rapido e ajudam no marketing com foco em energia e emagrecimento.</p>
+    </section>
+
+    <section class="card p-6 md:p-8 space-y-4">
+      <h3 class="section-title text-2xl md:text-3xl flex items-center gap-2"><i data-lucide="target" class="text-fp-green"></i> Estrategia de venda</h3>
+      <p class="text-black/75"><strong>Pare de vender produto isolado.</strong> Venda ofertas com contexto e resultado percebido.</p>
+      <div class="grid md:grid-cols-3 gap-3">
+        <div class="rounded-xl border border-black/10 p-4">Desafio 7 dias</div>
+        <div class="rounded-xl border border-black/10 p-4">METABOLIC +</div>
+        <div class="rounded-xl border border-black/10 p-4">Plano Emagrecimento 15 dias</div>
+      </div>
+      <p class="text-black/70">Ex.: METABOLIC + com <strong>preço recomendado R$ 55</strong> — oferta clara para o cliente e previsibilidade para você.</p>
+    </section>
+
+    <section class="rounded-[20px] bg-fp-green text-white p-6 md:p-10 space-y-4">
+      <h3 class="section-title text-2xl md:text-4xl flex items-center gap-2"><i data-lucide="rocket"></i> Comece agora com a FITPOINT</h3>
+      <ul class="space-y-1 text-white/95">
+        <li>Tenha sua marca fitness</li>
+        <li>Venda produtos validados</li>
+        <li>Lucre desde o primeiro kit</li>
+      </ul>
+      <a class="btn bg-white !text-fp-green" href="https://wa.me/5527992865962?text=Ol%C3%A1%2C%20quero%20come%C3%A7ar%20agora%20com%20a%20FITPOINT." target="_blank" rel="noopener">
+        <i data-lucide="message-circle"></i>
+        Clique aqui e fale comigo no WhatsApp
+      </a>
+    </section>
   </main>
   <script src="/js/app.js"></script>
 </body>

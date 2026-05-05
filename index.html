@@ -135,6 +135,7 @@
                 height: 520px;
             }
         }
+
     </style>
     <link rel="stylesheet" href="/css/product-chips.css">
 
@@ -278,18 +279,16 @@
         <section class="container-edge py-14">
             <section class="space-y-2 mb-5">
                 <h1 class="font-display text-3xl font-bold flex items-center gap-2">
-                    <i data-lucide="map-pin"></i> Points
+                    <i data-lucide="map-pin"></i> Nossas unidades
                 </h1>
                 <p class="text-black/70">Veja nossas unidades no mapa e trace a rota até a mais próxima.</p>
             </section>
 
-            <!-- Mapa -->
             <section class="card overflow-hidden">
                 <div id="map"></div>
             </section>
 
-            <!-- Lista de unidades (CTA “Como chegar”) -->
-            <section class="space-y-6 mt-5">
+            <section class="grid gap-6 mt-5 md:grid-cols-2">
                 <article class="card p-5 ring-2 ring-fp-green shadow-lg relative overflow-visible z-0 isolate">
                     <span class="chip-principal">Unidade principal</span>
                     <h2 class="font-semibold text-lg flex items-center gap-2 mt-2">
@@ -299,56 +298,35 @@
                     <div class="mt-4 flex flex-wrap gap-3">
                         <a id="btn-route-1"
                             class="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-fp-green text-white font-medium"
-                            target="_blank">
+                            target="_blank" rel="noopener noreferrer">
                             <i data-lucide="route"></i> Como chegar
                         </a>
                         <a id="btn-view-1"
                             class="inline-flex items-center gap-2 px-4 py-2 rounded-2xl border border-fp-green text-fp-green font-medium"
-                            target="_blank">
+                            target="_blank" rel="noopener noreferrer">
                             <i data-lucide="map"></i> Ver no Maps
                         </a>
                     </div>
                 </article>
 
-                <section class="grid md:grid-cols-2 gap-6">
-                    <article class="card p-5">
-                        <h2 class="font-semibold text-lg flex items-center gap-2">
-                            <i data-lucide="building-2"></i> Fit Point Fitness - Vila Bethania
-                        </h2>
-                        <p class="text-sm text-black/70 mt-1">R. Cel. Nunes Ferreira, 84 — Vila Bethania, Viana/ES</p>
-                        <div class="mt-4 flex flex-wrap gap-3">
-                            <a id="btn-route-2"
-                                class="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-fp-green text-white font-medium"
-                                target="_blank">
-                                <i data-lucide="route"></i> Como chegar
-                            </a>
-                            <a id="btn-view-2"
-                                class="inline-flex items-center gap-2 px-4 py-2 rounded-2xl border border-fp-green text-fp-green font-medium"
-                                target="_blank">
-                                <i data-lucide="map"></i> Ver no Maps
-                            </a>
-                        </div>
-                    </article>
-
-                    <article class="card p-5">
-                        <h2 class="font-semibold text-lg flex items-center gap-2">
-                            <i data-lucide="building-2"></i> Fit Point Fitness - Vista Dourada
-                        </h2>
-                        <p class="text-sm text-black/70 mt-1">Av. Moxuara, 2549 — Vista Dourada, Cariacica/ES</p>
-                        <div class="mt-4 flex flex-wrap gap-3">
-                            <a id="btn-route-3"
-                                class="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-fp-green text-white font-medium"
-                                target="_blank">
-                                <i data-lucide="route"></i> Como chegar
-                            </a>
-                            <a id="btn-view-3"
-                                class="inline-flex items-center gap-2 px-4 py-2 rounded-2xl border border-fp-green text-fp-green font-medium"
-                                target="_blank">
-                                <i data-lucide="map"></i> Ver no Maps
-                            </a>
-                        </div>
-                    </article>
-                </section>
+                <article class="card p-5">
+                    <h2 class="font-semibold text-lg flex items-center gap-2">
+                        <i data-lucide="building-2"></i> Fit Point Fitness — Vila Bethania
+                    </h2>
+                    <p class="text-sm text-black/70 mt-1">R. Cel. Nunes Ferreira, 84 — Vila Bethania, Viana/ES</p>
+                    <div class="mt-4 flex flex-wrap gap-3">
+                        <a id="btn-route-2"
+                            class="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-fp-green text-white font-medium"
+                            target="_blank" rel="noopener noreferrer">
+                            <i data-lucide="route"></i> Como chegar
+                        </a>
+                        <a id="btn-view-2"
+                            class="inline-flex items-center gap-2 px-4 py-2 rounded-2xl border border-fp-green text-fp-green font-medium"
+                            target="_blank" rel="noopener noreferrer">
+                            <i data-lucide="map"></i> Ver no Maps
+                        </a>
+                    </div>
+                </article>
             </section>
         </section>
     </section>
@@ -366,8 +344,6 @@
     </footer>
 
     <script>
-        // 1) Cadastre aqui as coordenadas (lat, lng) e place_id (opcional) de cada unidade.
-        //    Dica: no Google Maps, clique com botão direito no ponto e copie as coordenadas.
         const LOCATIONS = [
             {
                 name: 'Fit Point Fitness — Itacibá',
@@ -380,22 +356,13 @@
                 viewBtn: 'btn-view-1'
             },
             {
-                name: 'Fit Point Fitness - Vila Bethania',
+                name: 'Fit Point Fitness — Vila Bethania',
                 lat: -20.360618,
                 lng: -40.405477,
                 placeId: null,
                 addr: 'R. Cel. Nunes Ferreira, 84 — Vila Bethania, Viana/ES',
                 routeBtn: 'btn-route-2',
                 viewBtn: 'btn-view-2'
-            },
-            {
-                name: 'Fit Point Fitness - Vista Dourada',
-                lat: -20.332230,
-                lng: -40.426799,
-                placeId: null,
-                addr: 'Av. Moxuara, 2549 — Vista Dourada, Cariacica/ES',
-                routeBtn: 'btn-route-3',
-                viewBtn: 'btn-view-3'
             }
         ];
 
@@ -413,7 +380,6 @@
               </svg>`;
         }
 
-        // 2) Estilo do mapa combinando a paleta FitPoint (opcional)
         const MAP_STYLE = [
             { elementType: 'geometry', stylers: [{ color: '#ebe3cd' }] },
             { elementType: 'labels.text.fill', stylers: [{ color: '#523735' }] },
@@ -425,7 +391,6 @@
             { featureType: 'poi.business', stylers: [{ visibility: 'off' }] }
         ];
 
-        // 3) Inicializa o mapa (chamada pelo callback do script do Google)
         function initMap() {
             const bounds = new google.maps.LatLngBounds();
             const map = new google.maps.Map(document.getElementById('map'), {
@@ -438,7 +403,7 @@
 
             const info = new google.maps.InfoWindow();
 
-            LOCATIONS.forEach((loc, i) => {
+            LOCATIONS.forEach((loc) => {
                 const primary = !!loc.primary;
                 const mSize = primary ? 44 : 36;
                 const anchorX = primary ? 22 : 18;
@@ -470,7 +435,6 @@
 
                 bounds.extend(marker.getPosition());
 
-                // Botões “Como chegar” e “Ver no Maps”
                 const route = document.getElementById(loc.routeBtn);
                 if (route) {
                     route.href = `https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`;
@@ -483,24 +447,20 @@
                 }
             });
 
-            // Ajusta o zoom para mostrar todos os marcadores
             map.fitBounds(bounds);
         }
 
-        // Exponha o initMap no escopo global (necessário para o callback do Google)
         window.initMap = initMap;
 
-        // Atualiza ícones Lucide
         document.addEventListener('DOMContentLoaded', () => {
             try { window.lucide && window.lucide.createIcons(); } catch (e) { }
-            document.getElementById('y').textContent = new Date().getFullYear();
+            var y = document.getElementById('y');
+            if (y) y.textContent = new Date().getFullYear();
         });
     </script>
 
-    <!-- Google Maps JS API - Carregado dinamicamente via API -->
     <script>
-        // Carrega a chave do Google Maps do backend e inicializa o script
-        (function() {
+        (function () {
             fetch('/api/config/google-maps-key')
                 .then(res => res.json())
                 .then(data => {
@@ -512,19 +472,20 @@
                         document.head.appendChild(script);
                     } else {
                         console.error('Erro ao carregar Google Maps API Key:', data.error);
-                        document.getElementById('map').innerHTML = '<p class="p-4 text-red-600">Erro ao carregar o mapa. Verifique a configuração da API.</p>';
+                        var el = document.getElementById('map');
+                        if (el) el.innerHTML = '<p class="p-4 text-red-600">Erro ao carregar o mapa. Verifique a configuração da API.</p>';
                     }
                 })
                 .catch(error => {
                     console.error('Erro ao carregar Google Maps API Key:', error);
-                    document.getElementById('map').innerHTML = '<p class="p-4 text-red-600">Erro ao carregar o mapa.</p>';
+                    var el = document.getElementById('map');
+                    if (el) el.innerHTML = '<p class="p-4 text-red-600">Erro ao carregar o mapa.</p>';
                 });
         })();
     </script>
     <script src="/js/config.js"></script>
     <script src="/js/database.js"></script>
     <script src="/js/app.js"></script>
-    <script>document.getElementById('y').textContent = new Date().getFullYear();</script>
 </body>
 
 </html>

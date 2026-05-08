@@ -11,36 +11,6 @@
     ];
   }
 
-  function decorateWhatsAppUnavailable(btn) {
-    if (!btn || btn.dataset.unavailableDecorated === '1') return;
-    btn.dataset.unavailableDecorated = '1';
-    btn.setAttribute('aria-disabled', 'true');
-    btn.setAttribute('tabindex', '-1');
-    btn.classList.add('cursor-not-allowed');
-    btn.removeAttribute('href');
-    btn.removeAttribute('target');
-    btn.removeAttribute('rel');
-    btn.style.backgroundColor = '#9CA3AF';
-    btn.style.color = '#F9FAFB';
-    btn.style.opacity = '0.72';
-    btn.style.border = '1px solid #9CA3AF';
-
-    var wrap = document.createElement('span');
-    wrap.className = 'relative inline-flex';
-    btn.parentNode.insertBefore(wrap, btn);
-    wrap.appendChild(btn);
-
-    var flag = document.createElement('span');
-    flag.className = 'class="pointer-events-none absolute -top-2 right-1 inline-flex items-center rounded-full border border-fp-orange/45 bg-fp-orange text-white px-2.5 py-1 text-[0.35rem] font-extrabold uppercase tracking-[0.08em] shadow-md"';
-    flag.textContent = 'temporariamente indisponivel';
-    wrap.appendChild(flag);
-
-    btn.addEventListener('click', function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    });
-  }
-
   function ensureInstagramModal() {
     if (document.getElementById('contact-ig-modal')) return;
 
@@ -125,9 +95,7 @@
   }
 
   function initContactActions() {
-    var wa = document.getElementById('contact-whatsapp');
     var ig = document.getElementById('contact-instagram');
-    if (wa) decorateWhatsAppUnavailable(wa);
     if (ig) {
       ig.addEventListener('click', function (e) {
         e.preventDefault();

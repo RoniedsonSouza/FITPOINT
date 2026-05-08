@@ -64,6 +64,7 @@
     else lines.push({ id: String(p.id), name: p.name, price: price, qty: 1 });
     writeStorage();
     render();
+    showItemAddedFeedback(p.name);
   }
 
   function setQty(id, qty) {
@@ -113,6 +114,26 @@
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  function showItemAddedFeedback(productName) {
+    var existing = document.getElementById('fp-item-added');
+    if (existing) existing.remove();
+
+    var box = document.createElement('div');
+    box.id = 'fp-item-added';
+    box.setAttribute('role', 'status');
+    box.setAttribute('aria-live', 'polite');
+    box.className =
+      'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[85] max-w-[min(90vw,22rem)] rounded-2xl bg-white text-fp-ink px-5 py-4 text-sm shadow-2xl border border-black/10 text-center pointer-events-none';
+    box.innerHTML =
+      '<p class="font-semibold text-fp-green">Adicionado ao pedido</p>' +
+      '<p class="mt-1.5 text-black/75 leading-snug">' + escapeHtml(productName) + '</p>';
+    document.body.appendChild(box);
+
+    window.setTimeout(function () {
+      if (box.parentNode) box.remove();
+    }, 2000);
   }
 
   function escapeAttr(s) {
@@ -175,7 +196,17 @@
   }
 
   function isWhatsAppUnavailable() {
-    return true;
+    return false;
+  }
+
+  function restoreWhatsAppButton(btn) {
+    if (!btn) return;
+    var flag = btn.nextElementSibling;
+    if (flag && flag.getAttribute && flag.getAttribute('data-fp-wa-unavail-flag') === '1') {
+      flag.remove();
+    }
+    delete btn.dataset.unavailableDecorated;
+    btn.classList.remove('cursor-not-allowed');
   }
 
   function decorateWhatsAppUnavailable(btn) {
@@ -187,6 +218,7 @@
     btn.dataset.unavailableDecorated = '1';
 
     var flag = document.createElement('span');
+    flag.setAttribute('data-fp-wa-unavail-flag', '1');
     flag.className = 'pointer-events-none absolute -top-2 right-1 inline-flex items-center rounded-full border border-fp-orange/45 bg-fp-orange text-white px-2.5 py-1 text-[0.62rem] font-extrabold uppercase tracking-[0.08em] shadow-md';
     flag.textContent = 'temporariamente indisponivel';
 
@@ -354,7 +386,7 @@
 
     if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
       navigator.clipboard.writeText(text).then(function () {
-        showToast('Pedido copiado para a area de transferencia.');
+        showToast('Pedido copiado para a área de transferência.');
         go();
       }).catch(go);
     } else {
@@ -382,7 +414,10 @@
       backdrop.classList.toggle('hidden', !open);
       backdrop.setAttribute('aria-hidden', open ? 'false' : 'true');
     }
-    if (fab) fab.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (fab) {
+      fab.setAttribute('aria-expanded', open ? 'true' : 'false');
+      fab.classList.toggle('max-md:hidden', open);
+    }
     document.body.classList.toggle('overflow-hidden', open);
   }
 
@@ -440,6 +475,7 @@
       if (isWhatsAppUnavailable()) {
         decorateWhatsAppUnavailable(waBtn);
       } else {
+        restoreWhatsAppButton(waBtn);
         waBtn.disabled = disabled;
       }
     }
@@ -476,6 +512,16 @@
       '<span>Pedir pelo Instagram</span>';
     waBtn.parentNode.insertBefore(igBtn, waBtn.nextSibling);
     igBtn.addEventListener('click', function () { openInstagramPicker(); });
+
+    if (!document.getElementById('cart-instagram-clipboard-hint')) {
+      var igHint = document.createElement('p');
+      igHint.id = 'cart-instagram-clipboard-hint';
+      igHint.className =
+        'text-[11px] sm:text-xs text-black/65 leading-snug mt-3 rounded-lg border border-fp-orange/35 bg-fp-orange/8 px-3 py-2.5';
+      igHint.innerHTML =
+        '<strong class="text-fp-ink">Atenção:</strong> ao pedir pelo Instagram, o texto do pedido formatado é copiado automaticamente para a <strong class="text-fp-ink">área de transferência</strong>. Quando o chat da loja abrir, basta <strong class="text-fp-ink">colar</strong> a mensagem (Ctrl+V no computador ou “Colar” no celular) para enviar o pedido.';
+      igBtn.parentNode.insertBefore(igHint, igBtn.nextSibling);
+    }
   }
 
   function bind() {
@@ -494,8 +540,11 @@
     if (backdrop) backdrop.addEventListener('click', function () { closeDrawer(); });
     if (closeBtn) closeBtn.addEventListener('click', function () { closeDrawer(); });
     if (clearBtn) clearBtn.addEventListener('click', function () { clear(); });
-    if (waBtn && isWhatsAppUnavailable()) decorateWhatsAppUnavailable(waBtn);
-    if (waBtn) waBtn.addEventListener('click', function () { openWhatsApp(); });
+    if (waBtn) {
+      if (isWhatsAppUnavailable()) decorateWhatsAppUnavailable(waBtn);
+      else restoreWhatsAppButton(waBtn);
+      waBtn.addEventListener('click', function () { openWhatsApp(); });
+    }
 
     if (linesEl) {
       linesEl.addEventListener('click', function (e) {

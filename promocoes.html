@@ -338,7 +338,7 @@
   <div id="cart-root"
     class="fixed z-[60] pointer-events-none bottom-0 left-0 right-0 flex flex-col items-stretch gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-0 max-md:gap-0 max-md:px-0 max-md:pb-0 md:inset-auto md:bottom-6 md:right-6 md:left-auto md:w-auto md:items-end md:gap-3 md:px-0 md:pb-0">
     <div id="cart-panel"
-      class="hidden pointer-events-auto w-full max-w-lg mx-auto md:mx-0 md:w-[min(92vw,26rem)] lg:w-[min(92vw,28rem)] max-md:mx-0 max-md:max-w-none max-md:w-full max-md:h-[calc(100dvh-env(safe-area-inset-bottom))] max-md:max-h-[calc(100dvh-env(safe-area-inset-bottom))] max-md:rounded-t-3xl md:h-[min(86vh,700px)] flex flex-col rounded-t-2xl md:rounded-2xl bg-white shadow-2xl border border-black/10 overflow-hidden min-h-0"
+      class="hidden pointer-events-auto w-full max-w-lg mx-auto md:mx-0 md:w-[min(92vw,26rem)] lg:w-[min(92vw,28rem)] max-md:mx-0 max-md:max-w-none max-md:w-full max-md:h-[calc(100dvh-env(safe-area-inset-bottom))] max-md:max-h-[calc(100dvh-env(safe-area-inset-bottom))] max-md:rounded-t-3xl md:h-[calc(100vh-3rem)] md:max-h-[calc(100vh-3rem)] flex flex-col rounded-t-2xl md:rounded-2xl bg-white shadow-2xl border border-black/10 overflow-hidden min-h-0"
       role="dialog" aria-modal="true" aria-labelledby="cart-title" aria-hidden="true">
       <div class="flex items-center justify-between p-4 sm:p-4 border-b border-black/5 shrink-0 bg-white">
         <h2 id="cart-title" class="font-display font-bold text-lg text-fp-ink">Seu pedido</h2>
@@ -348,8 +348,8 @@
           <span class="text-xl leading-none" aria-hidden="true">×</span>
         </button>
       </div>
-      <div id="cart-lines" class="flex-1 overflow-y-auto min-h-0 max-md:min-h-[min(42dvh,24rem)] overscroll-contain p-4 sm:p-4 max-md:py-3"></div>
-      <div class="px-4 py-3 sm:px-4 shrink-0 bg-fp-fog/80 border-t border-black/5 space-y-3 max-md:max-h-[min(34vh,15.5rem)] max-md:overflow-y-auto max-md:min-h-0 max-md:overscroll-contain">
+      <div id="cart-lines" class="flex-1 overflow-y-auto min-h-0 md:min-h-[35vh] max-md:min-h-[min(42dvh,24rem)] overscroll-contain p-4 sm:p-4 max-md:py-3"></div>
+      <div class="px-4 py-3 sm:px-4 shrink-0 bg-fp-fog/80 border-t border-black/5 space-y-3 md:max-h-[34vh] md:overflow-y-auto md:overscroll-contain max-md:max-h-[min(34vh,15.5rem)] max-md:overflow-y-auto max-md:min-h-0 max-md:overscroll-contain">
         <div>
           <label for="cart-payment" class="text-xs font-medium text-black/60">Forma de pagamento</label>
           <select id="cart-payment"

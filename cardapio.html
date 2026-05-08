@@ -346,9 +346,9 @@
   <div id="cart-backdrop" class="hidden fixed inset-0 z-[55] bg-black/40 transition-opacity" aria-hidden="true"></div>
 
   <div id="cart-root"
-    class="fixed z-[60] pointer-events-none bottom-0 left-0 right-0 flex flex-col items-stretch gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-0 md:inset-auto md:bottom-6 md:right-6 md:left-auto md:w-auto md:items-end md:gap-3 md:px-0 md:pb-0">
+    class="fixed z-[60] pointer-events-none bottom-0 left-0 right-0 flex flex-col items-stretch gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-0 max-md:gap-0 max-md:px-0 max-md:pb-0 md:inset-auto md:bottom-6 md:right-6 md:left-auto md:w-auto md:items-end md:gap-3 md:px-0 md:pb-0">
     <div id="cart-panel"
-      class="hidden pointer-events-auto w-full max-w-lg mx-auto md:mx-0 md:w-[min(92vw,26rem)] lg:w-[min(92vw,28rem)] h-[min(92dvh,720px)] md:h-[min(86vh,700px)] flex flex-col rounded-t-2xl md:rounded-2xl bg-white shadow-2xl border border-black/10 overflow-hidden"
+      class="hidden pointer-events-auto w-full max-w-lg mx-auto md:mx-0 md:w-[min(92vw,26rem)] lg:w-[min(92vw,28rem)] max-md:mx-0 max-md:max-w-none max-md:w-full max-md:h-[calc(100dvh-env(safe-area-inset-bottom))] max-md:max-h-[calc(100dvh-env(safe-area-inset-bottom))] max-md:rounded-t-3xl md:h-[min(86vh,700px)] flex flex-col rounded-t-2xl md:rounded-2xl bg-white shadow-2xl border border-black/10 overflow-hidden min-h-0"
       role="dialog" aria-modal="true" aria-labelledby="cart-title" aria-hidden="true">
       <div class="flex items-center justify-between p-4 sm:p-4 border-b border-black/5 shrink-0 bg-white">
         <h2 id="cart-title" class="font-display font-bold text-lg text-fp-ink">Seu pedido</h2>
@@ -358,8 +358,8 @@
           <span class="text-xl leading-none" aria-hidden="true">×</span>
         </button>
       </div>
-      <div id="cart-lines" class="flex-1 overflow-y-auto min-h-0 p-4 sm:p-4"></div>
-      <div class="px-4 py-3 sm:px-4 shrink-0 bg-fp-fog/80 border-t border-black/5 space-y-3">
+      <div id="cart-lines" class="flex-1 overflow-y-auto min-h-0 max-md:min-h-[min(42dvh,24rem)] overscroll-contain p-4 sm:p-4 max-md:py-3"></div>
+      <div class="px-4 py-3 sm:px-4 shrink-0 bg-fp-fog/80 border-t border-black/5 space-y-3 max-md:max-h-[min(34vh,15.5rem)] max-md:overflow-y-auto max-md:min-h-0 max-md:overscroll-contain">
         <div>
           <label for="cart-payment" class="text-xs font-medium text-black/60">Forma de pagamento</label>
           <select id="cart-payment"
@@ -384,17 +384,17 @@
           <label for="cart-notes" class="text-xs font-medium text-black/60">Endereço e observações</label>
           <p class="text-[11px] text-black/45 mt-0.5 leading-snug">Para entrega, informe endereço completo. Horário, referência ou restrições alimentares também vão aqui.</p>
           <textarea id="cart-notes" rows="3"
-            class="mt-1 w-full text-sm rounded-xl border border-black/15 bg-white resize-none py-2 px-2.5 text-fp-ink placeholder:text-black/35 focus:outline-none focus:ring-2 focus:ring-fp-green/25 focus:border-fp-green"
+            class="mt-1 w-full text-sm rounded-xl border border-black/15 bg-white resize-none py-2 px-2.5 text-fp-ink placeholder:text-black/35 focus:outline-none focus:ring-2 focus:ring-fp-green/25 focus:border-fp-green max-md:min-h-[4.25rem]"
             placeholder="Ex.: Rua, número, bairro, CEP, ponto de referência…"></textarea>
         </div>
       </div>
-      <div class="flex items-center justify-between gap-2 px-4 py-2.5 sm:px-4 border-t border-black/5 bg-white shrink-0">
+      <div class="flex items-center justify-between gap-2 px-4 py-2 sm:px-4 border-t border-black/5 bg-white shrink-0 max-md:py-2">
         <button type="button" id="cart-clear" class="text-sm font-medium text-black/50 hover:text-fp-green">
           Limpar
         </button>
         <p class="text-sm text-fp-ink">Total <span id="cart-total-value" class="font-bold text-fp-green">R$&nbsp;0,00</span></p>
       </div>
-      <div class="p-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white shrink-0 md:pb-4">
+      <div class="p-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white shrink-0 max-md:p-3 max-md:pt-2 md:pb-4">
         <button type="button" id="cart-whatsapp"
           class="btn w-full justify-center gap-2 shadow-soft disabled:opacity-45 disabled:pointer-events-none min-h-[3rem] text-[0.95rem]" disabled>
           Enviar pedido no WhatsApp
@@ -402,7 +402,7 @@
       </div>
     </div>
     <button type="button" id="cart-fab"
-      class="pointer-events-auto self-end h-14 w-14 shrink-0 rounded-full bg-fp-green text-white shadow-lg flex items-center justify-center relative hover:opacity-95 transition-opacity md:self-end"
+      class="pointer-events-auto self-end h-14 w-14 shrink-0 rounded-full bg-fp-green text-white shadow-lg flex items-center justify-center relative hover:opacity-95 transition-opacity max-md:absolute max-md:right-3 max-md:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-md:z-[61] max-md:shadow-xl md:self-end"
       aria-label="Ver pedido" aria-haspopup="dialog" aria-expanded="false">
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"

@@ -246,6 +246,8 @@
 
   var igModalOpen = false;
   var igModalLastFocus = null;
+  var sendModalOpen = false;
+  var sendModalLastFocus = null;
 
   function getInstagramBranches() {
     var cfg = window.FitPointConfig || {};
@@ -356,6 +358,129 @@
       igModalLastFocus.focus({ preventScroll: true });
     }
     igModalLastFocus = null;
+  }
+
+  function ensureSendChannelModal() {
+    if (document.getElementById('fp-send-channel-modal')) return;
+
+    var root = document.createElement('div');
+    root.id = 'fp-send-channel-modal';
+    root.className = 'fixed inset-0 z-[72] hidden flex items-end md:items-center justify-center p-3 md:p-4';
+    root.setAttribute('aria-hidden', 'true');
+
+    var backdrop = document.createElement('div');
+    backdrop.className = 'absolute inset-0 bg-black/50';
+    backdrop.setAttribute('aria-hidden', 'true');
+
+    var panel = document.createElement('div');
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-labelledby', 'fp-send-channel-title');
+    panel.className = 'relative w-full max-w-md rounded-2xl bg-white shadow-2xl border border-black/10 p-5 sm:p-6 max-h-[min(90dvh,560px)] overflow-y-auto';
+
+    var title = document.createElement('h3');
+    title.id = 'fp-send-channel-title';
+    title.className = 'font-display font-bold text-lg text-fp-ink';
+    title.textContent = 'Para onde enviar o pedido?';
+
+    var hint = document.createElement('p');
+    hint.className = 'text-sm text-black/65 mt-2 leading-snug';
+    hint.textContent = 'Escolha o canal. Vamos aplicar o envio com a mesma lógica atual para WhatsApp ou Instagram.';
+
+    var actions = document.createElement('div');
+    actions.className = 'mt-5 flex flex-col gap-2';
+
+    var waBtn = document.createElement('button');
+    waBtn.type = 'button';
+    waBtn.className = 'w-full rounded-xl border border-black/12 bg-white hover:bg-fp-fog/80 px-4 py-3 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-fp-green/30 focus:border-fp-green';
+    waBtn.setAttribute('data-send-channel', 'whatsapp');
+    waBtn.innerHTML =
+      '<span class="block font-semibold text-fp-ink">WhatsApp</span>' +
+      '<span class="block text-sm text-black/55 mt-0.5">Abrir conversa com a mensagem do pedido preenchida.</span>';
+
+    var igBtn = document.createElement('button');
+    igBtn.type = 'button';
+    igBtn.className = 'w-full rounded-xl border border-black/12 bg-white hover:bg-fp-fog/80 px-4 py-3 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-fp-green/30 focus:border-fp-green';
+    igBtn.setAttribute('data-send-channel', 'instagram');
+    igBtn.innerHTML =
+      '<span class="block font-semibold text-fp-ink">Instagram</span>' +
+      '<span class="block text-sm text-black/55 mt-0.5">Escolher filial e abrir o chat no Instagram.</span>';
+
+    var igInfo = document.createElement('p');
+    igInfo.className = 'mt-4 text-xs sm:text-sm text-black/70 leading-snug rounded-lg border border-fp-orange/35 bg-fp-orange/8 px-3 py-2.5';
+    igInfo.innerHTML =
+      '<strong class="text-fp-ink">Atenção:</strong> no Instagram, o texto do pedido formatado será copiado para a <strong class="text-fp-ink">área de transferência</strong>. Com o chat aberto, basta <strong class="text-fp-ink">colar</strong> a mensagem para enviar.';
+
+    var cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'mt-4 w-full text-sm font-medium text-black/50 hover:text-fp-green py-2';
+    cancel.setAttribute('data-send-dismiss', '1');
+    cancel.textContent = 'Cancelar';
+
+    actions.appendChild(waBtn);
+    actions.appendChild(igBtn);
+    panel.appendChild(title);
+    panel.appendChild(hint);
+    panel.appendChild(actions);
+    panel.appendChild(igInfo);
+    panel.appendChild(cancel);
+    root.appendChild(backdrop);
+    root.appendChild(panel);
+    document.body.appendChild(root);
+
+    function close() {
+      closeSendChannelModal();
+    }
+
+    backdrop.addEventListener('click', close);
+    cancel.addEventListener('click', close);
+    actions.addEventListener('click', function (e) {
+      var t = e.target;
+      if (!(t instanceof HTMLElement)) return;
+      var row = t.closest('[data-send-channel]');
+      if (!row || !actions.contains(row)) return;
+      var channel = row.getAttribute('data-send-channel');
+      closeSendChannelModal();
+      if (channel === 'whatsapp') openWhatsApp();
+      if (channel === 'instagram') openInstagramPicker();
+    });
+  }
+
+  function openSendChannelModal() {
+    if (lines.length === 0) return;
+    ensureSendChannelModal();
+    var root = document.getElementById('fp-send-channel-modal');
+    if (!root) return;
+
+    var waBtn = root.querySelector('[data-send-channel="whatsapp"]');
+    if (waBtn instanceof HTMLButtonElement) {
+      var waUnavailable = isWhatsAppUnavailable();
+      waBtn.disabled = waUnavailable;
+      waBtn.classList.toggle('opacity-50', waUnavailable);
+      waBtn.classList.toggle('cursor-not-allowed', waUnavailable);
+    }
+
+    sendModalLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    sendModalOpen = true;
+    root.classList.remove('hidden');
+    root.setAttribute('aria-hidden', 'false');
+    var first = root.querySelector('[data-send-channel="whatsapp"], [data-send-channel="instagram"]');
+    if (first instanceof HTMLElement) {
+      setTimeout(function () { first.focus(); }, 50);
+    }
+  }
+
+  function closeSendChannelModal() {
+    var root = document.getElementById('fp-send-channel-modal');
+    if (root) {
+      root.classList.add('hidden');
+      root.setAttribute('aria-hidden', 'true');
+    }
+    sendModalOpen = false;
+    if (sendModalLastFocus && document.contains(sendModalLastFocus)) {
+      sendModalLastFocus.focus({ preventScroll: true });
+    }
+    sendModalLastFocus = null;
   }
 
   function showToast(message) {
@@ -469,21 +594,19 @@
     if (totalEl) totalEl.textContent = currency(totalMoney());
 
     var waBtn = document.getElementById('cart-whatsapp');
-    var igBtn = document.getElementById('cart-instagram');
     var disabled = lines.length === 0;
     if (waBtn) {
-      if (isWhatsAppUnavailable()) {
-        decorateWhatsAppUnavailable(waBtn);
-      } else {
-        restoreWhatsAppButton(waBtn);
-        waBtn.disabled = disabled;
-      }
+      waBtn.disabled = disabled;
     }
-    if (igBtn) igBtn.disabled = disabled;
   }
 
   function onKeydown(e) {
     if (e.key !== 'Escape') return;
+    if (sendModalOpen) {
+      e.preventDefault();
+      closeSendChannelModal();
+      return;
+    }
     if (igModalOpen) {
       e.preventDefault();
       closeInstagramModal();
@@ -492,35 +615,6 @@
     if (drawerOpen) {
       e.preventDefault();
       closeDrawer();
-    }
-  }
-
-  function injectInstagramButton() {
-    var waBtn = document.getElementById('cart-whatsapp');
-    if (!waBtn || document.getElementById('cart-instagram')) return;
-    var wrap = waBtn.parentNode;
-    if (wrap) wrap.classList.add('flex', 'flex-col', 'gap-2');
-    var igBtn = document.createElement('button');
-    igBtn.id = 'cart-instagram';
-    igBtn.type = 'button';
-    igBtn.disabled = true;
-    igBtn.className =
-      'btn btn-outline w-full justify-center gap-2 min-h-[3rem] text-[0.95rem] disabled:opacity-45 disabled:pointer-events-none';
-    igBtn.setAttribute('aria-haspopup', 'dialog');
-    igBtn.innerHTML =
-      '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>' +
-      '<span>Pedir pelo Instagram</span>';
-    waBtn.parentNode.insertBefore(igBtn, waBtn.nextSibling);
-    igBtn.addEventListener('click', function () { openInstagramPicker(); });
-
-    if (!document.getElementById('cart-instagram-clipboard-hint')) {
-      var igHint = document.createElement('p');
-      igHint.id = 'cart-instagram-clipboard-hint';
-      igHint.className =
-        'text-[11px] sm:text-xs text-black/65 leading-snug mt-3 rounded-lg border border-fp-orange/35 bg-fp-orange/8 px-3 py-2.5';
-      igHint.innerHTML =
-        '<strong class="text-fp-ink">Atenção:</strong> ao pedir pelo Instagram, o texto do pedido formatado é copiado automaticamente para a <strong class="text-fp-ink">área de transferência</strong>. Quando o chat da loja abrir, basta <strong class="text-fp-ink">colar</strong> a mensagem (Ctrl+V no computador ou “Colar” no celular) para enviar o pedido.';
-      igBtn.parentNode.insertBefore(igHint, igBtn.nextSibling);
     }
   }
 
@@ -534,16 +628,13 @@
 
     if (!linesEl) return;
 
-    injectInstagramButton();
-
     if (fab) fab.addEventListener('click', function () { toggleDrawer(); });
     if (backdrop) backdrop.addEventListener('click', function () { closeDrawer(); });
     if (closeBtn) closeBtn.addEventListener('click', function () { closeDrawer(); });
     if (clearBtn) clearBtn.addEventListener('click', function () { clear(); });
     if (waBtn) {
-      if (isWhatsAppUnavailable()) decorateWhatsAppUnavailable(waBtn);
-      else restoreWhatsAppButton(waBtn);
-      waBtn.addEventListener('click', function () { openWhatsApp(); });
+      waBtn.textContent = 'Enviar pedido';
+      waBtn.addEventListener('click', function () { openSendChannelModal(); });
     }
 
     if (linesEl) {

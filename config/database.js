@@ -30,7 +30,66 @@ async function ensureDatabase() {
       ALTER TABLE ${SCHEMA}.products
       ADD COLUMN IF NOT EXISTS is_kit BOOLEAN DEFAULT false
     `);
-    console.log(`✅ Schema "${SCHEMA}" e colunas products (promo_price, is_kit) verificadas`);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.products
+      ADD COLUMN IF NOT EXISTS description TEXT
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.products
+      ADD COLUMN IF NOT EXISTS nutrition JSONB DEFAULT '{}'::jsonb
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.products
+      ADD COLUMN IF NOT EXISTS options JSONB DEFAULT '[]'::jsonb
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA}.categories (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) UNIQUE NOT NULL,
+        slug VARCHAR(100) UNIQUE NOT NULL,
+        sort_order INTEGER DEFAULT 0,
+        active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    const catCheck = await client.query(
+      `SELECT COUNT(*)::int AS cnt FROM ${SCHEMA}.categories`
+    );
+    if (catCheck.rows[0].cnt === 0) {
+      await client.query(`
+        INSERT INTO ${SCHEMA}.categories (name, slug, sort_order, active)
+        VALUES ('Bebida', 'bebida', 0, true), ('Lanche', 'lanche', 1, true)
+        ON CONFLICT DO NOTHING
+      `);
+    }
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA}.loyalty_customers (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        phone VARCHAR(50) NOT NULL UNIQUE,
+        total_visits INTEGER NOT NULL DEFAULT 0,
+        total_rewards INTEGER NOT NULL DEFAULT 0,
+        active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.loyalty_customers
+      ADD COLUMN IF NOT EXISTS avatar TEXT
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA}.loyalty_settings (
+        id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+        visits_per_reward INTEGER NOT NULL DEFAULT 10
+      )
+    `);
+    await client.query(`
+      INSERT INTO ${SCHEMA}.loyalty_settings (id, visits_per_reward)
+      VALUES (1, 10)
+      ON CONFLICT (id) DO NOTHING
+    `);
+    console.log(`✅ Schema "${SCHEMA}" e tabelas/colunas verificadas`);
   } catch (error) {
     if (error.code === '42P01') {
       console.warn(

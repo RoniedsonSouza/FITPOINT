@@ -528,6 +528,52 @@
       </button>
     </div>
 
+    <!-- Categorias Section -->
+    <div id="section-categories" class="mb-10">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="font-display text-2xl font-bold">Categorias</h2>
+        <button type="button" onclick="openCategoryModal()" class="btn">
+          <i data-lucide="plus"></i> Nova Categoria
+        </button>
+      </div>
+      <div id="categories-list" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <p class="text-black/60">Carregando...</p>
+      </div>
+    </div>
+
+    <!-- Fidelidade Section -->
+    <div id="section-loyalty" class="mb-10">
+      <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+        <div>
+          <h2 class="font-display text-2xl font-bold">Fidelidade</h2>
+          <p class="text-sm text-black/60 mt-1" id="loyalty-rule-text">A cada 10 visitas, o cliente ganha um Shake ou Hype Drink.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <a href="/fidelidade.html" target="_blank" class="btn btn-outline" style="padding: 0.5rem 1rem;">
+            <i data-lucide="external-link"></i> Ver página pública
+          </a>
+          <button type="button" onclick="openLoyaltyModal()" class="btn">
+            <i data-lucide="plus"></i> Novo cliente
+          </button>
+        </div>
+      </div>
+      <div class="card !mb-4">
+        <h3 class="font-semibold text-sm mb-2">Configuração do programa</h3>
+        <div class="flex flex-wrap items-end gap-3">
+          <div>
+            <label class="text-xs text-black/60 block mb-1">Visitas para ganhar prêmio</label>
+            <input type="number" id="loyalty-visits-per-reward" min="2" max="100" step="1" value="10" class="!w-24 !min-h-0 !py-2 !px-2">
+          </div>
+          <button type="button" onclick="saveLoyaltySettings()" class="btn btn-outline" style="padding: 0.5rem 1rem;">
+            <i data-lucide="save"></i> Salvar configuração
+          </button>
+        </div>
+      </div>
+      <div id="loyalty-list" class="grid gap-3">
+        <p class="text-black/60">Carregando...</p>
+      </div>
+    </div>
+
     <!-- Produtos Section -->
     <div id="section-products">
       <div class="flex justify-between items-center mb-4">
@@ -566,10 +612,51 @@
         </div>
         <div class="form-group">
           <label>Categoria</label>
-          <select id="product-category" class="px-2" required>
-            <option value="Bebida">Bebida</option>
-            <option value="Lanche">Lanche</option>
-          </select>
+          <div class="flex gap-2 items-center">
+            <select id="product-category" class="px-2 flex-1" required>
+              <option value="">Selecione…</option>
+            </select>
+            <button type="button" onclick="openCategoryModal()" class="btn btn-outline shrink-0" style="padding: 0.5rem 0.75rem; white-space: nowrap;">
+              <i data-lucide="plus"></i> Nova
+            </button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Descrição</label>
+          <textarea id="product-description" rows="3" placeholder="Detalhes do produto para a página de detalhes…"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Informações nutricionais (opcional)</label>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <div>
+              <label class="text-xs text-black/60">Calorias (kcal)</label>
+              <input type="number" id="product-nutrition-kcal" min="0" step="1" placeholder="240">
+            </div>
+            <div>
+              <label class="text-xs text-black/60">Proteínas (g)</label>
+              <input type="number" id="product-nutrition-protein" min="0" step="0.1" placeholder="28">
+            </div>
+            <div>
+              <label class="text-xs text-black/60">Carboidratos (g)</label>
+              <input type="number" id="product-nutrition-carbs" min="0" step="0.1" placeholder="12">
+            </div>
+            <div>
+              <label class="text-xs text-black/60">Gorduras (g)</label>
+              <input type="number" id="product-nutrition-fat" min="0" step="0.1" placeholder="8">
+            </div>
+            <div>
+              <label class="text-xs text-black/60">Fibras (g)</label>
+              <input type="number" id="product-nutrition-fiber" min="0" step="0.1" placeholder="3">
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Opções / variações (opcional)</label>
+          <p class="text-xs text-black/50 mb-2">Ex.: Pizza comum (+R$0) e Pizza com frango (+R$8). Marque uma como padrão.</p>
+          <div id="product-options-list" class="space-y-2"></div>
+          <button type="button" onclick="addProductOptionRow()" class="btn btn-outline mt-2" style="padding: 0.5rem 1rem;">
+            <i data-lucide="plus"></i> Adicionar opção
+          </button>
         </div>
         <div class="form-group">
           <label class="flex items-start gap-2 cursor-pointer">
@@ -599,6 +686,89 @@
         </div>
         <div class="flex gap-2 justify-end">
           <button type="button" onclick="closeProductModal()" class="btn btn-secondary">Cancelar</button>
+          <button type="submit" class="btn">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Categoria -->
+  <div id="category-modal" class="modal">
+    <div class="modal-content" style="max-width: 28rem;">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-display text-xl font-bold" id="category-modal-title">Nova Categoria</h3>
+        <button type="button" onclick="closeCategoryModal()" class="text-2xl">&times;</button>
+      </div>
+      <form id="category-form" onsubmit="saveCategory(event)">
+        <input type="hidden" id="category-id-input">
+        <div class="form-group">
+          <label>Nome</label>
+          <input type="text" id="category-name" required placeholder="Ex.: Sobremesa">
+        </div>
+        <div class="form-group">
+          <label>Ordem de exibição</label>
+          <input type="number" id="category-sort-order" min="0" step="1" value="0">
+        </div>
+        <div class="form-group">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="category-active" checked> Ativa
+          </label>
+        </div>
+        <div class="flex gap-2 justify-end">
+          <button type="button" onclick="closeCategoryModal()" class="btn btn-secondary">Cancelar</button>
+          <button type="submit" class="btn">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Fidelidade -->
+  <div id="loyalty-modal" class="modal">
+    <div class="modal-content" style="max-width: 28rem;">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-display text-xl font-bold" id="loyalty-modal-title">Novo cliente</h3>
+        <button type="button" onclick="closeLoyaltyModal()" class="text-2xl">&times;</button>
+      </div>
+      <form id="loyalty-form" onsubmit="saveLoyaltyCustomer(event)">
+        <input type="hidden" id="loyalty-id-input">
+        <div class="form-group">
+          <label>Nome</label>
+          <input type="text" id="loyalty-name" required placeholder="Ex.: Maria Silva">
+        </div>
+        <div class="form-group">
+          <label>Telefone</label>
+          <input type="tel" id="loyalty-phone" required placeholder="Ex.: (27) 99999-9999">
+        </div>
+        <div class="form-group">
+          <label>Avatar (opcional)</label>
+          <input type="file" id="loyalty-avatar-file" accept="image/jpeg,image/png,image/webp,image/gif">
+          <p class="text-xs text-black/50 mt-1">JPG, PNG, WebP ou GIF · máx. 5 MB</p>
+          <div class="mt-3 flex items-center gap-3">
+            <img id="loyalty-avatar-preview" alt="Pré-visualização" class="hidden h-16 w-16 rounded-full object-cover border border-black/10 bg-black/5">
+            <input type="hidden" id="loyalty-avatar">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Histórico inicial (opcional)</label>
+          <p class="text-xs text-black/50 mb-2">Use para importar ganhadores ou visitas já acumuladas.</p>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs text-black/60">Visitas totais</label>
+              <input type="number" id="loyalty-total-visits" min="0" step="1" value="0">
+            </div>
+            <div>
+              <label class="text-xs text-black/60">Prêmios ganhos</label>
+              <input type="number" id="loyalty-total-rewards" min="0" step="1" value="0">
+            </div>
+          </div>
+        </div>
+        <div class="form-group" id="loyalty-active-group" style="display: none;">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="loyalty-active" checked> Ativo (visível no ranking)
+          </label>
+        </div>
+        <div class="flex gap-2 justify-end">
+          <button type="button" onclick="closeLoyaltyModal()" class="btn btn-secondary">Cancelar</button>
           <button type="submit" class="btn">Salvar</button>
         </div>
       </form>
@@ -648,6 +818,8 @@
         if (Auth.isAuthenticated()) {
         showAdminPanel();
         if (typeof loadProducts === 'function') await loadProducts();
+        if (typeof loadCategories === 'function') await loadCategories();
+        if (typeof loadLoyaltyCustomers === 'function') await loadLoyaltyCustomers();
       } else {
         showLoginScreen();
       }
@@ -680,6 +852,8 @@
         await Auth.login(username, password);
         showAdminPanel();
         if (typeof loadProducts === 'function') await loadProducts();
+        if (typeof loadCategories === 'function') await loadCategories();
+        if (typeof loadLoyaltyCustomers === 'function') await loadLoyaltyCustomers();
       } catch (error) {
         errorDiv.textContent = error.message;
         errorDiv.style.display = 'block';

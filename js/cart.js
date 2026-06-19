@@ -34,11 +34,52 @@
     return base;
   }
 
+  function lineKey(line) {
+    return String(line.id) + '::' + String(line.option_id || '');
+  }
+
+  function findOption(p, optionId) {
+    var opts = p.options || [];
+    if (!optionId) return null;
+    for (var i = 0; i < opts.length; i++) {
+      if (String(opts[i].id) === String(optionId)) return opts[i];
+    }
+    return null;
+  }
+
+  function getDefaultOption(p) {
+    var opts = p.options || [];
+    if (!opts.length) return null;
+    for (var i = 0; i < opts.length; i++) {
+      if (opts[i].default) return opts[i];
+    }
+    return opts[0];
+  }
+
+  function linePriceFromProduct(p, option) {
+    var base = unitPriceFromProduct(p);
+    if (!option) return base;
+    return base + (Number(option.price_adjustment) || 0);
+  }
+
+  function lineDisplayName(p, option) {
+    if (!option) return p.name;
+    return p.name + ' (' + option.name + ')';
+  }
+
   function syncCatalogPrices() {
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i];
       var p = catalogById.get(String(line.id));
-      if (p) line.price = unitPriceFromProduct(p);
+      if (p) {
+        var opt = line.option_id ? findOption(p, line.option_id) : null;
+        line.price = linePriceFromProduct(p, opt);
+        line.name = lineDisplayName(p, opt);
+        if (opt) {
+          line.option_name = opt.name;
+          line.option_adjustment = Number(opt.price_adjustment) || 0;
+        }
+      }
     }
   }
 
@@ -51,28 +92,53 @@
     render();
   }
 
-  function addById(id) {
+  function addById(id, optionId) {
     var p = catalogById.get(String(id));
     if (!p) return;
-    var price = unitPriceFromProduct(p);
+    var opts = p.options || [];
+    var option = null;
+    if (opts.length) {
+      if (optionId === null || optionId === '') {
+        option = null;
+        optionId = '';
+      } else if (optionId === undefined) {
+        option = getDefaultOption(p);
+        if (!option) return;
+        optionId = option.id;
+      } else {
+        option = findOption(p, optionId);
+        if (!option) return;
+        optionId = option.id;
+      }
+    }
+    var price = linePriceFromProduct(p, option);
     var sid = String(p.id);
+    var key = sid + '::' + String(optionId || '');
     var existing = null;
     for (var i = 0; i < lines.length; i++) {
-      if (String(lines[i].id) === sid) { existing = lines[i]; break; }
+      if (lineKey(lines[i]) === key) { existing = lines[i]; break; }
     }
+    var displayName = lineDisplayName(p, option);
     if (existing) existing.qty += 1;
-    else lines.push({ id: String(p.id), name: p.name, price: price, qty: 1 });
+    else {
+      var line = { id: sid, name: displayName, price: price, qty: 1 };
+      if (option) {
+        line.option_id = String(option.id);
+        line.option_name = option.name;
+        line.option_adjustment = Number(option.price_adjustment) || 0;
+      }
+      lines.push(line);
+    }
     writeStorage();
     render();
-    showItemAddedFeedback(p.name);
+    showItemAddedFeedback(displayName);
   }
 
-  function setQty(id, qty) {
+  function setQty(lineKeyVal, qty) {
     var n = Math.max(0, parseInt(String(qty), 10) || 0);
-    var sid = String(id);
     var idx = -1;
     for (var i = 0; i < lines.length; i++) {
-      if (String(lines[i].id) === sid) { idx = i; break; }
+      if (lineKey(lines[i]) === String(lineKeyVal)) { idx = i; break; }
     }
     if (idx < 0) return;
     if (n <= 0) {
@@ -573,6 +639,7 @@
       linesEl.innerHTML = '<p class="text-sm text-black/60 text-center py-6">Seu pedido está vazio.</p>';
     } else {
       linesEl.innerHTML = lines.map(function (l) {
+        var lk = lineKey(l);
         return (
           '<div class="flex flex-wrap items-center gap-2 py-3 border-b border-black/5 last:border-0">' +
             '<div class="min-w-0 flex-1 basis-[40%]">' +
@@ -580,9 +647,9 @@
               '<p class="text-xs text-black/50">' + currency(l.price) + ' un.</p>' +
             '</div>' +
             '<div class="flex items-center gap-1 shrink-0">' +
-              '<button type="button" class="cart-qty-minus h-9 w-9 rounded-lg border border-black/10 bg-white text-fp-ink font-semibold leading-none" data-cart-id="' + escapeAttr(l.id) + '" aria-label="Diminuir quantidade">−</button>' +
+              '<button type="button" class="cart-qty-minus h-9 w-9 rounded-lg border border-black/10 bg-white text-fp-ink font-semibold leading-none" data-cart-key="' + escapeAttr(lk) + '" aria-label="Diminuir quantidade">−</button>' +
               '<span class="w-8 text-center text-sm font-semibold">' + l.qty + '</span>' +
-              '<button type="button" class="cart-qty-plus h-9 w-9 rounded-lg border border-black/10 bg-white text-fp-ink font-semibold leading-none" data-cart-id="' + escapeAttr(l.id) + '" aria-label="Aumentar quantidade">+</button>' +
+              '<button type="button" class="cart-qty-plus h-9 w-9 rounded-lg border border-black/10 bg-white text-fp-ink font-semibold leading-none" data-cart-key="' + escapeAttr(lk) + '" aria-label="Aumentar quantidade">+</button>' +
             '</div>' +
             '<p class="text-sm font-semibold text-fp-green shrink-0 ml-auto">' + currency(l.price * l.qty) + '</p>' +
           '</div>'
@@ -643,15 +710,15 @@
         if (!(t instanceof HTMLElement)) return;
         var minus = t.closest('.cart-qty-minus');
         var plus = t.closest('.cart-qty-plus');
-        var id = (minus && minus.getAttribute('data-cart-id')) || (plus && plus.getAttribute('data-cart-id'));
-        if (!id) return;
+        var key = (minus && minus.getAttribute('data-cart-key')) || (plus && plus.getAttribute('data-cart-key'));
+        if (!key) return;
         var line = null;
         for (var i = 0; i < lines.length; i++) {
-          if (String(lines[i].id) === String(id)) { line = lines[i]; break; }
+          if (lineKey(lines[i]) === String(key)) { line = lines[i]; break; }
         }
         if (!line) return;
-        if (minus) setQty(line.id, line.qty - 1);
-        if (plus) setQty(line.id, line.qty + 1);
+        if (minus) setQty(key, line.qty - 1);
+        if (plus) setQty(key, line.qty + 1);
       });
     }
 

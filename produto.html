@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Produto — FitPoint Fitness</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            fp: { green: '#1D6B3A', green2: '#2F9D57', orange: '#F57C00', ink: '#0E1F16', fog: '#F5F3EE' }
+          },
+          fontFamily: { sans: ['Inter', 'system-ui'], display: ['Poppins', 'Inter'] },
+          boxShadow: { soft: '0 6px 24px rgba(0,0,0,.06)' },
+          borderRadius: { xl2: '1.25rem' }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --fp-green: #1D6B3A;
+      --fp-ink: #0E1F16;
+      --fp-fog: #F5F3EE;
+      --radius: 20px;
+      --shadow: 0 6px 24px rgba(0, 0, 0, .06);
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .75rem 1.25rem;
+      border-radius: var(--radius);
+      background: var(--fp-green);
+      color: #fff;
+      font-weight: 600;
+      transition: .2s ease;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+    }
+    .btn:hover { opacity: .95; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      padding: .35rem .7rem;
+      border-radius: 999px;
+      font-size: .75rem;
+      font-weight: 600;
+      background: rgba(29, 107, 58, .10);
+      color: var(--fp-green);
+    }
+    .container-edge { max-width: 72rem; margin: 0 auto; padding: 0 1rem; }
+  </style>
+  <link rel="stylesheet" href="/css/page-bg.css">
+  <link rel="stylesheet" href="/css/product-chips.css">
+  <link rel="stylesheet" href="/css/promo-badge.css">
+</head>
+
+<body class="page-bg text-fp-ink font-sans" data-page="product">
+  <header class="bg-white/80 backdrop-blur sticky top-0 z-50 border-b border-black/5">
+    <div class="container-edge flex items-center justify-between h-16">
+      <a href="/" class="flex items-center gap-3">
+        <img src="/assets/logo.png" alt="FitPoint Fitness" class="h-10 w-30 rounded-full" />
+        <span class="font-display text-xl font-bold tracking-tight">FitPoint <span class="text-fp-green">Fitness</span></span>
+      </a>
+      <nav class="hidden md:flex items-center gap-6 text-sm">
+        <a href="/" class="hover:text-fp-green" data-nav="home">Inicio</a>
+        <a href="/promocoes.html" class="hover:text-fp-green" data-nav="promos">Promoções</a>
+        <a href="/fidelidade.html" class="hover:text-fp-green" data-nav="loyalty">Fidelidade</a>
+        <a href="/sobre.html" class="hover:text-fp-green" data-nav="about">Sobre</a>
+        <a href="/contato.html" class="hover:text-fp-green" data-nav="contact">Contato</a>
+        <a href="/cardapio.html" class="btn">Ver Cardápio</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-3 sm:px-4 py-6 md:py-10">
+    <div id="product-detail" class="min-h-[40vh]">
+      <p class="text-center py-12 text-black/50">Carregando…</p>
+    </div>
+  </main>
+
+  <div id="cart-backdrop" class="hidden fixed inset-0 z-[55] bg-black/40 transition-opacity" aria-hidden="true"></div>
+  <div id="cart-root"
+    class="fixed z-[60] pointer-events-none bottom-0 left-0 right-0 flex flex-col items-stretch gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-0 max-md:gap-0 max-md:px-0 max-md:pb-0 md:inset-auto md:bottom-4 md:right-6 md:left-auto md:w-auto md:items-end md:gap-3 md:px-0 md:pb-0">
+    <div id="cart-panel"
+      class="hidden pointer-events-auto w-full max-w-lg mx-auto md:mx-0 md:w-[min(92vw,26rem)] lg:w-[min(92vw,28rem)] max-md:mx-0 max-md:max-w-none max-md:w-full max-md:h-[calc(100dvh-env(safe-area-inset-bottom))] max-md:max-h-[calc(100dvh-env(safe-area-inset-bottom))] max-md:rounded-t-3xl md:h-[min(88dvh,700px)] md:max-h-[calc(100dvh-4.5rem)] flex flex-col rounded-t-2xl md:rounded-2xl bg-white shadow-2xl border border-black/10 overflow-hidden min-h-0"
+      role="dialog" aria-modal="true" aria-labelledby="cart-title" aria-hidden="true">
+      <div class="flex items-center justify-between p-4 border-b border-black/5 shrink-0 bg-white">
+        <h2 id="cart-title" class="font-display font-bold text-lg text-fp-ink">Seu pedido</h2>
+        <button type="button" id="cart-close" class="h-9 w-9 inline-flex items-center justify-center rounded-full border border-black/10 bg-white text-fp-ink hover:bg-black/5" aria-label="Fechar pedido">
+          <span class="text-xl leading-none" aria-hidden="true">×</span>
+        </button>
+      </div>
+      <div id="cart-lines" class="flex-1 overflow-y-auto min-h-0 overscroll-contain p-4"></div>
+      <div class="px-4 py-3 shrink-0 bg-fp-fog/80 border-t border-black/5 space-y-3">
+        <div>
+          <label for="cart-payment" class="text-xs font-medium text-black/60">Forma de pagamento</label>
+          <select id="cart-payment" class="mt-1 w-full text-sm rounded-xl border border-black/15 bg-white py-2 px-2.5">
+            <option value="">Selecione…</option>
+            <option value="pix">Pix</option>
+            <option value="dinheiro">Dinheiro</option>
+            <option value="credito">Cartão de crédito</option>
+            <option value="debito">Cartão de débito</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div>
+          <label for="cart-fulfillment" class="text-xs font-medium text-black/60">Como receber o pedido</label>
+          <select id="cart-fulfillment" class="mt-1 w-full text-sm rounded-xl border border-black/15 bg-white py-2 px-2.5">
+            <option value="retirada">Retirada na loja</option>
+            <option value="entrega">Entrega no endereço</option>
+          </select>
+        </div>
+        <div>
+          <label for="cart-notes" class="text-xs font-medium text-black/60">Endereço e observações</label>
+          <textarea id="cart-notes" rows="3" class="mt-1 w-full text-sm rounded-xl border border-black/15 bg-white resize-none py-2 px-2.5" placeholder="Ex.: Rua, número, bairro…"></textarea>
+        </div>
+      </div>
+      <div class="flex items-center justify-between gap-2 px-4 py-2 border-t border-black/5 bg-white shrink-0">
+        <button type="button" id="cart-clear" class="text-sm font-medium text-black/50 hover:text-fp-green">Limpar</button>
+        <p class="text-sm">Total <span id="cart-total-value" class="font-bold text-fp-green">R$&nbsp;0,00</span></p>
+      </div>
+      <div class="p-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white shrink-0">
+        <button type="button" id="cart-whatsapp" class="btn w-full justify-center min-h-[3rem] disabled:opacity-45 disabled:pointer-events-none" disabled>Enviar pedido</button>
+      </div>
+    </div>
+    <button type="button" id="cart-fab"
+      class="pointer-events-auto self-end h-14 w-14 shrink-0 rounded-full bg-fp-green text-white shadow-lg flex items-center justify-center relative hover:opacity-95 transition-opacity md:self-end"
+      aria-label="Ver pedido">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" /><path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" />
+      </svg>
+      <span id="cart-fab-count" class="hidden absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 rounded-full bg-fp-orange text-white text-xs font-bold flex items-center justify-center">0</span>
+    </button>
+  </div>
+
+  <footer class="bg-white border-t border-black/5 mt-8">
+    <div class="max-w-6xl mx-auto px-4 py-8 text-sm">© <span id="y"></span> FitPoint</div>
+  </footer>
+
+  <script src="/js/config.js"></script>
+  <script src="/js/database.js"></script>
+  <script src="/js/cart.js"></script>
+  <script src="/js/app.js"></script>
+  <script>document.getElementById('y').textContent = new Date().getFullYear();</script>
+</body>
+
+</html>

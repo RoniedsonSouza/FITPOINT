@@ -10,6 +10,8 @@ fs.mkdirSync(uploadsDir, { recursive: true });
 
 // Routes
 const productsRoutes = require('./routes/products');
+const categoriesRoutes = require('./routes/categories');
+const loyaltyRoutes = require('./routes/loyalty');
 const authRoutes = require('./routes/auth');
 
 const app = express();
@@ -37,6 +39,8 @@ app.use(express.static(path.join(__dirname)));
 
 // Rotas da API (públicas para leitura, autenticadas para escrita)
 app.use('/api/products', productsRoutes);
+app.use('/api/categories', categoriesRoutes);
+app.use('/api/loyalty', loyaltyRoutes);
 app.use('/api/auth', authRoutes);
 
 // Rota de health check

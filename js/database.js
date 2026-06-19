@@ -138,6 +138,188 @@ const DB = {
     }
   },
 
+  // === CATEGORIAS ===
+
+  async getCategories() {
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/categories`);
+      if (!response.ok) throw new Error('Erro ao buscar categorias');
+      return await response.json();
+    } catch (error) {
+      console.error('Erro ao buscar categorias:', error);
+      return [
+        { id: 1, name: 'Bebida', slug: 'bebida', sort_order: 0, active: true },
+        { id: 2, name: 'Lanche', slug: 'lanche', sort_order: 1, active: true }
+      ];
+    }
+  },
+
+  async addCategory(category) {
+    const response = await fetch(`${getApiBaseUrl()}/categories`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(category)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao criar categoria';
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(`401: ${errorMsg}`);
+      }
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async updateCategory(id, updates) {
+    const response = await fetch(`${getApiBaseUrl()}/categories/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(updates)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao atualizar categoria';
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(`401: ${errorMsg}`);
+      }
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async deleteCategory(id) {
+    const response = await fetch(`${getApiBaseUrl()}/categories/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao excluir categoria';
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(`401: ${errorMsg}`);
+      }
+      throw new Error(errorMsg);
+    }
+  },
+
+  // === FIDELIDADE ===
+
+  async getLoyaltySettings() {
+    const response = await fetch(`${getApiBaseUrl()}/loyalty/settings`);
+    if (!response.ok) throw new Error('Erro ao buscar configurações de fidelidade');
+    return response.json();
+  },
+
+  async updateLoyaltySettings(settings) {
+    const response = await fetch(`${getApiBaseUrl()}/loyalty/settings`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(settings)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao salvar configurações';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async getLoyaltyRankings() {
+    const response = await fetch(`${getApiBaseUrl()}/loyalty/rankings`);
+    if (!response.ok) throw new Error('Erro ao buscar rankings de fidelidade');
+    return response.json();
+  },
+
+  async getLoyaltyCustomers() {
+    const response = await fetch(`${getApiBaseUrl()}/loyalty/customers`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao buscar clientes de fidelidade';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async addLoyaltyCustomer(customer) {
+    const response = await fetch(`${getApiBaseUrl()}/loyalty/customers`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(customer)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao criar cliente';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async updateLoyaltyCustomer(id, updates) {
+    const response = await fetch(`${getApiBaseUrl()}/loyalty/customers/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(updates)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao atualizar cliente';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async deleteLoyaltyCustomer(id) {
+    const response = await fetch(`${getApiBaseUrl()}/loyalty/customers/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao excluir cliente';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+  },
+
+  async registerLoyaltyVisit(id, delta = 1) {
+    const response = await fetch(`${getApiBaseUrl()}/loyalty/customers/${id}/visit`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ delta })
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao registrar visita';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async uploadLoyaltyAvatar(file) {
+    const formData = new FormData();
+    formData.append('image', file);
+    const response = await fetch(`${getApiBaseUrl()}/loyalty/upload-avatar`, {
+      method: 'POST',
+      headers: getAuthHeadersMultipart(),
+      body: formData
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      const errorMsg = err.error || 'Erro ao enviar avatar';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
   // Remove um produto
   async deleteProduct(id) {
     try {

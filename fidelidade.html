@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Fidelidade — FitPoint Fitness</title>
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            fp: { green: '#1D6B3A', green2: '#2F9D57', orange: '#F57C00', ink: '#0E1F16', fog: '#F5F3EE' }
+          },
+          fontFamily: { sans: ['Inter', 'system-ui'], display: ['Poppins', 'Inter'] },
+          boxShadow: { soft: '0 6px 24px rgba(0,0,0,.06)' },
+          borderRadius: { xl2: '1.25rem' }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --fp-green: #1D6B3A;
+      --fp-orange: #F57C00;
+      --fp-ink: #0E1F16;
+      --radius: 20px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .75rem 1.25rem;
+      border-radius: var(--radius);
+      background: var(--fp-green);
+      color: #fff;
+      font-weight: 600;
+      transition: .2s ease;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+    }
+    .btn:hover { opacity: .95; }
+    .container-edge { max-width: 72rem; margin: 0 auto; padding: 0 1rem; }
+  </style>
+  <link rel="stylesheet" href="/css/page-bg.css">
+  <link rel="stylesheet" href="/css/loyalty.css">
+</head>
+
+<body class="page-bg text-fp-ink font-sans loyalty-page" data-page="loyalty">
+  <header class="bg-white/80 backdrop-blur sticky top-0 z-50 border-b border-black/5">
+    <div class="container-edge flex items-center justify-between h-16">
+      <a href="/" class="flex items-center gap-3">
+        <img src="/assets/logo.png" alt="FitPoint Fitness" class="h-10 w-30 rounded-full" />
+        <span class="font-display text-xl font-bold tracking-tight">FitPoint <span class="text-fp-green">Fitness</span></span>
+      </a>
+      <nav class="hidden md:flex items-center gap-6 text-sm">
+        <a href="/" class="hover:text-fp-green flex items-center gap-1" data-nav="home">Inicio</a>
+        <a href="/promocoes.html" class="hover:text-fp-green flex items-center gap-1" data-nav="promos">Promoções</a>
+        <a href="/fidelidade.html" class="hover:text-fp-green flex items-center gap-1" data-nav="loyalty">Fidelidade</a>
+        <a href="/sobre.html" class="hover:text-fp-green flex items-center gap-1" data-nav="about">Sobre</a>
+        <a href="/contato.html" class="hover:text-fp-green flex items-center gap-1" data-nav="contact">Contato</a>
+        <a href="/cardapio.html" class="btn"><i data-lucide="shopping-bag"></i> Ver Cardápio</a>
+      </nav>
+      <div class="flex items-center gap-2 md:hidden">
+        <button id="mobile-menu-toggle" type="button" class="inline-flex items-center justify-center h-11 w-11 rounded-full border border-black/10 bg-white text-fp-ink shadow-soft" aria-label="Abrir menu" aria-controls="mobile-menu" aria-expanded="false">
+          <i data-lucide="menu"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div id="mobile-menu" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-200" data-menu-overlay data-menu-close></div>
+    <nav class="absolute top-0 right-0 h-full w-72 max-w-[80vw] bg-white shadow-soft p-6 flex flex-col gap-6 translate-x-full transition-transform duration-200" data-menu-panel aria-label="Menu mobile">
+      <div class="flex items-center justify-between">
+        <span class="font-display text-xl font-bold text-fp-ink">Menu</span>
+        <button type="button" class="inline-flex items-center justify-center h-9 w-9 rounded-full border border-black/10 bg-white text-fp-ink" data-menu-close aria-label="Fechar menu">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="flex flex-col gap-4 text-base text-fp-ink">
+        <a href="/" class="flex items-center gap-2" data-menu-close data-nav="home">Início</a>
+        <a href="/cardapio.html" class="flex items-center gap-2" data-menu-close data-nav="menu">Cardápio</a>
+        <a href="/promocoes.html" class="flex items-center gap-2" data-menu-close data-nav="promos">Promoções</a>
+        <a href="/fidelidade.html" class="flex items-center gap-2" data-menu-close data-nav="loyalty">Fidelidade</a>
+        <a href="/sobre.html" class="flex items-center gap-2" data-menu-close data-nav="about">Sobre</a>
+        <a href="/contato.html" class="flex items-center gap-2" data-menu-close data-nav="contact">Contato</a>
+      </div>
+    </nav>
+  </div>
+
+  <main class="max-w-6xl mx-auto px-3 sm:px-4 py-8 md:py-12">
+    <section class="loyalty-hero text-center">
+      <div class="loyalty-hero-icon mx-auto"><i data-lucide="trophy" class="w-8 h-8"></i></div>
+      <h1 class="loyalty-hero-title">Programa de Fidelidade</h1>
+      <p class="loyalty-hero-rule" id="loyalty-hero-rule">
+        A cada <strong>10 visitas</strong> com consumo mínimo, ganhe um <strong>Shake</strong> ou <strong>Hype Drink</strong>!
+      </p>
+    </section>
+
+    <div class="loyalty-stats">
+      <div class="loyalty-stat">
+        <div class="loyalty-stat-value" id="loyalty-stat-participants">—</div>
+        <div class="loyalty-stat-label">Participantes</div>
+      </div>
+      <div class="loyalty-stat">
+        <div class="loyalty-stat-value" id="loyalty-stat-winners" style="color: var(--fp-orange, #F57C00);">—</div>
+        <div class="loyalty-stat-label">Ganhadores</div>
+      </div>
+    </div>
+
+    <div class="loyalty-rules">
+      <div class="loyalty-rule-card">
+        <div class="loyalty-rule-card-icon"><i data-lucide="store" class="w-4 h-4"></i></div>
+        <p class="loyalty-rule-card-title">Visite</p>
+        <p class="loyalty-rule-card-desc">Consuma na FitPoint</p>
+      </div>
+      <div class="loyalty-rule-card">
+        <div class="loyalty-rule-card-icon"><i data-lucide="star" class="w-4 h-4"></i></div>
+        <p class="loyalty-rule-card-title">Acumule</p>
+        <p class="loyalty-rule-card-desc">Cada visita conta</p>
+      </div>
+      <div class="loyalty-rule-card">
+        <div class="loyalty-rule-card-icon"><i data-lucide="gift" class="w-4 h-4"></i></div>
+        <p class="loyalty-rule-card-title">Ganhe</p>
+        <p class="loyalty-rule-card-desc">Shake ou Hype Drink</p>
+      </div>
+    </div>
+
+    <div class="loyalty-grid">
+      <section aria-labelledby="loyalty-participants-title">
+        <h2 id="loyalty-participants-title" class="loyalty-section-title">
+          <i data-lucide="users" class="w-5 h-5 text-fp-green"></i>
+          Participantes
+        </h2>
+        <div id="loyalty-in-progress" class="loyalty-rank-list">
+          <p class="loyalty-empty">Carregando ranking…</p>
+        </div>
+      </section>
+
+      <aside class="loyalty-winners-panel" aria-labelledby="loyalty-winners-title">
+        <h2 id="loyalty-winners-title" class="loyalty-section-title">
+          <i data-lucide="award" class="w-5 h-5 text-fp-orange"></i>
+          Hall dos ganhadores
+        </h2>
+        <div id="loyalty-winners" class="loyalty-winners-list">
+          <p class="loyalty-empty">Carregando…</p>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <footer class="bg-white border-t border-black/5 mt-8">
+    <div class="max-w-6xl mx-auto px-4 py-8 text-sm">© <span id="y"></span> FitPoint</div>
+  </footer>
+
+  <script src="/js/config.js"></script>
+  <script src="/js/database.js"></script>
+  <script src="/js/app.js"></script>
+  <script>document.getElementById('y').textContent = new Date().getFullYear();</script>
+</body>
+
+</html>

@@ -5,6 +5,12 @@ const multer = require('multer');
 const router = express.Router();
 const { query, table } = require('../config/database');
 const { authenticateToken } = require('../config/auth');
+const {
+  normalizeNutrition,
+  normalizeOptions,
+  validateOptions,
+  mapProductRow
+} = require('./productHelpers');
 
 const productsUploadDir = path.join(__dirname, '..', 'uploads', 'products');
 fs.mkdirSync(productsUploadDir, { recursive: true });
@@ -39,6 +45,14 @@ function uploadProductImageMiddleware(req, res, next) {
   });
 }
 
+async function validateCategoryName(category) {
+  const result = await query(
+    `SELECT id FROM ${table('categories')} WHERE name = $1 AND active = true`,
+    [category]
+  );
+  return result.rows.length > 0;
+}
+
 // POST /api/products/upload-image — enviar imagem (autenticado)
 router.post('/upload-image', authenticateToken, uploadProductImageMiddleware, (req, res) => {
   if (!req.file) {
@@ -54,20 +68,7 @@ router.get('/', async (req, res) => {
     const result = await query(
       `SELECT * FROM ${table('products')} ORDER BY created_at DESC`
     );
-    
-    const products = result.rows.map(row => ({
-      id: row.id,
-      name: row.name,
-      price: parseFloat(row.price),
-      promo_price: row.promo_price != null ? parseFloat(row.promo_price) : null,
-      is_kit: row.is_kit === true,
-      category: row.category,
-      tags: row.tags || [],
-      image: row.image,
-      active: row.active
-    }));
-    
-    res.json(products);
+    res.json(result.rows.map(mapProductRow));
   } catch (error) {
     console.error('Erro ao buscar produtos:', error);
     res.status(500).json({ error: 'Erro ao buscar produtos' });
@@ -81,25 +82,12 @@ router.get('/:id', async (req, res) => {
       `SELECT * FROM ${table('products')} WHERE id = $1`,
       [req.params.id]
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Produto não encontrado' });
     }
-    
-    const row = result.rows[0];
-    const product = {
-      id: row.id,
-      name: row.name,
-      price: parseFloat(row.price),
-      promo_price: row.promo_price != null ? parseFloat(row.promo_price) : null,
-      is_kit: row.is_kit === true,
-      category: row.category,
-      tags: row.tags || [],
-      image: row.image,
-      active: row.active
-    };
-    
-    res.json(product);
+
+    res.json(mapProductRow(result.rows[0]));
   } catch (error) {
     console.error('Erro ao buscar produto:', error);
     res.status(500).json({ error: 'Erro ao buscar produto' });
@@ -109,10 +97,28 @@ router.get('/:id', async (req, res) => {
 // POST /api/products - Criar novo produto (requer autenticação)
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { id, name, price, category, tags = [], image, active = true, promo_price, is_kit = false } = req.body;
+    const {
+      id,
+      name,
+      price,
+      category,
+      tags = [],
+      image,
+      active = true,
+      promo_price,
+      is_kit = false,
+      description,
+      nutrition,
+      options = []
+    } = req.body;
 
     if (!id || !name || price === undefined || !category) {
       return res.status(400).json({ error: 'Campos obrigatórios: id, name, price, category' });
+    }
+
+    const catOk = await validateCategoryName(category);
+    if (!catOk) {
+      return res.status(400).json({ error: 'Categoria inválida ou inativa' });
     }
 
     let promoVal = null;
@@ -128,12 +134,20 @@ router.post('/', authenticateToken, async (req, res) => {
       promoVal = p;
     }
 
-    // Verificar se já existe
+    const normalizedOptions = normalizeOptions(options);
+    const optValidation = validateOptions(normalizedOptions);
+    if (!optValidation.ok) {
+      return res.status(400).json({ error: optValidation.error });
+    }
+
+    const normalizedNutrition = normalizeNutrition(nutrition);
+    const descVal = description != null && String(description).trim() ? String(description).trim() : null;
+
     const existing = await query(
       `SELECT id FROM ${table('products')} WHERE id = $1`,
       [id]
     );
-    
+
     if (existing.rows.length > 0) {
       return res.status(409).json({ error: `Produto com ID "${id}" já existe` });
     }
@@ -141,9 +155,23 @@ router.post('/', authenticateToken, async (req, res) => {
     const kitVal = is_kit === true || is_kit === 1 || is_kit === 'true';
 
     await query(
-      `INSERT INTO ${table('products')} (id, name, price, category, tags, image, active, promo_price, is_kit, created_at, updated_at) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())`,
-      [id, name, price, category, JSON.stringify(tags), image || null, active, promoVal, kitVal]
+      `INSERT INTO ${table('products')}
+       (id, name, price, category, tags, image, active, promo_price, is_kit, description, nutrition, options, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())`,
+      [
+        id,
+        name,
+        price,
+        category,
+        JSON.stringify(tags),
+        image || null,
+        active,
+        promoVal,
+        kitVal,
+        descVal,
+        JSON.stringify(normalizedNutrition),
+        JSON.stringify(normalizedOptions)
+      ]
     );
 
     res.status(201).json({ message: 'Produto criado com sucesso', id });
@@ -156,19 +184,36 @@ router.post('/', authenticateToken, async (req, res) => {
 // PUT /api/products/:id - Atualizar produto (requer autenticação)
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
-    const { name, price, category, tags, image, active, promo_price, is_kit } = req.body;
+    const {
+      name,
+      price,
+      category,
+      tags,
+      image,
+      active,
+      promo_price,
+      is_kit,
+      description,
+      nutrition,
+      options
+    } = req.body;
 
-    // Verificar se existe
     const existing = await query(
       `SELECT id FROM ${table('products')} WHERE id = $1`,
       [req.params.id]
     );
-    
+
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: 'Produto não encontrado' });
     }
 
-    // Montar query dinamicamente
+    if (category !== undefined) {
+      const catOk = await validateCategoryName(category);
+      if (!catOk) {
+        return res.status(400).json({ error: 'Categoria inválida ou inativa' });
+      }
+    }
+
     const updates = [];
     const values = [];
     let paramIndex = 1;
@@ -200,6 +245,23 @@ router.put('/:id', authenticateToken, async (req, res) => {
     if (is_kit !== undefined) {
       updates.push(`is_kit = $${paramIndex++}`);
       values.push(is_kit === true || is_kit === 1 || is_kit === 'true');
+    }
+    if (description !== undefined) {
+      updates.push(`description = $${paramIndex++}`);
+      values.push(description != null && String(description).trim() ? String(description).trim() : null);
+    }
+    if (nutrition !== undefined) {
+      updates.push(`nutrition = $${paramIndex++}`);
+      values.push(JSON.stringify(normalizeNutrition(nutrition)));
+    }
+    if (options !== undefined) {
+      const normalizedOptions = normalizeOptions(options);
+      const optValidation = validateOptions(normalizedOptions);
+      if (!optValidation.ok) {
+        return res.status(400).json({ error: optValidation.error });
+      }
+      updates.push(`options = $${paramIndex++}`);
+      values.push(JSON.stringify(normalizedOptions));
     }
     if (promo_price !== undefined) {
       if (promo_price === null || promo_price === '') {
@@ -254,11 +316,11 @@ router.delete('/:id', authenticateToken, async (req, res) => {
       `DELETE FROM ${table('products')} WHERE id = $1`,
       [req.params.id]
     );
-    
+
     if (result.rowCount === 0) {
       return res.status(404).json({ error: 'Produto não encontrado' });
     }
-    
+
     res.json({ message: 'Produto deletado com sucesso' });
   } catch (error) {
     console.error('Erro ao deletar produto:', error);

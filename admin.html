@@ -26,578 +26,196 @@
           fontFamily: {
             sans: ['Inter', 'system-ui'],
             display: ['Poppins', 'Inter']
-          },
-          boxShadow: {
-            soft: '0 6px 24px rgba(0,0,0,.06)'
-          },
-          borderRadius: { xl2: '1.25rem' }
+          }
         }
       }
     }
   </script>
-
-  <style>
-    :root {
-      --fp-green: #1D6B3A;
-      --fp-green2: #2F9D57;
-      --fp-orange: #F57C00;
-      --fp-ink: #0E1F16;
-      --fp-fog: #F5F3EE;
-      --shadow: 0 6px 24px rgba(0, 0, 0, .06);
-      --radius: 20px;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: .5rem;
-      padding: .75rem 1.25rem;
-      border-radius: var(--radius);
-      background: var(--fp-green);
-      color: #fff;
-      font-weight: 600;
-      transition: .2s ease;
-      text-decoration: none;
-      border: none;
-      cursor: pointer;
-      font-size: 0.875rem;
-    }
-
-    .btn:hover {
-      opacity: .95;
-    }
-
-    .btn-danger {
-      background: #dc2626;
-    }
-
-    .btn-secondary {
-      background: #6b7280;
-    }
-
-    .btn-outline {
-      background: #fff;
-      color: var(--fp-green);
-      border: 1px solid var(--fp-green);
-    }
-
-    .container-edge {
-      max-width: 72rem;
-      margin: 0 auto;
-      padding: 0 1rem;
-    }
-
-    .card {
-      background: #fff;
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 1.5rem;
-      margin-bottom: 1rem;
-    }
-
-    /* Estilos modernos para inputs, textareas e selects */
-    input:not([type="checkbox"]):not([type="hidden"]), 
-    textarea, 
-    select {
-      width: 100%;
-      padding: 0.875rem 1rem;
-      border: 2px solid #e5e7eb;
-      border-radius: 0.75rem;
-      font-size: 0.9375rem;
-      font-family: inherit;
-      background-color: #ffffff;
-      color: var(--fp-ink);
-      transition: all 0.2s ease;
-      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    }
-
-    input:not([type="checkbox"]):not([type="hidden"]):hover,
-    textarea:hover,
-    select:hover {
-      border-color: #d1d5db;
-      box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.08);
-    }
-
-    input:not([type="checkbox"]):not([type="hidden"]):focus, 
-    textarea:focus, 
-    select:focus {
-      outline: none;
-      border-color: var(--fp-green);
-      box-shadow: 0 0 0 3px rgba(29, 107, 58, 0.1), 0 2px 4px 0 rgba(0, 0, 0, 0.08);
-      background-color: #ffffff;
-    }
-
-    input:not([type="checkbox"]):not([type="hidden"]):disabled,
-    textarea:disabled,
-    select:disabled {
-      background-color: #f3f4f6;
-      color: #6b7280;
-      cursor: not-allowed;
-      opacity: 0.7;
-    }
-
-    input::placeholder,
-    textarea::placeholder {
-      color: #9ca3af;
-      opacity: 1;
-    }
-
-    textarea {
-      resize: vertical;
-      min-height: 100px;
-      line-height: 1.5;
-    }
-
-    /* Select melhorado e moderno */
-    select {
-      cursor: pointer;
-      appearance: none;
-      -webkit-appearance: none;
-      -moz-appearance: none;
-      background-color: #ffffff;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6L8 10L12 6' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-      background-position: right 1.125rem center;
-      background-repeat: no-repeat;
-      background-size: 1rem 1rem;
-      padding: 0.875rem 3rem 0.875rem 1rem;
-      position: relative;
-      min-height: 3rem;
-      font-weight: 500;
-    }
-
-    select:hover {
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6L8 10L12 6' stroke='%231D6B3A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-      border-color: #d1d5db;
-    }
-
-    select:focus {
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6L8 10L12 6' stroke='%231D6B3A' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-      border-color: var(--fp-green);
-      box-shadow: 0 0 0 3px rgba(29, 107, 58, 0.1), 0 2px 4px 0 rgba(0, 0, 0, 0.08);
-    }
-
-    /* Opções do select */
-    select option {
-      padding: 0.875rem 1rem;
-      background-color: #ffffff;
-      color: var(--fp-ink);
-      font-weight: 500;
-      border-radius: 0.5rem;
-    }
-
-    select option:first-child {
-      color: #9ca3af;
-      font-weight: 400;
-    }
-
-    select option:checked,
-    select option:focus {
-      background: linear-gradient(to right, rgba(29, 107, 58, 0.1), rgba(29, 107, 58, 0.05));
-      color: var(--fp-green);
-      font-weight: 600;
-    }
-
-    /* Checkbox moderno */
-    input[type="checkbox"] {
-      width: 1.25rem;
-      height: 1.25rem;
-      border: 2px solid #d1d5db;
-      border-radius: 0.375rem;
-      cursor: pointer;
-      appearance: none;
-      position: relative;
-      margin-right: 0.5rem;
-      vertical-align: middle;
-      transition: all 0.2s ease;
-      flex-shrink: 0;
-    }
-
-    input[type="checkbox"]:hover {
-      border-color: var(--fp-green);
-    }
-
-    input[type="checkbox"]:checked {
-      background-color: var(--fp-green);
-      border-color: var(--fp-green);
-    }
-
-    input[type="checkbox"]:checked::after {
-      content: '';
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%) rotate(45deg);
-      width: 0.375rem;
-      height: 0.625rem;
-      border: solid white;
-      border-width: 0 2px 2px 0;
-    }
-
-    input[type="checkbox"]:focus {
-      outline: none;
-      box-shadow: 0 0 0 3px rgba(29, 107, 58, 0.1);
-    }
-
-    .form-group {
-      margin-bottom: 1.5rem;
-    }
-
-    .form-group:last-child {
-      margin-bottom: 0;
-    }
-
-    label {
-      display: block;
-      margin-bottom: 0.625rem;
-      font-weight: 600;
-      font-size: 0.875rem;
-      color: var(--fp-ink);
-      letter-spacing: 0.025em;
-    }
-
-    label:has(input[type="checkbox"]) {
-      display: flex;
-      align-items: center;
-      cursor: pointer;
-      font-weight: 500;
-      margin-bottom: 0;
-    }
-
-    .chip {
-      display: inline-flex;
-      align-items: center;
-      gap: .35rem;
-      padding: .35rem .7rem;
-      border-radius: 999px;
-      font-size: .75rem;
-      font-weight: 600;
-      background: rgba(29, 107, 58, .10);
-      color: var(--fp-green);
-    }
-
-    .modal {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.5);
-      z-index: 50;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .modal.active {
-      display: flex;
-    }
-
-    .modal-content {
-      background: white;
-      border-radius: var(--radius);
-      padding: 2.5rem;
-      max-width: 700px;
-      width: 90%;
-      max-height: 90vh;
-      overflow-y: auto;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    }
-
-    .modal-content h3 {
-      margin-bottom: 1.5rem;
-    }
-
-    .modal-content form {
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-    }
-
-    /* Ajustes para mobile - apenas admin */
-    @media (max-width: 768px) {
-      /* Títulos menores */
-      .font-display.text-3xl {
-        font-size: 1.75rem !important;
-        line-height: 2rem !important;
-      }
-
-      .font-display.text-2xl {
-        font-size: 1.5rem !important;
-        line-height: 1.75rem !important;
-      }
-
-      .font-display.text-xl {
-        font-size: 1.25rem !important;
-      }
-
-      /* Headers e textos menores */
-      h1 {
-        font-size: 1.5rem !important;
-      }
-
-      h2 {
-        font-size: 1.375rem !important;
-      }
-
-      h3 {
-        font-size: 1.25rem !important;
-      }
-
-      /* Labels menores */
-      label {
-        font-size: 0.8125rem !important;
-        margin-bottom: 0.5rem !important;
-      }
-
-      /* Inputs com fonte menor */
-      input:not([type="checkbox"]):not([type="hidden"]), 
-      textarea, 
-      select {
-        font-size: 0.875rem !important;
-        padding: 0.75rem 0.875rem !important;
-      }
-
-      /* Botões menores */
-      .btn {
-        font-size: 0.8125rem !important;
-        padding: 0.625rem 1rem !important;
-      }
-
-      /* Cards menores */
-      .card {
-        padding: 1.25rem !important;
-      }
-
-      /* Texto geral menor */
-      .text-sm {
-        font-size: 0.75rem !important;
-      }
-
-      p {
-        font-size: 0.875rem !important;
-      }
-
-      /* Modal menor em mobile */
-      .modal-content {
-        padding: 1.5rem !important;
-        max-width: 95% !important;
-      }
-
-      .modal-content h3 {
-        font-size: 1.25rem !important;
-        margin-bottom: 1.25rem !important;
-      }
-
-      /* Espaçamentos menores */
-      .form-group {
-        margin-bottom: 1.25rem !important;
-      }
-
-      /* Tabs menores */
-      button[onclick*="showTab"] {
-        padding: 0.5rem 0.75rem !important;
-        font-size: 0.875rem !important;
-      }
-
-      /* Chip menor */
-      .chip {
-        font-size: 0.6875rem !important;
-        padding: 0.25rem 0.5rem !important;
-      }
-
-      /* Header menor */
-      header .container-edge {
-        padding: 0 1rem !important;
-      }
-
-      header .text-xl {
-        font-size: 1.125rem !important;
-      }
-    }
-
-    @media (max-width: 480px) {
-      /* Ajustes ainda menores para telas muito pequenas */
-      .font-display.text-3xl {
-        font-size: 1.5rem !important;
-        line-height: 1.75rem !important;
-      }
-
-      .font-display.text-2xl {
-        font-size: 1.25rem !important;
-        line-height: 1.5rem !important;
-      }
-
-      h1 {
-        font-size: 1.375rem !important;
-      }
-
-      h2 {
-        font-size: 1.25rem !important;
-      }
-
-      h3 {
-        font-size: 1.125rem !important;
-      }
-
-      input:not([type="checkbox"]):not([type="hidden"]), 
-      textarea, 
-      select {
-        font-size: 0.8125rem !important;
-        padding: 0.625rem 0.75rem !important;
-      }
-
-      textarea {
-        min-height: 80px !important;
-      }
-
-      .btn {
-        font-size: 0.75rem !important;
-        padding: 0.5rem 0.875rem !important;
-      }
-
-      .modal-content {
-        padding: 1.25rem !important;
-      }
-
-      .modal-content h3 {
-        font-size: 1.125rem !important;
-      }
-
-      label {
-        font-size: 0.75rem !important;
-      }
-
-      .chip {
-        font-size: 0.625rem !important;
-        padding: 0.2rem 0.45rem !important;
-      }
-
-      .container-edge {
-        padding: 0 0.875rem !important;
-      }
-    }
-  </style>
   <link rel="stylesheet" href="/css/page-bg.css">
+  <link rel="stylesheet" href="/css/admin.css">
 </head>
 
 <body class="page-bg text-fp-ink font-sans">
-  <header class="bg-white/80 backdrop-blur sticky top-0 z-50 border-b border-black/5">
-    <div class="container-edge flex items-center justify-between h-16">
-      <a href="/" class="flex items-center gap-3">
-        <img src="/assets/logo.png" alt="FitPoint Fitness" class="h-10 w-30 rounded-full" />
-        <span class="font-display text-xl font-bold tracking-tight">FitPoint <span
-            class="text-fp-green">Admin</span></span>
-      </a>
-      <nav class="flex items-center gap-4">
-        <a href="/" class="text-sm hover:text-fp-green">Voltar ao Site</a>
-        <button onclick="location.reload()" class="btn btn-secondary">
-          <i data-lucide="refresh-cw"></i> Atualizar
+  <header class="admin-header">
+    <div class="admin-header-inner">
+      <div class="flex items-center gap-3">
+        <button type="button" id="admin-menu-toggle" class="admin-menu-toggle" aria-label="Abrir menu">
+          <i data-lucide="menu"></i>
+        </button>
+        <a href="/" class="flex items-center gap-3 no-underline text-inherit">
+          <img src="/assets/logo.png" alt="FitPoint Fitness" class="h-9 w-auto rounded-full" />
+          <span class="font-display text-lg font-bold tracking-tight hidden sm:inline">FitPoint <span class="text-fp-green">Admin</span></span>
+        </a>
+      </div>
+      <nav class="flex items-center gap-3">
+        <a href="/" class="text-sm hover:text-fp-green no-underline text-inherit hidden sm:inline">Voltar ao Site</a>
+        <button type="button" onclick="location.reload()" class="btn btn-secondary btn-sm">
+          <i data-lucide="refresh-cw"></i>
+          <span class="hidden sm:inline">Atualizar</span>
         </button>
       </nav>
     </div>
   </header>
 
   <!-- Login Screen -->
-  <div id="login-screen" class="container-edge py-8">
-    <div class="max-w-md mx-auto mt-20">
-      <div class="card text-center">
-        <h1 class="font-display text-2xl font-bold mb-4">Painel Administrativo</h1>
-        <p class="text-black/70 mb-6">Faça login para acessar</p>
-        <form id="login-form" onsubmit="handleLogin(event)">
-          <div class="form-group">
-            <label>Usuário</label>
-            <input type="text" id="login-username" required autocomplete="username">
-          </div>
-          <div class="form-group">
-            <label>Senha</label>
-            <input type="password" id="login-password" required autocomplete="current-password">
-          </div>
-          <div id="login-error" class="text-red-600 text-sm mb-4" style="display: none;"></div>
-          <button type="submit" class="btn w-full">Entrar</button>
-        </form>
-      </div>
+  <div id="login-screen" class="login-screen">
+    <div class="login-card card">
+      <h1 class="font-display text-2xl font-bold mb-2">Painel Administrativo</h1>
+      <p class="text-black/70 mb-6">Faça login para acessar</p>
+      <form id="login-form" onsubmit="handleLogin(event)">
+        <div class="form-group text-left">
+          <label>Usuário</label>
+          <input type="text" id="login-username" required autocomplete="username">
+        </div>
+        <div class="form-group text-left">
+          <label>Senha</label>
+          <input type="password" id="login-password" required autocomplete="current-password">
+        </div>
+        <div id="login-error" class="text-red-600 text-sm mb-4" style="display: none;"></div>
+        <button type="submit" id="login-submit-btn" class="btn btn-primary btn-lg w-full">Entrar</button>
+      </form>
     </div>
   </div>
 
   <!-- Admin Panel -->
-  <main id="admin-panel" class="container-edge py-8" style="display: none;">
-    <div class="mb-6 flex justify-between items-center">
-      <div>
-        <h1 class="font-display text-3xl font-bold mt-5">Painel Administrativo</h1>
-        <p class="text-black/70 mt-2">Gerencie produtos, preços e promoções do cardápio</p>
-      </div>
-      <button onclick="logout()" class="btn btn-secondary">
-        <i data-lucide="log-out"></i> Sair
-      </button>
-    </div>
+  <div id="admin-panel" class="admin-shell" style="display: none;">
+    <div id="admin-sidebar-overlay" class="admin-sidebar-overlay"></div>
 
-    <!-- Categorias Section -->
-    <div id="section-categories" class="mb-10">
-      <div class="flex justify-between items-center mb-4">
-        <h2 class="font-display text-2xl font-bold">Categorias</h2>
-        <button type="button" onclick="openCategoryModal()" class="btn">
-          <i data-lucide="plus"></i> Nova Categoria
+    <aside id="admin-sidebar" class="admin-sidebar">
+      <p class="admin-sidebar-label">Menu</p>
+      <button type="button" class="admin-nav-item is-active" data-admin-nav="dashboard">
+        <i data-lucide="layout-dashboard"></i> Início
+      </button>
+      <button type="button" class="admin-nav-item" data-admin-nav="categorias">
+        <i data-lucide="folder"></i> Categorias
+      </button>
+      <button type="button" class="admin-nav-item" data-admin-nav="fidelidade">
+        <i data-lucide="heart"></i> Fidelidade
+      </button>
+      <button type="button" class="admin-nav-item" data-admin-nav="produtos">
+        <i data-lucide="shopping-bag"></i> Produtos
+      </button>
+
+      <div class="admin-sidebar-footer">
+        <button type="button" onclick="logout()" class="admin-nav-item text-red-600">
+          <i data-lucide="log-out"></i> Sair
         </button>
       </div>
-      <div id="categories-list" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <p class="text-black/60">Carregando...</p>
-      </div>
-    </div>
+    </aside>
 
-    <!-- Fidelidade Section -->
-    <div id="section-loyalty" class="mb-10">
-      <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
-        <div>
-          <h2 class="font-display text-2xl font-bold">Fidelidade</h2>
+    <main class="admin-main">
+      <!-- Dashboard -->
+      <section id="view-dashboard" class="admin-view is-active">
+        <div class="admin-view-header">
+          <h1>Bem-vindo ao painel</h1>
+          <p>Gerencie categorias, fidelidade e produtos do FitPoint em módulos separados.</p>
+        </div>
+        <div class="module-grid">
+          <button type="button" class="module-card" data-module-card="categorias">
+            <span class="module-card-icon"><i data-lucide="folder"></i></span>
+            <h2>Categorias</h2>
+            <p>Organize o cardápio em seções do site.</p>
+            <span class="module-card-stat" id="stat-categories">—</span>
+          </button>
+          <button type="button" class="module-card" data-module-card="fidelidade">
+            <span class="module-card-icon"><i data-lucide="heart"></i></span>
+            <h2>Fidelidade</h2>
+            <p>Programa de visitas e prêmios para clientes.</p>
+            <span class="module-card-stat" id="stat-loyalty">—</span>
+          </button>
+          <button type="button" class="module-card" data-module-card="produtos">
+            <span class="module-card-icon"><i data-lucide="shopping-bag"></i></span>
+            <h2>Produtos</h2>
+            <p>Preços, promoções, kits e opções do cardápio.</p>
+            <span class="module-card-stat" id="stat-products">—</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Categorias -->
+      <section id="view-categories" class="admin-view">
+        <div class="admin-view-header">
+          <h1>Categorias</h1>
+          <p>Organize as seções do cardápio no site.</p>
+        </div>
+        <div class="module-toolbar">
+          <span></span>
+          <div class="module-toolbar-actions">
+            <button type="button" onclick="openCategoryModal()" class="btn btn-primary btn-md">
+              <i data-lucide="plus"></i> Nova Categoria
+            </button>
+          </div>
+        </div>
+        <div id="categories-list" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <p class="text-black/60">Selecione este módulo para carregar.</p>
+        </div>
+      </section>
+
+      <!-- Fidelidade -->
+      <section id="view-loyalty" class="admin-view">
+        <div class="admin-view-header">
+          <h1>Fidelidade</h1>
           <p class="text-sm text-black/60 mt-1" id="loyalty-rule-text">A cada 10 visitas, o cliente ganha um Shake ou Hype Drink.</p>
         </div>
-        <div class="flex flex-wrap gap-2">
-          <a href="/fidelidade.html" target="_blank" class="btn btn-outline" style="padding: 0.5rem 1rem;">
-            <i data-lucide="external-link"></i> Ver página pública
-          </a>
-          <button type="button" onclick="openLoyaltyModal()" class="btn">
-            <i data-lucide="plus"></i> Novo cliente
-          </button>
-        </div>
-      </div>
-      <div class="card !mb-4">
-        <h3 class="font-semibold text-sm mb-2">Configuração do programa</h3>
-        <div class="flex flex-wrap items-end gap-3">
-          <div>
-            <label class="text-xs text-black/60 block mb-1">Visitas para ganhar prêmio</label>
-            <input type="number" id="loyalty-visits-per-reward" min="2" max="100" step="1" value="10" class="!w-24 !min-h-0 !py-2 !px-2">
+        <div class="module-toolbar">
+          <span></span>
+          <div class="module-toolbar-actions">
+            <a href="/fidelidade.html" target="_blank" class="btn btn-outline btn-md">
+              <i data-lucide="external-link"></i> Ver página pública
+            </a>
+            <button type="button" onclick="openLoyaltyModal()" class="btn btn-primary btn-md">
+              <i data-lucide="plus"></i> Novo cliente
+            </button>
           </div>
-          <button type="button" onclick="saveLoyaltySettings()" class="btn btn-outline" style="padding: 0.5rem 1rem;">
-            <i data-lucide="save"></i> Salvar configuração
-          </button>
         </div>
-      </div>
-      <div class="mb-3 flex flex-wrap items-center gap-3">
-        <input type="search" id="loyalty-search" class="flex-1 min-w-[200px]" placeholder="Buscar por nome ou telefone…" autocomplete="off" aria-label="Buscar clientes de fidelidade">
-      </div>
-      <div id="loyalty-pagination" class="mb-3 hidden"></div>
-      <div id="loyalty-list" class="grid gap-3">
-        <p class="text-black/60">Carregando...</p>
-      </div>
-    </div>
+        <div class="card mb-4">
+          <h3 class="font-semibold text-sm mb-2">Configuração do programa</h3>
+          <div class="flex flex-wrap items-end gap-3">
+            <div>
+              <label class="text-xs text-black/60 block mb-1">Visitas para ganhar prêmio</label>
+              <input type="number" id="loyalty-visits-per-reward" min="2" max="100" step="1" value="10" class="input-compact !w-24 !min-h-0 !py-2 !px-2">
+            </div>
+            <button type="button" id="btn-save-loyalty-settings" onclick="saveLoyaltySettings()" class="btn btn-outline btn-md">
+              <i data-lucide="save"></i> Salvar configuração
+            </button>
+          </div>
+        </div>
+        <div class="mb-3">
+          <input type="search" id="loyalty-search" class="max-w-md" placeholder="Buscar por nome ou telefone…" autocomplete="off" aria-label="Buscar clientes de fidelidade">
+        </div>
+        <div id="loyalty-pagination" class="mb-3 hidden"></div>
+        <div id="loyalty-list" class="grid gap-3">
+          <p class="text-black/60">Selecione este módulo para carregar.</p>
+        </div>
+      </section>
 
-    <!-- Produtos Section -->
-    <div id="section-products">
-      <div class="flex justify-between items-center mb-4">
-        <h2 class="font-display text-2xl font-bold">Produtos</h2>
-        <button onclick="openProductModal()" class="btn">
-          <i data-lucide="plus"></i> Adicionar Produto
-        </button>
-      </div>
-      <div id="products-list" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <p>Carregando...</p>
-      </div>
-    </div>
-  </main>
+      <!-- Produtos -->
+      <section id="view-products" class="admin-view">
+        <div class="admin-view-header">
+          <h1>Produtos</h1>
+          <p>Gerencie preços, promoções, kits e opções do cardápio.</p>
+        </div>
+        <div class="module-toolbar">
+          <span></span>
+          <div class="module-toolbar-actions">
+            <button type="button" onclick="openProductModal()" class="btn btn-primary btn-md">
+              <i data-lucide="plus"></i> Adicionar Produto
+            </button>
+          </div>
+        </div>
+        <div id="products-list" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <p class="text-black/60">Selecione este módulo para carregar.</p>
+        </div>
+      </section>
+    </main>
+  </div>
 
   <!-- Modal Produto -->
   <div id="product-modal" class="modal">
     <div class="modal-content">
       <div class="flex justify-between items-center mb-4">
         <h3 class="font-display text-2xl font-bold" id="product-modal-title">Adicionar Produto</h3>
-        <button onclick="closeProductModal()" class="text-2xl">&times;</button>
+        <button type="button" onclick="closeProductModal()" class="modal-close" aria-label="Fechar">&times;</button>
       </div>
       <form id="product-form" onsubmit="saveProduct(event)">
         <input type="hidden" id="product-id-input" autocomplete="off">
@@ -617,10 +235,10 @@
         <div class="form-group">
           <label>Categoria</label>
           <div class="flex gap-2 items-center">
-            <select id="product-category" class="px-2 flex-1" required>
+            <select id="product-category" class="flex-1" required>
               <option value="">Selecione…</option>
             </select>
-            <button type="button" onclick="openCategoryModal()" class="btn btn-outline shrink-0" style="padding: 0.5rem 0.75rem; white-space: nowrap;">
+            <button type="button" onclick="openCategoryModal()" class="btn btn-outline btn-sm shrink-0">
               <i data-lucide="plus"></i> Nova
             </button>
           </div>
@@ -658,7 +276,7 @@
           <label>Opções / variações (opcional)</label>
           <p class="text-xs text-black/50 mb-2">Ex.: Pizza comum (+R$0) e Pizza com frango (+R$8). Marque uma como padrão.</p>
           <div id="product-options-list" class="space-y-2"></div>
-          <button type="button" onclick="addProductOptionRow()" class="btn btn-outline mt-2" style="padding: 0.5rem 1rem;">
+          <button type="button" onclick="addProductOptionRow()" class="btn btn-outline btn-sm mt-2">
             <i data-lucide="plus"></i> Adicionar opção
           </button>
         </div>
@@ -688,9 +306,9 @@
             <input type="checkbox" id="product-active" checked> Ativo (visível no cardápio)
           </label>
         </div>
-        <div class="flex gap-2 justify-end">
-          <button type="button" onclick="closeProductModal()" class="btn btn-secondary">Cancelar</button>
-          <button type="submit" class="btn">Salvar</button>
+        <div class="modal-footer">
+          <button type="button" onclick="closeProductModal()" class="btn btn-secondary btn-md">Cancelar</button>
+          <button type="submit" class="btn btn-primary btn-lg">Salvar</button>
         </div>
       </form>
     </div>
@@ -698,10 +316,10 @@
 
   <!-- Modal Categoria -->
   <div id="category-modal" class="modal">
-    <div class="modal-content" style="max-width: 28rem;">
+    <div class="modal-content modal-content--sm">
       <div class="flex justify-between items-center mb-4">
         <h3 class="font-display text-xl font-bold" id="category-modal-title">Nova Categoria</h3>
-        <button type="button" onclick="closeCategoryModal()" class="text-2xl">&times;</button>
+        <button type="button" onclick="closeCategoryModal()" class="modal-close" aria-label="Fechar">&times;</button>
       </div>
       <form id="category-form" onsubmit="saveCategory(event)">
         <input type="hidden" id="category-id-input">
@@ -718,9 +336,9 @@
             <input type="checkbox" id="category-active" checked> Ativa
           </label>
         </div>
-        <div class="flex gap-2 justify-end">
-          <button type="button" onclick="closeCategoryModal()" class="btn btn-secondary">Cancelar</button>
-          <button type="submit" class="btn">Salvar</button>
+        <div class="modal-footer">
+          <button type="button" onclick="closeCategoryModal()" class="btn btn-secondary btn-md">Cancelar</button>
+          <button type="submit" class="btn btn-primary btn-lg">Salvar</button>
         </div>
       </form>
     </div>
@@ -728,10 +346,10 @@
 
   <!-- Modal Fidelidade -->
   <div id="loyalty-modal" class="modal">
-    <div class="modal-content" style="max-width: 28rem;">
+    <div class="modal-content modal-content--sm">
       <div class="flex justify-between items-center mb-4">
         <h3 class="font-display text-xl font-bold" id="loyalty-modal-title">Novo cliente</h3>
-        <button type="button" onclick="closeLoyaltyModal()" class="text-2xl">&times;</button>
+        <button type="button" onclick="closeLoyaltyModal()" class="modal-close" aria-label="Fechar">&times;</button>
       </div>
       <form id="loyalty-form" onsubmit="saveLoyaltyCustomer(event)">
         <input type="hidden" id="loyalty-id-input">
@@ -771,9 +389,9 @@
             <input type="checkbox" id="loyalty-active" checked> Ativo (visível no ranking)
           </label>
         </div>
-        <div class="flex gap-2 justify-end">
-          <button type="button" onclick="closeLoyaltyModal()" class="btn btn-secondary">Cancelar</button>
-          <button type="submit" class="btn">Salvar</button>
+        <div class="modal-footer">
+          <button type="button" onclick="closeLoyaltyModal()" class="btn btn-secondary btn-md">Cancelar</button>
+          <button type="submit" class="btn btn-primary btn-lg">Salvar</button>
         </div>
       </form>
     </div>
@@ -782,95 +400,88 @@
   <script src="/js/config.js"></script>
   <script src="/js/auth.js"></script>
   <script src="/js/database.js"></script>
-  <script src="/js/admin.js"></script>
+  <script src="/js/admin/shared.js"></script>
+  <script src="/js/admin/ui.js"></script>
+  <script src="/js/admin/categories.js"></script>
+  <script src="/js/admin/products.js"></script>
+  <script src="/js/admin/loyalty.js"></script>
+  <script src="/js/admin/router.js"></script>
   <script>
-    // Aguardar carregamento de todos os scripts
     window.addEventListener('DOMContentLoaded', () => {
-      // Pequeno delay para garantir que todos os scripts foram carregados
       setTimeout(() => {
-        // Verificar se todos os módulos estão disponíveis
         if (typeof DB === 'undefined') {
-          console.error('DB não está definido. Verifique se database.js foi carregado corretamente.');
-          document.getElementById('login-screen').innerHTML = '<div class="p-4 text-red-600">Erro: Módulo DB não carregado. Recarregue a página ou verifique o console.</div>';
-          document.getElementById('login-screen').style.display = 'block';
+          document.getElementById('login-screen').innerHTML = '<div class="p-4 text-red-600 card">Erro: Módulo DB não carregado. Recarregue a página.</div>';
           return;
         }
         if (typeof Auth === 'undefined') {
-          console.error('Auth não está definido. Verifique se auth.js foi carregado corretamente.');
-          document.getElementById('login-screen').innerHTML = '<div class="p-4 text-red-600">Erro: Módulo Auth não carregado. Recarregue a página ou verifique o console.</div>';
-          document.getElementById('login-screen').style.display = 'block';
+          document.getElementById('login-screen').innerHTML = '<div class="p-4 text-red-600 card">Erro: Módulo Auth não carregado. Recarregue a página.</div>';
           return;
         }
-        
         try {
-          if (window.lucide) window.lucide.createIcons();
+          refreshIcons();
           checkAuth();
         } catch (error) {
-          console.error('Erro ao inicializar:', error);
-          document.getElementById('login-screen').innerHTML = '<div class="p-4 text-red-600">Erro ao inicializar: ' + error.message + '</div>';
-          document.getElementById('login-screen').style.display = 'block';
+          document.getElementById('login-screen').innerHTML = '<div class="p-4 text-red-600 card">Erro ao inicializar: ' + error.message + '</div>';
         }
       }, 100);
     });
 
     async function checkAuth() {
-      if (typeof Auth === 'undefined' || typeof DB === 'undefined') {
-        console.error('Módulos não carregados');
-        return;
-      }
-      
-        if (Auth.isAuthenticated()) {
+      if (typeof Auth === 'undefined' || typeof DB === 'undefined') return;
+
+      if (Auth.isAuthenticated()) {
         showAdminPanel();
-        if (typeof loadProducts === 'function') await loadProducts();
-        if (typeof loadCategories === 'function') await loadCategories();
-        if (typeof loadLoyaltyCustomers === 'function') await loadLoyaltyCustomers();
+        initAdminAfterLogin();
       } else {
         showLoginScreen();
       }
     }
 
     function showLoginScreen() {
-      document.getElementById('login-screen').style.display = 'block';
+      document.getElementById('login-screen').style.display = 'flex';
       document.getElementById('admin-panel').style.display = 'none';
     }
 
     function showAdminPanel() {
       document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('admin-panel').style.display = 'block';
+      document.getElementById('admin-panel').style.display = 'flex';
+      refreshIcons();
     }
 
     async function handleLogin(event) {
       event.preventDefault();
       if (typeof Auth === 'undefined' || typeof DB === 'undefined') {
-        alert('Erro: Módulos não carregados. Recarregue a página.');
+        showToast('Erro: Módulos não carregados. Recarregue a página.', 'error');
         return;
       }
-      
+
       const username = document.getElementById('login-username').value;
       const password = document.getElementById('login-password').value;
       const errorDiv = document.getElementById('login-error');
+      const btn = document.getElementById('login-submit-btn');
 
       errorDiv.style.display = 'none';
 
-      try {
-        await Auth.login(username, password);
-        showAdminPanel();
-        if (typeof loadProducts === 'function') await loadProducts();
-        if (typeof loadCategories === 'function') await loadCategories();
-        if (typeof loadLoyaltyCustomers === 'function') await loadLoyaltyCustomers();
-      } catch (error) {
-        errorDiv.textContent = error.message;
-        errorDiv.style.display = 'block';
-      }
+      await withButtonLoading(btn, async () => {
+        try {
+          await Auth.login(username, password);
+          showAdminPanel();
+          initAdminAfterLogin();
+        } catch (error) {
+          errorDiv.textContent = error.message;
+          errorDiv.style.display = 'block';
+        }
+      }, 'Entrando…');
     }
 
     function logout() {
       Auth.logout();
+      AdminRouter.reset();
       showLoginScreen();
       document.getElementById('login-form').reset();
+      window.location.hash = '';
     }
   </script>
 </body>
 
 </html>
-

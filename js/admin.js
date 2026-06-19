@@ -513,6 +513,10 @@ async function deleteProduct(id) {
 
 let loyaltyVisitsPerReward = 10;
 let editingLoyaltyId = null;
+let loyaltyPage = 1;
+let loyaltySearch = '';
+const loyaltyLimit = 10;
+let loyaltySearchTimer = null;
 
 function formatPhoneDisplay(phone) {
   const d = String(phone || '').replace(/\D/g, '');
@@ -587,6 +591,33 @@ async function saveLoyaltySettings() {
   }
 }
 
+function renderLoyaltyPagination(meta) {
+  const el = document.getElementById('loyalty-pagination');
+  if (!el) return;
+  if (!meta.total) {
+    el.classList.add('hidden');
+    el.innerHTML = '';
+    return;
+  }
+  el.classList.remove('hidden');
+  const prevDisabled = meta.page <= 1;
+  const nextDisabled = meta.page >= meta.total_pages;
+  el.innerHTML = `
+    <div class="flex flex-wrap items-center justify-between gap-2 text-sm">
+      <p class="text-black/60">Página ${meta.page} de ${meta.total_pages} (${meta.total} clientes)</p>
+      <div class="flex gap-2">
+        <button type="button" class="btn btn-outline" style="padding:0.4rem 0.75rem;font-size:0.8125rem" ${prevDisabled ? 'disabled' : ''} onclick="loyaltyChangePage(${meta.page - 1})">Anterior</button>
+        <button type="button" class="btn btn-outline" style="padding:0.4rem 0.75rem;font-size:0.8125rem" ${nextDisabled ? 'disabled' : ''} onclick="loyaltyChangePage(${meta.page + 1})">Próxima</button>
+      </div>
+    </div>`;
+}
+
+function loyaltyChangePage(page) {
+  if (page < 1) return;
+  loyaltyPage = page;
+  loadLoyaltyCustomers();
+}
+
 async function loadLoyaltyCustomers() {
   const container = document.getElementById('loyalty-list');
   if (!container || typeof DB === 'undefined') return;
@@ -594,9 +625,18 @@ async function loadLoyaltyCustomers() {
 
   try {
     await loadLoyaltySettings();
-    const customers = await DB.getLoyaltyCustomers();
+    const data = await DB.getLoyaltyCustomers({
+      q: loyaltySearch || undefined,
+      page: loyaltyPage,
+      limit: loyaltyLimit
+    });
+    const customers = data.items || [];
+    renderLoyaltyPagination(data);
+
     if (customers.length === 0) {
-      container.innerHTML = '<p class="text-black/60">Nenhum cliente cadastrado. Clique em "Novo cliente" para começar.</p>';
+      container.innerHTML = loyaltySearch
+        ? `<p class="text-black/60">Nenhum cliente encontrado para «${escapeAttr(loyaltySearch)}».</p>`
+        : '<p class="text-black/60">Nenhum cliente cadastrado. Clique em "Novo cliente" para começar.</p>';
       return;
     }
 
@@ -676,8 +716,7 @@ function openLoyaltyModal(customerId = null) {
   if (customerId) {
     title.textContent = 'Editar cliente';
     activeGroup.style.display = 'block';
-    DB.getLoyaltyCustomers().then(customers => {
-      const c = customers.find(x => x.id === customerId);
+    DB.getLoyaltyCustomer(customerId).then(c => {
       if (!c) return;
       document.getElementById('loyalty-id-input').value = c.id;
       document.getElementById('loyalty-name').value = c.name;
@@ -692,6 +731,8 @@ function openLoyaltyModal(customerId = null) {
         prev.src = c.avatar;
         prev.classList.remove('hidden');
       }
+    }).catch(err => {
+      alert('Erro ao carregar cliente: ' + (err.message || err));
     });
   } else {
     title.textContent = 'Novo cliente';
@@ -795,6 +836,18 @@ async function applyLoyaltyVisitDelta(id, delta) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  const loyaltySearchInput = document.getElementById('loyalty-search');
+  if (loyaltySearchInput) {
+    loyaltySearchInput.addEventListener('input', () => {
+      clearTimeout(loyaltySearchTimer);
+      loyaltySearchTimer = setTimeout(() => {
+        loyaltySearch = loyaltySearchInput.value.trim();
+        loyaltyPage = 1;
+        loadLoyaltyCustomers();
+      }, 300);
+    });
+  }
+
   const loyaltyAvatarFile = document.getElementById('loyalty-avatar-file');
   const loyaltyAvatarPreview = document.getElementById('loyalty-avatar-preview');
   if (loyaltyAvatarFile && loyaltyAvatarPreview) {

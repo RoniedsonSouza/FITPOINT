@@ -11,8 +11,15 @@ const {
   mapCustomerRow,
   applyVisitDelta,
   parseNonNegativeInt,
-  parseVisitsPerReward
+  parseVisitsPerReward,
+  parsePaginationQuery,
+  parseSearchQuery,
+  buildNamePhoneSearchClause,
+  participantOrderSql,
+  computeTotalPages
 } = require('./loyaltyHelpers');
+
+const WINNERS_HALL_LIMIT = 5;
 
 const loyaltyUploadDir = path.join(__dirname, '..', 'uploads', 'loyalty');
 fs.mkdirSync(loyaltyUploadDir, { recursive: true });
@@ -123,30 +130,62 @@ router.post('/upload-avatar', authenticateToken, uploadAvatarMiddleware, (req, r
 router.get('/rankings', async (req, res) => {
   try {
     const visitsPerReward = await getVisitsPerReward();
-    const result = await query(
+    const { page, limit, offset } = parsePaginationQuery(req.query);
+    const search = parseSearchQuery(req.query);
+    const searchPart = buildNamePhoneSearchClause(search, 1);
+    const baseWhere = `WHERE active = true${searchPart.clause}`;
+
+    const countResult = await query(
+      `SELECT COUNT(*)::int AS cnt FROM ${table('loyalty_customers')} ${baseWhere}`,
+      searchPart.values
+    );
+    const participantsTotal = countResult.rows[0]?.cnt ?? 0;
+    const totalPages = computeTotalPages(participantsTotal, limit);
+
+    const orderSql = participantOrderSql(visitsPerReward);
+    const listValues = [...searchPart.values, limit, offset];
+    const limitIdx = searchPart.values.length + 1;
+    const offsetIdx = searchPart.values.length + 2;
+
+    const participantsResult = await query(
       `SELECT * FROM ${table('loyalty_customers')}
-       WHERE active = true
-       ORDER BY total_visits DESC, name ASC`
+       ${baseWhere}
+       ORDER BY ${orderSql}
+       LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+      listValues
     );
 
-    const customers = result.rows.map(row =>
-      mapCustomerRow(row, { maskName: true, visitsPerReward })
+    const inProgress = participantsResult.rows.map(row =>
+      mapPublicRankingItem(mapCustomerRow(row, { maskName: true, visitsPerReward }))
     );
 
-    const inProgress = customers
-      .sort((a, b) =>
-        b.display_progress - a.display_progress ||
-        b.total_visits - a.total_visits ||
-        a.display_name.localeCompare(b.display_name)
-      )
-      .map(mapPublicRankingItem);
+    const winnersCountResult = await query(
+      `SELECT COUNT(*)::int AS cnt FROM ${table('loyalty_customers')}
+       WHERE active = true AND total_rewards >= 1`
+    );
+    const winnersTotal = winnersCountResult.rows[0]?.cnt ?? 0;
 
-    const winners = customers
-      .filter(c => c.total_rewards >= 1)
-      .sort((a, b) => b.total_rewards - a.total_rewards || b.total_visits - a.total_visits)
-      .map(mapPublicWinnerItem);
+    const winnersResult = await query(
+      `SELECT * FROM ${table('loyalty_customers')}
+       WHERE active = true AND total_rewards >= 1
+       ORDER BY total_rewards DESC, total_visits DESC, name ASC
+       LIMIT ${WINNERS_HALL_LIMIT}`
+    );
 
-    res.json({ in_progress: inProgress, winners, visits_per_reward: visitsPerReward });
+    const winners = winnersResult.rows.map(row =>
+      mapPublicWinnerItem(mapCustomerRow(row, { maskName: true, visitsPerReward }))
+    );
+
+    res.json({
+      in_progress: inProgress,
+      winners,
+      visits_per_reward: visitsPerReward,
+      participants_total: participantsTotal,
+      winners_total: winnersTotal,
+      page,
+      limit,
+      total_pages: totalPages
+    });
   } catch (error) {
     console.error('Erro ao buscar rankings de fidelidade:', error);
     res.status(500).json({ error: 'Erro ao buscar rankings de fidelidade' });
@@ -157,15 +196,60 @@ router.get('/rankings', async (req, res) => {
 router.get('/customers', authenticateToken, async (req, res) => {
   try {
     const visitsPerReward = await getVisitsPerReward();
-    const result = await query(
-      `SELECT * FROM ${table('loyalty_customers')} ORDER BY name ASC`
+    const { page, limit, offset } = parsePaginationQuery(req.query);
+    const search = parseSearchQuery(req.query);
+    const searchPart = buildNamePhoneSearchClause(search, 1);
+    const baseWhere = `WHERE 1=1${searchPart.clause}`;
+
+    const countResult = await query(
+      `SELECT COUNT(*)::int AS cnt FROM ${table('loyalty_customers')} ${baseWhere}`,
+      searchPart.values
     );
-    res.json(result.rows.map(row =>
-      mapCustomerRow(row, { includePhone: true, visitsPerReward })
-    ));
+    const total = countResult.rows[0]?.cnt ?? 0;
+    const totalPages = computeTotalPages(total, limit);
+
+    const listValues = [...searchPart.values, limit, offset];
+    const limitIdx = searchPart.values.length + 1;
+    const offsetIdx = searchPart.values.length + 2;
+
+    const result = await query(
+      `SELECT * FROM ${table('loyalty_customers')}
+       ${baseWhere}
+       ORDER BY name ASC
+       LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+      listValues
+    );
+
+    res.json({
+      items: result.rows.map(row =>
+        mapCustomerRow(row, { includePhone: true, visitsPerReward })
+      ),
+      total,
+      page,
+      limit,
+      total_pages: totalPages
+    });
   } catch (error) {
     console.error('Erro ao buscar clientes de fidelidade:', error);
     res.status(500).json({ error: 'Erro ao buscar clientes de fidelidade' });
+  }
+});
+
+// GET /api/loyalty/customers/:id — admin
+router.get('/customers/:id', authenticateToken, async (req, res) => {
+  try {
+    const visitsPerReward = await getVisitsPerReward();
+    const result = await query(
+      `SELECT * FROM ${table('loyalty_customers')} WHERE id = $1`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Cliente não encontrado' });
+    }
+    res.json(mapCustomerRow(result.rows[0], { includePhone: true, visitsPerReward }));
+  } catch (error) {
+    console.error('Erro ao buscar cliente de fidelidade:', error);
+    res.status(500).json({ error: 'Erro ao buscar cliente de fidelidade' });
   }
 });
 

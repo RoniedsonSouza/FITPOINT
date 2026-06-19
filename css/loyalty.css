@@ -375,3 +375,58 @@
   border-radius: 1rem;
   border: 1px dashed rgba(0, 0, 0, 0.1);
 }
+
+.loyalty-search-input {
+  padding: 0.625rem 0.875rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fff;
+  font-size: 0.875rem;
+  color: var(--fp-ink, #0E1F16);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.loyalty-search-input:focus {
+  outline: none;
+  border-color: var(--loyalty-green, #1D6B3A);
+  box-shadow: 0 0 0 3px rgba(29, 107, 58, 0.12);
+}
+
+.loyalty-pagination-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.loyalty-pagination-info {
+  font-size: 0.8125rem;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.loyalty-pagination-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.loyalty-pagination-btn {
+  padding: 0.4rem 0.75rem;
+  border-radius: 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--fp-ink, #0E1F16);
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.loyalty-pagination-btn:hover:not(:disabled) {
+  background: rgba(29, 107, 58, 0.08);
+}
+
+.loyalty-pagination-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

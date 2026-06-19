@@ -226,19 +226,44 @@ const DB = {
     return response.json();
   },
 
-  async getLoyaltyRankings() {
-    const response = await fetch(`${getApiBaseUrl()}/loyalty/rankings`);
+  async getLoyaltyRankings(params = {}) {
+    const qs = new URLSearchParams();
+    if (params.q) qs.set('q', params.q);
+    if (params.page) qs.set('page', String(params.page));
+    if (params.limit) qs.set('limit', String(params.limit));
+    const query = qs.toString();
+    const url = `${getApiBaseUrl()}/loyalty/rankings${query ? `?${query}` : ''}`;
+    const response = await fetch(url);
     if (!response.ok) throw new Error('Erro ao buscar rankings de fidelidade');
     return response.json();
   },
 
-  async getLoyaltyCustomers() {
-    const response = await fetch(`${getApiBaseUrl()}/loyalty/customers`, {
+  async getLoyaltyCustomers(params = {}) {
+    const qs = new URLSearchParams();
+    if (params.q) qs.set('q', params.q);
+    if (params.page) qs.set('page', String(params.page));
+    if (params.limit) qs.set('limit', String(params.limit));
+    const query = qs.toString();
+    const url = `${getApiBaseUrl()}/loyalty/customers${query ? `?${query}` : ''}`;
+    const response = await fetch(url, {
       headers: getAuthHeaders()
     });
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       const errorMsg = error.error || 'Erro ao buscar clientes de fidelidade';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async getLoyaltyCustomer(id) {
+    const response = await fetch(`${getApiBaseUrl()}/loyalty/customers/${id}`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao buscar cliente';
       if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
       throw new Error(errorMsg);
     }

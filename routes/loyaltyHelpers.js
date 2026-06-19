@@ -115,6 +115,54 @@ function parseVisitsPerReward(value) {
   return { value: num };
 }
 
+function parsePaginationQuery(query) {
+  let page = parseInt(String(query?.page), 10);
+  let limit = parseInt(String(query?.limit), 10);
+  if (Number.isNaN(page) || page < 1) page = 1;
+  if (Number.isNaN(limit) || limit < 1) limit = 10;
+  if (limit > 50) limit = 50;
+  return { page, limit, offset: (page - 1) * limit };
+}
+
+function parseSearchQuery(query) {
+  const q = String(query?.q || '').trim();
+  return q || null;
+}
+
+function buildNamePhoneSearchClause(search, startIndex, alias = '') {
+  if (!search) {
+    return { clause: '', values: [], nextIndex: startIndex };
+  }
+  const col = alias ? `${alias}.` : '';
+  const escaped = search.replace(/[%_\\]/g, '\\$&');
+  const namePattern = `%${escaped}%`;
+  const phoneDigits = normalizePhone(search);
+  const values = [namePattern];
+  let clause = ` AND (${col}name ILIKE $${startIndex}`;
+  let nextIndex = startIndex + 1;
+  if (phoneDigits) {
+    clause += ` OR ${col}phone LIKE $${nextIndex}`;
+    values.push(`%${phoneDigits}%`);
+    nextIndex += 1;
+  }
+  clause += ')';
+  return { clause, values, nextIndex };
+}
+
+function participantOrderSql(visitsPerReward, alias = '') {
+  const n = Math.max(2, Number(visitsPerReward) || DEFAULT_VISITS_PER_REWARD);
+  const col = alias ? `${alias}.` : '';
+  return `CASE
+    WHEN ${col}total_visits = 0 THEN 0
+    WHEN ${col}total_visits % ${n} = 0 THEN ${n}
+    ELSE ${col}total_visits % ${n}
+  END DESC, ${col}total_visits DESC, ${col}name ASC`;
+}
+
+function computeTotalPages(total, limit) {
+  return Math.max(1, Math.ceil(total / limit) || 1);
+}
+
 module.exports = {
   DEFAULT_VISITS_PER_REWARD,
   normalizePhone,
@@ -126,5 +174,10 @@ module.exports = {
   mapCustomerRow,
   applyVisitDelta,
   parseNonNegativeInt,
-  parseVisitsPerReward
+  parseVisitsPerReward,
+  parsePaginationQuery,
+  parseSearchQuery,
+  buildNamePhoneSearchClause,
+  participantOrderSql,
+  computeTotalPages
 };

@@ -678,12 +678,15 @@ function loyaltyParticipantMeta(item, n) {
     return `${item.progress}/${n} visitas · Faltam ${item.visits_to_reward}`;
 }
 
-function renderLoyaltyParticipantsList(items, n) {
+function renderLoyaltyParticipantsList(items, n, rankOffset = 0, searchTerm = '') {
     if (!items.length) {
+        if (searchTerm) {
+            return `<p class="loyalty-empty">Nenhum participante encontrado para «${escapeHtml(searchTerm)}».</p>`;
+        }
         return '<p class="loyalty-empty">Nenhum participante cadastrado ainda. Visite a FitPoint e seja o primeiro!</p>';
     }
     return items.map((item, i) => {
-        const pos = i + 1;
+        const pos = rankOffset + i + 1;
         const pct = Math.round((item.progress / n) * 100);
         const topClass = pos <= 3 ? ' loyalty-rank-pos--top' : '';
         const completeClass = item.cycle_complete ? ' loyalty-rank-item--complete' : '';
@@ -701,6 +704,38 @@ function renderLoyaltyParticipantsList(items, n) {
             </div>
           </div>`;
     }).join('');
+}
+
+function renderLoyaltyParticipantsPagination(meta) {
+    const el = document.getElementById('loyalty-participants-pagination');
+    if (!el) return;
+    if (!meta.participants_total) {
+        el.classList.add('hidden');
+        el.innerHTML = '';
+        return;
+    }
+    el.classList.remove('hidden');
+    const prevDisabled = meta.page <= 1;
+    const nextDisabled = meta.page >= meta.total_pages;
+    el.innerHTML = `
+      <div class="loyalty-pagination-inner">
+        <p class="loyalty-pagination-info">Página ${meta.page} de ${meta.total_pages}</p>
+        <div class="loyalty-pagination-actions">
+          <button type="button" class="loyalty-pagination-btn" ${prevDisabled ? 'disabled' : ''} onclick="loyaltyPublicChangePage(${meta.page - 1})">Anterior</button>
+          <button type="button" class="loyalty-pagination-btn" ${nextDisabled ? 'disabled' : ''} onclick="loyaltyPublicChangePage(${meta.page + 1})">Próxima</button>
+        </div>
+      </div>`;
+}
+
+let loyaltyParticipantsPage = 1;
+let loyaltyParticipantsSearch = '';
+const loyaltyParticipantsLimit = 10;
+let loyaltyParticipantsSearchTimer = null;
+
+function loyaltyPublicChangePage(page) {
+    if (page < 1) return;
+    loyaltyParticipantsPage = page;
+    loadLoyaltyParticipants();
 }
 
 function renderLoyaltyWinnersList(items, n) {
@@ -725,8 +760,7 @@ function renderLoyaltyWinnersList(items, n) {
     }).join('');
 }
 
-async function initLoyalty() {
-    if (document.body.dataset.page !== 'loyalty') return;
+async function loadLoyaltyParticipants() {
     const inProgressEl = document.getElementById('loyalty-in-progress');
     const winnersEl = document.getElementById('loyalty-winners');
     const ruleEl = document.getElementById('loyalty-hero-rule');
@@ -734,10 +768,25 @@ async function initLoyalty() {
     const statWinners = document.getElementById('loyalty-stat-winners');
     if (!inProgressEl || !winnersEl) return;
 
+    inProgressEl.innerHTML = '<p class="loyalty-empty">Carregando…</p>';
+
     try {
-        let data = { in_progress: [], winners: [], visits_per_reward: 10 };
+        let data = {
+            in_progress: [],
+            winners: [],
+            visits_per_reward: 10,
+            participants_total: 0,
+            winners_total: 0,
+            page: 1,
+            limit: loyaltyParticipantsLimit,
+            total_pages: 1
+        };
         if (typeof DB !== 'undefined') {
-            data = await DB.getLoyaltyRankings();
+            data = await DB.getLoyaltyRankings({
+                q: loyaltyParticipantsSearch || undefined,
+                page: loyaltyParticipantsPage,
+                limit: loyaltyParticipantsLimit
+            });
         }
         const n = data.visits_per_reward || 10;
         if (ruleEl) {
@@ -745,9 +794,11 @@ async function initLoyalty() {
         }
         const participants = data.in_progress || [];
         const winners = data.winners || [];
-        if (statParticipants) statParticipants.textContent = String(participants.length);
-        if (statWinners) statWinners.textContent = String(winners.length);
-        inProgressEl.innerHTML = renderLoyaltyParticipantsList(participants, n);
+        if (statParticipants) statParticipants.textContent = String(data.participants_total ?? participants.length);
+        if (statWinners) statWinners.textContent = String(data.winners_total ?? winners.length);
+        const rankOffset = ((data.page || 1) - 1) * (data.limit || loyaltyParticipantsLimit);
+        inProgressEl.innerHTML = renderLoyaltyParticipantsList(participants, n, rankOffset, loyaltyParticipantsSearch);
+        renderLoyaltyParticipantsPagination(data);
         winnersEl.innerHTML = renderLoyaltyWinnersList(winners, n);
     } catch (e) {
         console.error(e);
@@ -757,5 +808,22 @@ async function initLoyalty() {
     refreshIcons();
 }
 
-initMobileMenu(); highlightActiveNav(); initHome(); initMenu(); initPromos(); initProductDetail(); initLoyalty(); refreshIcons();
+async function initLoyalty() {
+    if (document.body.dataset.page !== 'loyalty') return;
 
+    const searchInput = document.getElementById('loyalty-participants-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            clearTimeout(loyaltyParticipantsSearchTimer);
+            loyaltyParticipantsSearchTimer = setTimeout(() => {
+                loyaltyParticipantsSearch = searchInput.value.trim();
+                loyaltyParticipantsPage = 1;
+                loadLoyaltyParticipants();
+            }, 300);
+        });
+    }
+
+    await loadLoyaltyParticipants();
+}
+
+initMobileMenu(); highlightActiveNav(); initHome(); initMenu(); initPromos(); initProductDetail(); initLoyalty(); refreshIcons();

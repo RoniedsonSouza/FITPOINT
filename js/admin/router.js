@@ -16,7 +16,10 @@ const AdminRouter = {
     this.bindSidebar();
     this.bindModuleCards();
     this.bindMobileMenu();
-    this.handleHash();
+  },
+
+  isAuthenticated() {
+    return typeof Auth !== 'undefined' && Auth.isAuthenticated();
   },
 
   bindSidebar() {
@@ -70,6 +73,7 @@ const AdminRouter = {
   },
 
   handleHash() {
+    if (!this.isAuthenticated()) return;
     const module = this.parseHash();
     this.showModule(module, false);
   },
@@ -85,6 +89,8 @@ const AdminRouter = {
   },
 
   showModule(module, forceReload) {
+    if (!this.isAuthenticated()) return;
+
     const route = this.routes[module];
     if (!route) return;
 
@@ -124,7 +130,7 @@ const AdminRouter = {
       const [categories, products, loyaltyData] = await Promise.all([
         DB.getCategories().catch(() => []),
         DB.getProducts().catch(() => []),
-        DB.getLoyaltyCustomers({ page: 1, limit: 1 }).catch(() => ({ total: 0 }))
+        DB.getLoyaltyCustomers({ page: 1, limit: 1 })
       ]);
 
       const activeCats = (categories || []).filter(c => c.active !== false).length;
@@ -133,6 +139,7 @@ const AdminRouter = {
       const totalCustomers = loyaltyData.total ?? (loyaltyData.items || []).length;
       if (loyEl) loyEl.textContent = `${totalCustomers} cliente${totalCustomers !== 1 ? 's' : ''}`;
     } catch (error) {
+      if (handleAuthError(error)) return;
       if (catEl) catEl.textContent = '—';
       if (loyEl) loyEl.textContent = '—';
       if (prodEl) prodEl.textContent = '—';

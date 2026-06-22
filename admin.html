@@ -72,6 +72,7 @@
           <input type="password" id="login-password" required autocomplete="current-password">
         </div>
         <div id="login-error" class="text-red-600 text-sm mb-4" style="display: none;"></div>
+        <div id="login-checking" class="text-black/60 text-sm mb-4" style="display: none;">Verificando sessão…</div>
         <button type="submit" id="login-submit-btn" class="btn btn-primary btn-lg w-full">Entrar</button>
       </form>
     </div>
@@ -184,7 +185,7 @@
           <input type="search" id="loyalty-search" class="max-w-md" placeholder="Buscar por nome ou telefone…" autocomplete="off" aria-label="Buscar clientes de fidelidade">
         </div>
         <div id="loyalty-pagination" class="mb-3 hidden"></div>
-        <div id="loyalty-list" class="grid gap-3">
+        <div id="loyalty-list" class="loyalty-list grid gap-3">
           <p class="text-black/60">Selecione este módulo para carregar.</p>
         </div>
       </section>
@@ -419,6 +420,10 @@
         }
         try {
           refreshIcons();
+          Auth.initStorageSync(() => {
+            if (typeof logout === 'function') logout();
+          });
+          setupSessionRevalidation();
           checkAuth();
         } catch (error) {
           document.getElementById('login-screen').innerHTML = '<div class="p-4 text-red-600 card">Erro ao inicializar: ' + error.message + '</div>';
@@ -426,10 +431,51 @@
       }, 100);
     });
 
+    function isAdminPanelVisible() {
+      const panel = document.getElementById('admin-panel');
+      return panel && panel.style.display !== 'none';
+    }
+
+    function setupSessionRevalidation() {
+      if (window._adminSessionRevalidationBound) return;
+      window._adminSessionRevalidationBound = true;
+
+      document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState !== 'visible') return;
+        if (!Auth.isAuthenticated() || !isAdminPanelVisible()) return;
+
+        const user = await Auth.validateSession();
+        if (!user) {
+          showToast('Sessão expirada. Faça login novamente.', 'error');
+          logout();
+        }
+      });
+    }
+
+    function setLoginChecking(checking) {
+      const checkingEl = document.getElementById('login-checking');
+      const form = document.getElementById('login-form');
+      const submitBtn = document.getElementById('login-submit-btn');
+      if (checkingEl) checkingEl.style.display = checking ? 'block' : 'none';
+      if (form) form.style.display = checking ? 'none' : 'block';
+      if (submitBtn) submitBtn.disabled = checking;
+    }
+
     async function checkAuth() {
       if (typeof Auth === 'undefined' || typeof DB === 'undefined') return;
 
-      if (Auth.isAuthenticated()) {
+      if (!Auth.isAuthenticated()) {
+        showLoginScreen();
+        return;
+      }
+
+      setLoginChecking(true);
+      showLoginScreen();
+
+      const user = await Auth.validateSession();
+      setLoginChecking(false);
+
+      if (user) {
         showAdminPanel();
         initAdminAfterLogin();
       } else {

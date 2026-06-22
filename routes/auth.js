@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { query, table } = require('../config/database');
-const { comparePassword, generateToken, hashPassword } = require('../config/auth');
+const { comparePassword, generateToken, hashPassword, authenticateToken } = require('../config/auth');
 
 // POST /api/auth/login - Login
 router.post('/login', async (req, res) => {
@@ -46,6 +46,16 @@ router.post('/login', async (req, res) => {
     console.error('Erro no login:', error);
     res.status(500).json({ error: 'Erro ao realizar login' });
   }
+});
+
+// GET /api/auth/me - Validar sessão atual
+router.get('/me', authenticateToken, (req, res) => {
+  res.json({
+    user: {
+      id: req.user.id,
+      username: req.user.username
+    }
+  });
 });
 
 // POST /api/auth/register - Criar admin (apenas para setup inicial)

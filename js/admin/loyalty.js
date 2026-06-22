@@ -7,6 +7,7 @@ let loyaltySearch = '';
 const loyaltyLimit = 10;
 let loyaltySearchTimer = null;
 let loyaltyLoading = false;
+let loyaltyPaginationMeta = null;
 
 function formatPhoneDisplay(phone) {
   const d = String(phone || '').replace(/\D/g, '');
@@ -38,12 +39,88 @@ function loyaltyProgressLabel(c) {
   return `${display}/${n} neste ciclo · Faltam ${c.visits_to_reward ?? (n - display)}`;
 }
 
-function loyaltyAvatarHtml(c, sizeClass = 'h-12 w-12') {
+function loyaltyProgressLabelShort(c) {
+  const n = loyaltyVisitsPerReward;
+  const display = c.display_progress ?? c.progress ?? 0;
+  if (c.cycle_complete) {
+    return `${n}/${n} · Prêmio!`;
+  }
+  if ((c.total_visits || 0) === 0) {
+    return `0/${n} · faltam ${n}`;
+  }
+  return `${display}/${n} · faltam ${c.visits_to_reward ?? (n - display)}`;
+}
+
+function loyaltyAvatarHtml(c, sizeClass = 'loyalty-card-avatar') {
   const initial = escapeAttr((c.name || '?').charAt(0).toUpperCase());
   if (c.avatar) {
-    return `<img src="${escapeAttr(c.avatar)}" alt="" class="${sizeClass} rounded-full object-cover border border-black/10 shrink-0" loading="lazy">`;
+    return `<img src="${escapeAttr(c.avatar)}" alt="" class="${sizeClass}" loading="lazy">`;
   }
-  return `<span class="${sizeClass} rounded-full bg-fp-green/10 text-fp-green font-bold flex items-center justify-center shrink-0 border border-black/10">${initial}</span>`;
+  return `<span class="${sizeClass} loyalty-card-avatar--initial">${initial}</span>`;
+}
+
+function renderLoyaltyCustomerCard(c) {
+  const n = loyaltyVisitsPerReward;
+  const display = c.display_progress ?? c.progress ?? 0;
+  const progressPct = Math.round((display / n) * 100);
+  const cycleChip = c.cycle_complete
+    ? '<span class="chip loyalty-chip-cycle">Ciclo completo!</span>'
+    : '';
+  const progressFull = loyaltyProgressLabel(c);
+  const progressShort = loyaltyProgressLabelShort(c);
+
+  return `
+    <div class="card loyalty-card" data-loyalty-id="${c.id}">
+      <div class="loyalty-card-header">
+        <div class="loyalty-card-identity">
+          ${loyaltyAvatarHtml(c)}
+          <div class="loyalty-card-info">
+            <h3 class="loyalty-card-name">${escapeHtml(c.name)}</h3>
+            <p class="loyalty-card-phone">${formatPhoneDisplay(c.phone)}</p>
+          </div>
+        </div>
+        <div class="loyalty-card-actions">
+          <button type="button" onclick="editLoyaltyCustomer(${c.id})" class="btn btn-outline btn-sm btn-icon" title="Editar">
+            <i data-lucide="edit"></i>
+          </button>
+          <button type="button" onclick="deleteLoyaltyCustomer(${c.id})" class="btn btn-danger btn-sm btn-icon" title="Excluir">
+            <i data-lucide="trash"></i>
+          </button>
+        </div>
+      </div>
+      <div class="loyalty-card-chips">
+        <span class="chip">${c.total_visits} visita(s)</span>
+        <span class="chip loyalty-chip-progress" title="${escapeAttr(progressFull)}">
+          <span class="loyalty-chip-progress-full">${progressFull}</span>
+          <span class="loyalty-chip-progress-short">${progressShort}</span>
+        </span>
+        <span class="chip loyalty-chip-rewards">${c.total_rewards} prêmio(s)</span>
+        ${cycleChip}
+        ${!c.active ? '<span class="chip loyalty-chip-inactive">Inativo</span>' : ''}
+      </div>
+      <div class="loyalty-card-progress" role="progressbar" aria-valuenow="${display}" aria-valuemin="0" aria-valuemax="${n}">
+        <div class="loyalty-card-progress-bar ${c.cycle_complete ? 'loyalty-card-progress-bar--complete' : ''}" style="width: ${progressPct}%"></div>
+      </div>
+      <div class="loyalty-visit-row">
+        <span class="loyalty-visit-label">Registrar visita:</span>
+        <div class="loyalty-visit-stepper">
+          <button type="button" onclick="applyLoyaltyVisitDelta(event, ${c.id}, -1)" class="btn btn-outline btn-sm loyalty-visit-btn" title="Remover 1 visita" aria-label="Remover 1 visita">−1</button>
+          <button type="button" onclick="applyLoyaltyVisitDelta(event, ${c.id}, 1)" class="btn btn-outline btn-sm loyalty-visit-btn" title="Adicionar 1 visita" aria-label="Adicionar 1 visita">+1</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function updateLoyaltyCustomerCardDom(id, customer) {
+  const existing = document.querySelector(`[data-loyalty-id="${id}"]`);
+  if (!existing) return false;
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = renderLoyaltyCustomerCard(customer);
+  const newCard = wrapper.firstElementChild;
+  if (!newCard) return false;
+  existing.replaceWith(newCard);
+  refreshIcons();
+  return true;
 }
 
 async function loadLoyaltySettings() {
@@ -73,7 +150,7 @@ async function saveLoyaltySettings() {
       loyaltyVisitsPerReward = value;
       updateLoyaltyRuleText();
       showToast('Configuração salva!');
-      await loadLoyaltyCustomers();
+      await loadLoyaltyCustomers({ silent: true });
     } catch (error) {
       if (!handleAuthError(error)) showToast('Erro: ' + error.message, 'error');
     }
@@ -107,11 +184,20 @@ function loyaltyChangePage(page) {
   loadLoyaltyCustomers();
 }
 
-async function loadLoyaltyCustomers() {
+async function loadLoyaltyCustomers({ silent = false } = {}) {
   const container = document.getElementById('loyalty-list');
   if (!container || typeof DB === 'undefined') return;
+
+  const scrollY = window.scrollY;
+  const hasExistingCards = container.querySelector('[data-loyalty-id]');
+
   loyaltyLoading = true;
-  container.innerHTML = '<p class="text-black/60">Carregando...</p>';
+  if (!silent || !hasExistingCards) {
+    container.innerHTML = '<p class="text-black/60">Carregando...</p>';
+  } else {
+    container.classList.add('is-loading');
+  }
+  if (loyaltyPaginationMeta) renderLoyaltyPagination(loyaltyPaginationMeta);
 
   try {
     await loadLoyaltySettings();
@@ -121,65 +207,39 @@ async function loadLoyaltyCustomers() {
       limit: loyaltyLimit
     });
     const customers = data.items || [];
+
+    if (data.total_pages > 0 && loyaltyPage > data.total_pages) {
+      loyaltyPage = data.total_pages;
+      loyaltyLoading = false;
+      container.classList.remove('is-loading');
+      return loadLoyaltyCustomers({ silent });
+    }
+
+    loyaltyPaginationMeta = data;
     renderLoyaltyPagination(data);
 
     if (customers.length === 0) {
+      container.classList.remove('is-loading');
       container.innerHTML = loyaltySearch
         ? `<p class="text-black/60">Nenhum cliente encontrado para «${escapeAttr(loyaltySearch)}».</p>`
         : '<p class="text-black/60">Nenhum cliente cadastrado. Clique em "Novo cliente" para começar.</p>';
+      if (silent) window.scrollTo(0, scrollY);
       return;
     }
 
-    const n = loyaltyVisitsPerReward;
-    container.innerHTML = customers.map(c => {
-      const display = c.display_progress ?? c.progress ?? 0;
-      const progressPct = Math.round((display / n) * 100);
-      const cycleChip = c.cycle_complete
-        ? '<span class="chip" style="background: rgba(245, 124, 0, 0.12); color: #c2410c;">Ciclo completo!</span>'
-        : '';
-      return `
-        <div class="card">
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="flex gap-3 min-w-0 flex-1">
-              ${loyaltyAvatarHtml(c)}
-              <div class="min-w-0 flex-1">
-                <h3 class="font-semibold text-lg">${escapeHtml(c.name)}</h3>
-                <p class="text-sm text-black/60">${formatPhoneDisplay(c.phone)}</p>
-                <div class="mt-2 flex flex-wrap gap-2 text-xs">
-                  <span class="chip">${c.total_visits} visita(s)</span>
-                  <span class="chip">${loyaltyProgressLabel(c)}</span>
-                  <span class="chip" style="background: rgba(245, 124, 0, 0.12); color: #c2410c;">${c.total_rewards} prêmio(s)</span>
-                  ${cycleChip}
-                  ${!c.active ? '<span class="chip" style="background: #fee2e2; color: #dc2626;">Inativo</span>' : ''}
-                </div>
-                <div class="mt-2 h-2 rounded-full bg-black/10 overflow-hidden max-w-xs">
-                  <div class="h-full ${c.cycle_complete ? 'bg-fp-orange' : 'bg-fp-green'} rounded-full transition-all" style="width: ${progressPct}%"></div>
-                </div>
-                <div class="mt-3 flex flex-wrap items-center gap-2">
-                  <span class="text-xs text-black/55">Registrar visita:</span>
-                  <button type="button" onclick="applyLoyaltyVisitDelta(${c.id}, -1)" class="btn btn-outline btn-sm" title="Remover 1 visita">−1</button>
-                  <button type="button" onclick="applyLoyaltyVisitDelta(${c.id}, 1)" class="btn btn-outline btn-sm" title="Adicionar 1 visita">+1</button>
-                </div>
-              </div>
-            </div>
-            <div class="flex flex-wrap gap-2 shrink-0">
-              <button type="button" onclick="editLoyaltyCustomer(${c.id})" class="btn btn-outline btn-sm btn-icon" title="Editar">
-                <i data-lucide="edit"></i>
-              </button>
-              <button type="button" onclick="deleteLoyaltyCustomer(${c.id})" class="btn btn-danger btn-sm btn-icon" title="Excluir">
-                <i data-lucide="trash"></i>
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
-    }).join('');
-
+    container.classList.remove('is-loading');
+    container.innerHTML = customers.map(renderLoyaltyCustomerCard).join('');
     refreshIcons();
+
+    if (silent) {
+      requestAnimationFrame(() => window.scrollTo(0, scrollY));
+    }
   } catch (error) {
+    container.classList.remove('is-loading');
     container.innerHTML = '<p class="text-red-600">Erro ao carregar clientes de fidelidade.</p>';
   } finally {
     loyaltyLoading = false;
+    if (loyaltyPaginationMeta) renderLoyaltyPagination(loyaltyPaginationMeta);
   }
 }
 
@@ -278,7 +338,7 @@ async function saveLoyaltyCustomer(event) {
         showToast('Cliente cadastrado!');
       }
       closeLoyaltyModal();
-      await loadLoyaltyCustomers();
+      await loadLoyaltyCustomers({ silent: true });
       if (typeof AdminRouter !== 'undefined') AdminRouter.loadDashboardStats();
     } catch (error) {
       if (!handleAuthError(error)) showToast('Erro: ' + error.message, 'error');
@@ -295,35 +355,47 @@ async function deleteLoyaltyCustomer(id) {
   try {
     await DB.deleteLoyaltyCustomer(id);
     showToast('Cliente excluído!');
-    await loadLoyaltyCustomers();
+    await loadLoyaltyCustomers({ silent: true });
     if (typeof AdminRouter !== 'undefined') AdminRouter.loadDashboardStats();
   } catch (error) {
     if (!handleAuthError(error)) showToast('Erro: ' + error.message, 'error');
   }
 }
 
-async function applyLoyaltyVisitDelta(id, delta) {
-  if (!delta || delta === 0 || loyaltyLoading) return;
+async function applyLoyaltyVisitDelta(event, id, delta) {
+  if (!delta || delta === 0) return;
 
-  loyaltyLoading = true;
+  const btn = event?.currentTarget || event?.target;
+  if (btn?.disabled || btn?.classList.contains('is-loading')) return;
+
+  const stepper = btn?.closest('.loyalty-visit-stepper');
+  stepper?.classList.add('is-busy');
+
   try {
-    const result = await DB.registerLoyaltyVisit(id, delta);
-    const earned = result.rewards_earned || 0;
-    const n = result.visits_per_reward || loyaltyVisitsPerReward;
-    if (earned > 0) {
-      const name = result.customer?.name || 'Cliente';
-      const msg = earned === 1
-        ? `Parabéns! ${name} completou ${n} visitas e ganhou 1 prêmio!`
-        : `Parabéns! ${name} ganhou ${earned} prêmios!`;
-      showToast(msg, 'info');
-    } else {
-      showToast(delta > 0 ? 'Visita registrada.' : 'Visita removida.');
-    }
-    await loadLoyaltyCustomers();
-  } catch (error) {
-    if (!handleAuthError(error)) showToast('Erro: ' + error.message, 'error');
+    await withButtonLoading(btn, async () => {
+      try {
+        const result = await DB.registerLoyaltyVisit(id, delta);
+        const earned = result.rewards_earned || 0;
+        const n = result.visits_per_reward || loyaltyVisitsPerReward;
+        if (earned > 0) {
+          const name = result.customer?.name || 'Cliente';
+          const msg = earned === 1
+            ? `Parabéns! ${name} completou ${n} visitas e ganhou 1 prêmio!`
+            : `Parabéns! ${name} ganhou ${earned} prêmios!`;
+          showToast(msg, 'info');
+        } else {
+          showToast(delta > 0 ? 'Visita registrada.' : 'Visita removida.');
+        }
+
+        if (result.customer && !updateLoyaltyCustomerCardDom(id, result.customer)) {
+          await loadLoyaltyCustomers({ silent: true });
+        }
+      } catch (error) {
+        if (!handleAuthError(error)) showToast('Erro: ' + error.message, 'error');
+      }
+    }, '');
   } finally {
-    loyaltyLoading = false;
+    stepper?.classList.remove('is-busy');
   }
 }
 

@@ -156,7 +156,7 @@ router.get('/rankings', async (req, res) => {
     );
 
     const inProgress = participantsResult.rows.map(row =>
-      mapPublicRankingItem(mapCustomerRow(row, { maskName: true, visitsPerReward }))
+      mapPublicRankingItem(mapCustomerRow(row, { visitsPerReward }))
     );
 
     const winnersCountResult = await query(
@@ -173,7 +173,7 @@ router.get('/rankings', async (req, res) => {
     );
 
     const winners = winnersResult.rows.map(row =>
-      mapPublicWinnerItem(mapCustomerRow(row, { maskName: true, visitsPerReward }))
+      mapPublicWinnerItem(mapCustomerRow(row, { visitsPerReward }))
     );
 
     res.json({

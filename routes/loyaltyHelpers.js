@@ -4,16 +4,6 @@ function normalizePhone(phone) {
   return String(phone || '').replace(/\D/g, '');
 }
 
-function maskDisplayName(name) {
-  const trimmed = String(name || '').trim();
-  if (!trimmed) return 'Cliente';
-  const parts = trimmed.split(/\s+/).filter(Boolean);
-  if (parts.length === 1) return parts[0];
-  const first = parts[0];
-  const lastInitial = parts[parts.length - 1].charAt(0).toUpperCase();
-  return `${first} ${lastInitial}.`;
-}
-
 function getProgress(totalVisits, visitsPerReward = DEFAULT_VISITS_PER_REWARD) {
   const n = Math.max(2, Number(visitsPerReward) || DEFAULT_VISITS_PER_REWARD);
   const visits = Number(totalVisits) || 0;
@@ -43,7 +33,7 @@ function getVisitsToReward(totalVisits, visitsPerReward = DEFAULT_VISITS_PER_REW
   return n - progress;
 }
 
-function mapCustomerRow(row, { includePhone = false, maskName = false, visitsPerReward = DEFAULT_VISITS_PER_REWARD } = {}) {
+function mapCustomerRow(row, { includePhone = false, visitsPerReward = DEFAULT_VISITS_PER_REWARD } = {}) {
   const n = Math.max(2, Number(visitsPerReward) || DEFAULT_VISITS_PER_REWARD);
   const totalVisits = Number(row.total_visits) || 0;
   const totalRewards = Number(row.total_rewards) || 0;
@@ -54,7 +44,7 @@ function mapCustomerRow(row, { includePhone = false, maskName = false, visitsPer
   const out = {
     id: row.id,
     name: row.name,
-    display_name: maskName ? maskDisplayName(row.name) : row.name,
+    display_name: row.name,
     avatar: row.avatar || null,
     total_visits: totalVisits,
     total_rewards: totalRewards,
@@ -166,7 +156,6 @@ function computeTotalPages(total, limit) {
 module.exports = {
   DEFAULT_VISITS_PER_REWARD,
   normalizePhone,
-  maskDisplayName,
   getProgress,
   getDisplayProgress,
   isCycleComplete,

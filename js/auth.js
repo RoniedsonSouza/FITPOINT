@@ -2,7 +2,7 @@
 
 // Função helper para obter API_BASE_URL (evita conflito de const)
 function getApiBaseUrl() {
-  return window.FitPointConfig?.API_BASE_URL || 
+  return window.FitPointConfig?.API_BASE_URL ||
          (window.location.origin.includes('localhost') ? 'http://localhost:3000/api' : '/api');
 }
 
@@ -40,9 +40,33 @@ const Auth = {
     localStorage.removeItem(TOKEN_KEY);
   },
 
-  // Verificar se está autenticado
+  // Verificar se está autenticado (checagem local rápida)
   isAuthenticated() {
     return !!localStorage.getItem(TOKEN_KEY);
+  },
+
+  // Validar sessão no servidor
+  async validateSession() {
+    const token = this.getToken();
+    if (!token) return null;
+
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/auth/me`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!response.ok) {
+        this.logout();
+        return null;
+      }
+
+      const data = await response.json();
+      return data.user || null;
+    } catch (error) {
+      console.error('Erro ao validar sessão:', error);
+      this.logout();
+      return null;
+    }
   },
 
   // Obter token
@@ -54,5 +78,17 @@ const Auth = {
   getAuthHeader() {
     const token = this.getToken();
     return token ? { 'Authorization': `Bearer ${token}` } : {};
+  },
+
+  // Sincronizar logout entre abas
+  initStorageSync(onLogout) {
+    if (this._storageSyncBound) return;
+    this._storageSyncBound = true;
+
+    window.addEventListener('storage', (e) => {
+      if (e.key === TOKEN_KEY && e.newValue === null && typeof onLogout === 'function') {
+        onLogout();
+      }
+    });
   }
 };

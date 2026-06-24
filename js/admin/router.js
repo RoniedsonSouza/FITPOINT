@@ -8,7 +8,9 @@ const AdminRouter = {
     dashboard: { hash: '#/', viewId: 'view-dashboard', label: 'Início' },
     categorias: { hash: '#/categorias', viewId: 'view-categories', label: 'Categorias', loader: 'loadCategories' },
     fidelidade: { hash: '#/fidelidade', viewId: 'view-loyalty', label: 'Fidelidade', loader: 'loadLoyaltyCustomers' },
-    produtos: { hash: '#/produtos', viewId: 'view-products', label: 'Produtos', loader: 'loadProducts' }
+    produtos: { hash: '#/produtos', viewId: 'view-products', label: 'Produtos', loader: 'loadProducts' },
+    vendas: { hash: '#/vendas', viewId: 'view-daily-sales', label: 'Vendas do dia', loader: 'loadDailySales' },
+    diario: { hash: '#/diario', viewId: 'view-daily-diario', label: 'Diário', loader: 'loadDailyDiario' }
   },
 
   init() {
@@ -69,6 +71,8 @@ const AdminRouter = {
     if (hash.startsWith('#/categorias')) return 'categorias';
     if (hash.startsWith('#/fidelidade')) return 'fidelidade';
     if (hash.startsWith('#/produtos')) return 'produtos';
+    if (hash.startsWith('#/diario')) return 'diario';
+    if (hash.startsWith('#/vendas')) return 'vendas';
     return 'dashboard';
   },
 
@@ -100,7 +104,8 @@ const AdminRouter = {
     document.getElementById(route.viewId)?.classList.add('is-active');
 
     document.querySelectorAll('[data-admin-nav]').forEach(el => {
-      el.classList.toggle('is-active', el.dataset.adminNav === module);
+      const navModule = module === 'diario' ? 'vendas' : module;
+      el.classList.toggle('is-active', el.dataset.adminNav === navModule);
     });
 
     if (module === 'dashboard') {
@@ -110,7 +115,8 @@ const AdminRouter = {
 
     const loaderName = route.loader;
     if (loaderName && typeof window[loaderName] === 'function') {
-      if (forceReload || !this.loadedModules.has(module)) {
+      const alwaysReload = module === 'vendas' || module === 'diario';
+      if (forceReload || alwaysReload || !this.loadedModules.has(module)) {
         window[loaderName]();
         this.loadedModules.add(module);
       }
@@ -121,16 +127,26 @@ const AdminRouter = {
     const catEl = document.getElementById('stat-categories');
     const loyEl = document.getElementById('stat-loyalty');
     const prodEl = document.getElementById('stat-products');
+    const salesEl = document.getElementById('stat-daily-sales');
+    const dashItems = document.getElementById('dashboard-stat-items');
+    const dashRevenue = document.getElementById('dashboard-stat-revenue');
+    const dashTop = document.getElementById('dashboard-stat-top');
+    const dashSummary = document.getElementById('dashboard-daily-summary');
 
     if (catEl) catEl.textContent = 'Carregando…';
     if (loyEl) loyEl.textContent = 'Carregando…';
     if (prodEl) prodEl.textContent = 'Carregando…';
+    if (salesEl) salesEl.textContent = 'Carregando…';
+
+    const formatBRL = (value) =>
+      new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value) || 0);
 
     try {
-      const [categories, products, loyaltyData] = await Promise.all([
+      const [categories, products, loyaltyData, salesToday] = await Promise.all([
         DB.getCategories().catch(() => []),
         DB.getProducts().catch(() => []),
-        DB.getLoyaltyCustomers({ page: 1, limit: 1 })
+        DB.getLoyaltyCustomers({ page: 1, limit: 1 }),
+        DB.getTodaySalesSummary().catch(() => null)
       ]);
 
       const activeCats = (categories || []).filter(c => c.active !== false).length;
@@ -138,11 +154,30 @@ const AdminRouter = {
       if (prodEl) prodEl.textContent = `${(products || []).length} produto${(products || []).length !== 1 ? 's' : ''}`;
       const totalCustomers = loyaltyData.total ?? (loyaltyData.items || []).length;
       if (loyEl) loyEl.textContent = `${totalCustomers} cliente${totalCustomers !== 1 ? 's' : ''}`;
+
+      const totalItems = salesToday?.total_items ?? 0;
+      const totalRevenue = salesToday?.total_revenue ?? 0;
+      const topProduct = salesToday?.top_product;
+
+      if (salesEl) {
+        salesEl.textContent = totalItems > 0
+          ? `${totalItems} venda${totalItems !== 1 ? 's' : ''} · ${formatBRL(totalRevenue)} hoje`
+          : 'Nenhuma venda hoje';
+      }
+
+      if (dashSummary) dashSummary.classList.remove('hidden');
+      if (dashItems) dashItems.textContent = String(totalItems);
+      if (dashRevenue) dashRevenue.textContent = formatBRL(totalRevenue);
+      if (dashTop) dashTop.textContent = topProduct || '—';
     } catch (error) {
       if (handleAuthError(error)) return;
       if (catEl) catEl.textContent = '—';
       if (loyEl) loyEl.textContent = '—';
       if (prodEl) prodEl.textContent = '—';
+      if (salesEl) salesEl.textContent = '—';
+      if (dashItems) dashItems.textContent = '—';
+      if (dashRevenue) dashRevenue.textContent = '—';
+      if (dashTop) dashTop.textContent = '—';
     }
   },
 

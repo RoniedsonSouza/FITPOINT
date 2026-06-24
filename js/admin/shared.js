@@ -29,9 +29,14 @@ function generateOptionId() {
   return `opt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
-function parseNutritionField(id) {
+function parseNutritionField(id, decimals = null) {
   const el = document.getElementById(id);
   if (!el || el.value.trim() === '') return null;
+  if (decimals != null) {
+    const parsed = parseLooseDecimal(el.value, decimals);
+    if (parsed == null) return null;
+    return clampDecimal(parsed, 0, null, 0, decimals);
+  }
   const n = Number(el.value);
   return Number.isNaN(n) || n < 0 ? null : n;
 }
@@ -39,10 +44,10 @@ function parseNutritionField(id) {
 function readNutritionFromForm() {
   const nutrition = {};
   const kcal = parseNutritionField('product-nutrition-kcal');
-  const protein = parseNutritionField('product-nutrition-protein');
-  const carbs = parseNutritionField('product-nutrition-carbs');
-  const fat = parseNutritionField('product-nutrition-fat');
-  const fiber = parseNutritionField('product-nutrition-fiber');
+  const protein = parseNutritionField('product-nutrition-protein', NUTRITION_DECIMALS);
+  const carbs = parseNutritionField('product-nutrition-carbs', NUTRITION_DECIMALS);
+  const fat = parseNutritionField('product-nutrition-fat', NUTRITION_DECIMALS);
+  const fiber = parseNutritionField('product-nutrition-fiber', NUTRITION_DECIMALS);
   if (kcal != null) nutrition.kcal = Math.round(kcal);
   if (protein != null) nutrition.protein_g = protein;
   if (carbs != null) nutrition.carbs_g = carbs;
@@ -79,7 +84,7 @@ function addProductOptionRow(option = null) {
     </div>
     <div class="w-28">
       <label class="text-xs text-black/60">+ R$</label>
-      <input type="number" class="option-price" step="0.01" min="0" value="${option ? Number(option.price_adjustment || 0) : 0}">
+      <input type="number" class="option-price" step="0.01" min="0" value="${option ? formatDecimalInput(option.price_adjustment || 0, MONEY_DECIMALS) : formatDecimalInput(0, MONEY_DECIMALS)}">
     </div>
     <label class="flex items-center gap-1 text-sm pb-2 cursor-pointer shrink-0">
       <input type="radio" name="product-option-default" class="option-default" value="${rowId}" ${option?.default ? 'checked' : ''}>
@@ -94,6 +99,7 @@ function addProductOptionRow(option = null) {
     ensureOptionDefaultRadio();
   });
   list.appendChild(row);
+  bindDecimalInput(row.querySelector('.option-price'), { decimals: MONEY_DECIMALS, min: 0 });
   ensureOptionDefaultRadio();
   refreshIcons();
 }
@@ -121,13 +127,19 @@ function readProductOptionsFromForm() {
   rows.forEach(row => {
     const name = row.querySelector('.option-name')?.value.trim();
     if (!name) return;
-    const priceAdj = parseFloat(row.querySelector('.option-price')?.value) || 0;
+    const priceAdj = clampDecimal(
+      parseLooseDecimal(row.querySelector('.option-price')?.value, MONEY_DECIMALS),
+      0,
+      null,
+      0,
+      MONEY_DECIMALS
+    );
     const id = row.dataset.optionId || generateOptionId();
     const isDefault = row.querySelector('.option-default')?.checked === true;
     options.push({
       id,
       name,
-      price_adjustment: Math.max(0, priceAdj),
+      price_adjustment: priceAdj,
       default: isDefault
     });
   });

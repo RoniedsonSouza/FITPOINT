@@ -345,6 +345,93 @@ const DB = {
     return response.json();
   },
 
+  // === VENDAS DO DIA ===
+
+  async getDailySales(date) {
+    const qs = date ? `?date=${encodeURIComponent(date)}` : '';
+    const response = await fetch(`${getApiBaseUrl()}/daily-sales${qs}`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao buscar vendas do dia';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async getDailySalesSummary(date) {
+    const qs = date ? `?date=${encodeURIComponent(date)}` : '';
+    const response = await fetch(`${getApiBaseUrl()}/daily-sales/summary${qs}`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao buscar resumo de vendas';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async getTodaySalesSummary() {
+    const response = await fetch(`${getApiBaseUrl()}/daily-sales/summary/today`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao buscar resumo de hoje';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async addDailySale(payload) {
+    const response = await fetch(`${getApiBaseUrl()}/daily-sales`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao registrar venda';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async addDailySalesBatch(payload) {
+    const response = await fetch(`${getApiBaseUrl()}/daily-sales/batch`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao registrar vendas';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async deleteDailySale(id) {
+    const response = await fetch(`${getApiBaseUrl()}/daily-sales/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao excluir venda';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
   // Remove um produto
   async deleteProduct(id) {
     try {

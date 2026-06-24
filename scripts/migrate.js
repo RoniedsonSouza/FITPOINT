@@ -146,6 +146,22 @@ async function migrate() {
       ON CONFLICT (id) DO NOTHING
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA}.daily_sales (
+        id SERIAL PRIMARY KEY,
+        sale_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        product_id VARCHAR(255) NOT NULL REFERENCES ${SCHEMA}.products(id),
+        loyalty_customer_id INTEGER REFERENCES ${SCHEMA}.loyalty_customers(id) ON DELETE SET NULL,
+        quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+        unit_price DECIMAL(10,2) NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_daily_sales_date ON ${SCHEMA}.daily_sales(sale_date)
+    `);
+
     console.log('✅ Tabelas criadas no schema\n');
 
     // Criar usuário admin padrão

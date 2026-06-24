@@ -1,6 +1,25 @@
 // Módulo Produtos
 
 let editingProductId = null;
+let productDecimalInputsBound = false;
+
+function ensureProductDecimalInputs() {
+  if (productDecimalInputsBound) return;
+  productDecimalInputsBound = true;
+  bindDecimalInput(document.getElementById('product-price'), { decimals: MONEY_DECIMALS, min: 0 });
+  bindDecimalInput(document.getElementById('product-promo-price'), {
+    decimals: MONEY_DECIMALS,
+    min: 0,
+    allowEmpty: true
+  });
+  ['product-nutrition-protein', 'product-nutrition-carbs', 'product-nutrition-fat', 'product-nutrition-fiber'].forEach(id => {
+    bindDecimalInput(document.getElementById(id), {
+      decimals: NUTRITION_DECIMALS,
+      min: 0,
+      allowEmpty: true
+    });
+  });
+}
 
 async function loadProducts() {
   if (typeof DB === 'undefined') {
@@ -65,6 +84,7 @@ async function loadProducts() {
 }
 
 async function openProductModal(productId = null) {
+  ensureProductDecimalInputs();
   editingProductId = productId;
   const modal = document.getElementById('product-modal');
   const form = document.getElementById('product-form');
@@ -82,9 +102,11 @@ async function openProductModal(productId = null) {
       title.textContent = 'Editar Produto';
       document.getElementById('product-id-input').value = product.id;
       document.getElementById('product-name').value = product.name;
-      document.getElementById('product-price').value = product.price;
+      document.getElementById('product-price').value = formatDecimalInput(product.price, MONEY_DECIMALS);
       document.getElementById('product-promo-price').value =
-        product.promo_price != null && product.promo_price !== '' ? product.promo_price : '';
+        product.promo_price != null && product.promo_price !== ''
+          ? formatDecimalInput(product.promo_price, MONEY_DECIMALS)
+          : '';
       await populateCategorySelect(product.category);
       document.getElementById('product-description').value = product.description || '';
       fillNutritionForm(product.nutrition);
@@ -156,12 +178,18 @@ async function saveProduct(event) {
     idInput.value = id;
   }
   const name = document.getElementById('product-name').value.trim();
-  const price = parseFloat(document.getElementById('product-price').value);
+  const price = clampDecimal(
+    parseLooseDecimal(document.getElementById('product-price').value, MONEY_DECIMALS),
+    0,
+    null,
+    0,
+    MONEY_DECIMALS
+  );
   const promoRaw = document.getElementById('product-promo-price').value.trim();
   let promo_price = null;
   if (promoRaw !== '') {
-    const pr = parseFloat(promoRaw);
-    if (Number.isNaN(pr) || pr < 0) {
+    const pr = clampDecimal(parseLooseDecimal(promoRaw, MONEY_DECIMALS), 0, null, 0, MONEY_DECIMALS);
+    if (pr < 0) {
       showToast('Preço promocional inválido.', 'error');
       return;
     }

@@ -64,3 +64,92 @@ function handleAuthError(error) {
 function refreshIcons() {
   if (window.lucide) window.lucide.createIcons();
 }
+
+const MONEY_DECIMALS = 2;
+const NUTRITION_DECIMALS = 1;
+
+function parseLooseInt(raw) {
+  const str = String(raw ?? '').trim();
+  if (str === '') return null;
+  const num = parseInt(str, 10);
+  return Number.isInteger(num) ? num : null;
+}
+
+function restrictDecimalString(raw, maxDecimals = MONEY_DECIMALS) {
+  let str = String(raw ?? '').replace(',', '.');
+  if (str === '') return '';
+
+  const dotIdx = str.indexOf('.');
+  if (dotIdx === -1) {
+    return str.replace(/\D/g, '');
+  }
+
+  const intPart = str.slice(0, dotIdx).replace(/\D/g, '');
+  let fracPart = str.slice(dotIdx + 1).replace(/\D/g, '');
+  if (maxDecimals >= 0) fracPart = fracPart.slice(0, maxDecimals);
+
+  if (fracPart === '' && str.endsWith('.')) {
+    return `${intPart}.`;
+  }
+  return fracPart === '' ? intPart : `${intPart}.${fracPart}`;
+}
+
+function parseLooseDecimal(raw, maxDecimals = MONEY_DECIMALS) {
+  const str = String(raw ?? '').trim().replace(',', '.');
+  if (str === '' || str === '.') return null;
+  const num = parseFloat(str);
+  if (!Number.isFinite(num)) return null;
+  const factor = Math.pow(10, maxDecimals);
+  return Math.round(num * factor) / factor;
+}
+
+function clampInt(value, min, fallback) {
+  const floor = min != null ? min : 0;
+  const fb = fallback != null ? fallback : floor;
+  if (value == null || !Number.isInteger(value)) return fb;
+  return Math.max(floor, value);
+}
+
+function clampDecimal(value, min, max, fallback, decimals = MONEY_DECIMALS) {
+  const floor = min != null ? min : 0;
+  const fb = fallback != null ? fallback : floor;
+  if (value == null || !Number.isFinite(value)) return fb;
+  let out = Math.max(floor, value);
+  if (max != null && out > max) out = max;
+  const factor = Math.pow(10, decimals);
+  return Math.round(out * factor) / factor;
+}
+
+function formatDecimalInput(value, decimals = MONEY_DECIMALS) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return decimals <= 0 ? '0' : (0).toFixed(decimals);
+  if (decimals <= 0) return String(Math.round(num));
+  return num.toFixed(decimals);
+}
+
+function bindDecimalInput(input, options = {}) {
+  if (!input || input.dataset.decimalBound === '1') return;
+  const {
+    decimals = MONEY_DECIMALS,
+    min = 0,
+    max = null,
+    allowEmpty = false,
+    onInput
+  } = options;
+
+  input.dataset.decimalBound = '1';
+
+  input.addEventListener('input', () => {
+    const restricted = restrictDecimalString(input.value, decimals);
+    if (input.value !== restricted) input.value = restricted;
+    if (typeof onInput === 'function') onInput(input);
+  });
+
+  input.addEventListener('blur', () => {
+    if (allowEmpty && input.value.trim() === '') return;
+    const parsed = parseLooseDecimal(input.value, decimals);
+    const clamped = clampDecimal(parsed, min, max, min, decimals);
+    input.value = formatDecimalInput(clamped, decimals);
+    if (typeof onInput === 'function') onInput(input);
+  });
+}

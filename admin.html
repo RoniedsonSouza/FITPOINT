@@ -96,6 +96,9 @@
       <button type="button" class="admin-nav-item" data-admin-nav="produtos">
         <i data-lucide="shopping-bag"></i> Produtos
       </button>
+      <button type="button" class="admin-nav-item" data-admin-nav="vendas">
+        <i data-lucide="receipt"></i> Vendas do dia
+      </button>
 
       <div class="admin-sidebar-footer">
         <button type="button" onclick="logout()" class="admin-nav-item text-red-600">
@@ -130,6 +133,29 @@
             <p>Preços, promoções, kits e opções do cardápio.</p>
             <span class="module-card-stat" id="stat-products">—</span>
           </button>
+          <button type="button" class="module-card" data-module-card="vendas">
+            <span class="module-card-icon"><i data-lucide="receipt"></i></span>
+            <h2>Vendas do dia</h2>
+            <p>Registre vendas e acompanhe o levantamento diário.</p>
+            <span class="module-card-stat" id="stat-daily-sales">—</span>
+          </button>
+        </div>
+        <div id="dashboard-daily-summary" class="card mt-4 hidden">
+          <h3 class="font-semibold text-sm mb-3">Resumo de hoje</h3>
+          <div class="grid gap-3 sm:grid-cols-3 text-sm">
+            <div>
+              <p class="text-black/50 text-xs mb-1">Vendas</p>
+              <p class="font-semibold" id="dashboard-stat-items">—</p>
+            </div>
+            <div>
+              <p class="text-black/50 text-xs mb-1">Faturamento</p>
+              <p class="font-semibold text-fp-green" id="dashboard-stat-revenue">—</p>
+            </div>
+            <div>
+              <p class="text-black/50 text-xs mb-1">Mais vendido</p>
+              <p class="font-semibold" id="dashboard-stat-top">—</p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -206,6 +232,98 @@
         </div>
         <div id="products-list" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <p class="text-black/60">Selecione este módulo para carregar.</p>
+        </div>
+      </section>
+
+      <!-- Vendas do dia -->
+      <section id="view-daily-sales" class="admin-view">
+        <div class="admin-view-header">
+          <h1>Vendas do dia</h1>
+          <p id="daily-sales-date-label" class="text-sm text-black/60 mt-1">—</p>
+        </div>
+
+        <div class="module-toolbar">
+          <div class="daily-sales-date-nav">
+            <button type="button" onclick="shiftDailySalesDate(-1)" class="btn btn-outline btn-sm btn-icon" title="Dia anterior" aria-label="Dia anterior">
+              <i data-lucide="chevron-left"></i>
+            </button>
+            <input type="date" id="daily-sales-date" class="daily-sales-date-input" aria-label="Data">
+            <button type="button" onclick="shiftDailySalesDate(1)" class="btn btn-outline btn-sm btn-icon" title="Próximo dia" aria-label="Próximo dia">
+              <i data-lucide="chevron-right"></i>
+            </button>
+          </div>
+          <div class="module-toolbar-actions">
+            <button type="button" onclick="AdminRouter.navigate('diario')" class="btn btn-primary btn-md">
+              <i data-lucide="pen-line"></i> Diário
+            </button>
+          </div>
+        </div>
+
+        <div class="daily-sales-stats">
+          <div class="card daily-sales-stat-card">
+            <p class="daily-sales-stat-label">Vendas</p>
+            <p class="daily-sales-stat-value" id="daily-sales-stat-items">—</p>
+          </div>
+          <div class="card daily-sales-stat-card">
+            <p class="daily-sales-stat-label">Faturamento</p>
+            <p class="daily-sales-stat-value daily-sales-stat-value--revenue" id="daily-sales-stat-revenue">—</p>
+          </div>
+          <div class="card daily-sales-stat-card">
+            <p class="daily-sales-stat-label">Mais vendido</p>
+            <p class="daily-sales-stat-value daily-sales-stat-value--top" id="daily-sales-stat-top">—</p>
+          </div>
+        </div>
+
+        <div id="daily-sales-list" class="daily-sales-list">
+          <p class="text-black/60">Selecione este módulo para carregar.</p>
+        </div>
+      </section>
+
+      <!-- Diário — registro simplificado -->
+      <section id="view-daily-diario" class="admin-view">
+        <div class="daily-diario">
+          <div class="daily-diario-header">
+            <h1>Diário</h1>
+            <p>Registrar venda de hoje</p>
+          </div>
+          <form id="daily-diario-form" class="daily-diario-form" onsubmit="submitDailyDiario(event)">
+            <div class="daily-diario-field">
+              <label for="daily-diario-product-search">Produtos</label>
+              <div class="diario-combobox" id="diario-product-combobox">
+                <input type="search" id="daily-diario-product-search" placeholder="Buscar produto para adicionar…" autocomplete="off">
+                <div id="daily-diario-product-results" class="diario-combobox-results hidden"></div>
+              </div>
+            </div>
+            <div id="daily-diario-cart" class="daily-diario-cart">
+              <p class="daily-diario-cart-empty">Nenhum produto adicionado.</p>
+            </div>
+            <div class="daily-diario-field">
+              <label for="daily-diario-customer-search">Cliente (opcional)</label>
+              <div class="diario-combobox" id="diario-customer-combobox">
+                <input type="search" id="daily-diario-customer-search" placeholder="Buscar cliente…" autocomplete="off">
+                <div id="daily-diario-customer-results" class="diario-combobox-results hidden"></div>
+                <div id="daily-diario-customer-selected" class="diario-combobox-selected hidden"></div>
+              </div>
+            </div>
+            <div id="daily-diario-loyalty-wrap" class="daily-diario-loyalty-toggle hidden">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="daily-diario-loyalty-visit" checked>
+                <span>Contar visita de fidelidade</span>
+              </label>
+            </div>
+            <button type="submit" id="daily-diario-submit-btn" class="btn btn-primary btn-lg daily-diario-submit-btn">
+              <i data-lucide="plus"></i> Registrar
+            </button>
+          </form>
+          <div class="daily-diario-day-section">
+            <div class="daily-diario-day-header">
+              <h2 class="daily-diario-day-title">Vendas de hoje</h2>
+              <p id="daily-diario-day-stats" class="daily-diario-day-stats"></p>
+            </div>
+            <div id="daily-diario-list" class="daily-diario-list">
+              <p class="daily-diario-list-empty">Nenhuma venda hoje.</p>
+            </div>
+          </div>
         </div>
       </section>
     </main>
@@ -406,6 +524,7 @@
   <script src="/js/admin/categories.js"></script>
   <script src="/js/admin/products.js"></script>
   <script src="/js/admin/loyalty.js"></script>
+  <script src="/js/admin/daily-sales.js"></script>
   <script src="/js/admin/router.js"></script>
   <script>
     window.addEventListener('DOMContentLoaded', () => {

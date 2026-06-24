@@ -1,12 +1,11 @@
 // Módulo Vendas do dia + Diário
 
-const DIARIO_LOYALTY_THRESHOLD = 27;
-
 let dailySalesSelectedDate = null;
 let dailySalesProductsCache = [];
 let dailySalesCustomersCache = [];
 let diarioCart = [];
 let diarioSelectedCustomer = null;
+let diarioAccessValue = 27;
 let diarioComboboxesBound = false;
 let diarioSearchTimers = { product: null, customer: null };
 
@@ -242,43 +241,42 @@ function removeFromDiarioCart(productId) {
   updateDiarioLoyaltyUI();
 }
 
-function diarioCartHasEligibleProduct() {
-  return diarioCart.some(line => line.basePrice > DIARIO_LOYALTY_THRESHOLD);
+function computeDiarioSaleTotal() {
+  return diarioCart.reduce((sum, line) => sum + computeDiarioLineTotal(line), 0);
+}
+
+function computeDiarioLoyaltyVisits() {
+  const total = computeDiarioSaleTotal();
+  const access = diarioAccessValue > 0 ? diarioAccessValue : 27;
+  if (total <= 0 || access <= 0) return 0;
+  return Math.floor(total / access);
 }
 
 function updateDiarioLoyaltyUI() {
   const wrap = document.getElementById('daily-diario-loyalty-wrap');
-  const checkbox = document.getElementById('daily-diario-loyalty-visit');
-  if (!wrap || !checkbox) return;
+  const info = document.getElementById('daily-diario-loyalty-info');
+  if (!wrap || !info) return;
 
   const hasCustomer = Boolean(diarioSelectedCustomer);
-  const cartSize = diarioCart.length;
+  const hasItems = diarioCart.length > 0;
 
-  if (!hasCustomer || cartSize === 0) {
+  if (!hasCustomer || !hasItems) {
     wrap.classList.add('hidden');
-    checkbox.checked = false;
-    return;
-  }
-
-  if (cartSize === 1) {
-    wrap.classList.add('hidden');
-    checkbox.checked = diarioCartHasEligibleProduct();
+    info.textContent = '';
     return;
   }
 
   wrap.classList.remove('hidden');
-  checkbox.checked = diarioCartHasEligibleProduct();
-}
+  const total = computeDiarioSaleTotal();
+  const visits = computeDiarioLoyaltyVisits();
+  const access = diarioAccessValue > 0 ? diarioAccessValue : 27;
 
-function resolveApplyLoyaltyVisit() {
-  if (!diarioSelectedCustomer || diarioCart.length === 0) return false;
-
-  if (diarioCart.length === 1) {
-    return diarioCart[0].basePrice > DIARIO_LOYALTY_THRESHOLD;
+  if (visits > 0) {
+    const visitLabel = visits === 1 ? 'visita será contada' : 'visitas serão contadas';
+    info.textContent = `${visits} ${visitLabel} (${formatCurrency(total)} ÷ ${formatCurrency(access)})`;
+  } else {
+    info.textContent = `Valor abaixo do acesso — fidelidade não contabilizada (${formatCurrency(total)} de ${formatCurrency(access)})`;
   }
-
-  const checkbox = document.getElementById('daily-diario-loyalty-visit');
-  return Boolean(checkbox?.checked);
 }
 
 function renderDiarioCart() {
@@ -344,6 +342,7 @@ function onDiarioCartInput(e) {
     const parsed = parseLooseInt(e.target.value);
     if (parsed != null && parsed >= 1) line.quantity = parsed;
     updateDiarioCartRowTotal(productId);
+    updateDiarioLoyaltyUI();
     return;
   }
 
@@ -355,6 +354,7 @@ function onDiarioCartInput(e) {
       line.discount = Math.min(parsed, line.basePrice);
     }
     updateDiarioCartRowTotal(productId);
+    updateDiarioLoyaltyUI();
   }
 }
 
@@ -383,6 +383,7 @@ function onDiarioCartBlur(e) {
     );
     e.target.value = formatDecimalInput(line.discount, MONEY_DECIMALS);
     updateDiarioCartRowTotal(productId);
+    updateDiarioLoyaltyUI();
   }
 }
 
@@ -562,8 +563,11 @@ async function loadDailyDiario() {
   initDiarioComboboxes();
 
   try {
+    const settings = await DB.getLoyaltySettings().catch(() => ({}));
+    diarioAccessValue = Number(settings.access_value) || 27;
     await fetchDailySalesCatalog();
     await loadDailyDiarioList();
+    updateDiarioLoyaltyUI();
     productSearch?.focus();
     refreshIcons();
   } catch (error) {
@@ -651,7 +655,6 @@ async function submitDailyDiario(event) {
     try {
       const payload = {
         sale_date: getLocalDateString(),
-        apply_loyalty_visit: resolveApplyLoyaltyVisit(),
         items: diarioCart.map(line => ({
           product_id: line.productId,
           quantity: line.quantity,
@@ -670,7 +673,12 @@ async function submitDailyDiario(event) {
 
       let msg = 'Venda registrada.';
       if (result.loyalty_applied) {
-        msg += ' Visita de fidelidade contabilizada.';
+        const visits = result.loyalty_visits_applied || 1;
+        if (visits === 1) {
+          msg += ' 1 visita de fidelidade contabilizada.';
+        } else {
+          msg += ` ${visits} visitas de fidelidade contabilizadas.`;
+        }
         if (result.rewards_earned > 0) {
           msg += ' Cliente ganhou prêmio!';
         }

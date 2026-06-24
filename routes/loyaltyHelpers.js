@@ -1,4 +1,5 @@
 const DEFAULT_VISITS_PER_REWARD = 10;
+const DEFAULT_ACCESS_VALUE = 27;
 
 function normalizePhone(phone) {
   return String(phone || '').replace(/\D/g, '');
@@ -105,6 +106,21 @@ function parseVisitsPerReward(value) {
   return { value: num };
 }
 
+function parseAccessValue(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 1 || num > 10000) {
+    return { error: 'Valor do acesso deve ser um número entre R$ 1 e R$ 10.000' };
+  }
+  return { value: Math.round(num * 100) / 100 };
+}
+
+function computeLoyaltyVisitsFromAmount(totalAmount, accessValue = DEFAULT_ACCESS_VALUE) {
+  const total = Number(totalAmount) || 0;
+  const access = Number(accessValue) || DEFAULT_ACCESS_VALUE;
+  if (total <= 0 || access <= 0) return 0;
+  return Math.floor(total / access);
+}
+
 function parsePaginationQuery(query) {
   let page = parseInt(String(query?.page), 10);
   let limit = parseInt(String(query?.limit), 10);
@@ -155,6 +171,7 @@ function computeTotalPages(total, limit) {
 
 module.exports = {
   DEFAULT_VISITS_PER_REWARD,
+  DEFAULT_ACCESS_VALUE,
   normalizePhone,
   getProgress,
   getDisplayProgress,
@@ -164,6 +181,8 @@ module.exports = {
   applyVisitDelta,
   parseNonNegativeInt,
   parseVisitsPerReward,
+  parseAccessValue,
+  computeLoyaltyVisitsFromAmount,
   parsePaginationQuery,
   parseSearchQuery,
   buildNamePhoneSearchClause,

@@ -7,11 +7,13 @@ const { query, table } = require('../config/database');
 const { authenticateToken } = require('../config/auth');
 const {
   DEFAULT_VISITS_PER_REWARD,
+  DEFAULT_ACCESS_VALUE,
   normalizePhone,
   mapCustomerRow,
   applyVisitDelta,
   parseNonNegativeInt,
   parseVisitsPerReward,
+  parseAccessValue,
   parsePaginationQuery,
   parseSearchQuery,
   buildNamePhoneSearchClause,
@@ -54,14 +56,27 @@ function uploadAvatarMiddleware(req, res, next) {
 }
 
 async function getVisitsPerReward() {
+  const settings = await getLoyaltySettings();
+  return settings.visits_per_reward;
+}
+
+async function getLoyaltySettings() {
   const result = await query(
-    `SELECT visits_per_reward FROM ${table('loyalty_settings')} WHERE id = 1`
+    `SELECT visits_per_reward, access_value FROM ${table('loyalty_settings')} WHERE id = 1`
   );
   if (result.rows.length === 0) {
-    return DEFAULT_VISITS_PER_REWARD;
+    return {
+      visits_per_reward: DEFAULT_VISITS_PER_REWARD,
+      access_value: DEFAULT_ACCESS_VALUE
+    };
   }
-  const n = Number(result.rows[0].visits_per_reward);
-  return Number.isFinite(n) && n >= 2 ? n : DEFAULT_VISITS_PER_REWARD;
+  const row = result.rows[0];
+  const visits = Number(row.visits_per_reward);
+  const access = Number(row.access_value);
+  return {
+    visits_per_reward: Number.isFinite(visits) && visits >= 2 ? visits : DEFAULT_VISITS_PER_REWARD,
+    access_value: Number.isFinite(access) && access > 0 ? access : DEFAULT_ACCESS_VALUE
+  };
 }
 
 function mapPublicRankingItem(item) {
@@ -88,8 +103,8 @@ function mapPublicWinnerItem(item) {
 // GET /api/loyalty/settings — público
 router.get('/settings', async (req, res) => {
   try {
-    const visits_per_reward = await getVisitsPerReward();
-    res.json({ visits_per_reward });
+    const settings = await getLoyaltySettings();
+    res.json(settings);
   } catch (error) {
     console.error('Erro ao buscar configurações de fidelidade:', error);
     res.status(500).json({ error: 'Erro ao buscar configurações de fidelidade' });
@@ -99,19 +114,29 @@ router.get('/settings', async (req, res) => {
 // PUT /api/loyalty/settings — admin
 router.put('/settings', authenticateToken, async (req, res) => {
   try {
-    const parsed = parseVisitsPerReward(req.body?.visits_per_reward);
-    if (parsed.error) {
-      return res.status(400).json({ error: parsed.error });
+    const parsedVisits = parseVisitsPerReward(req.body?.visits_per_reward);
+    if (parsedVisits.error) {
+      return res.status(400).json({ error: parsedVisits.error });
+    }
+
+    const parsedAccess = parseAccessValue(req.body?.access_value);
+    if (parsedAccess.error) {
+      return res.status(400).json({ error: parsedAccess.error });
     }
 
     await query(
-      `INSERT INTO ${table('loyalty_settings')} (id, visits_per_reward)
-       VALUES (1, $1)
-       ON CONFLICT (id) DO UPDATE SET visits_per_reward = EXCLUDED.visits_per_reward`,
-      [parsed.value]
+      `INSERT INTO ${table('loyalty_settings')} (id, visits_per_reward, access_value)
+       VALUES (1, $1, $2)
+       ON CONFLICT (id) DO UPDATE SET
+         visits_per_reward = EXCLUDED.visits_per_reward,
+         access_value = EXCLUDED.access_value`,
+      [parsedVisits.value, parsedAccess.value]
     );
 
-    res.json({ visits_per_reward: parsed.value });
+    res.json({
+      visits_per_reward: parsedVisits.value,
+      access_value: parsedAccess.value
+    });
   } catch (error) {
     console.error('Erro ao atualizar configurações de fidelidade:', error);
     res.status(500).json({ error: 'Erro ao atualizar configurações de fidelidade' });

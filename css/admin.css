@@ -977,7 +977,7 @@ input[type="checkbox"]:checked::after {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   max-width: 100%;
 }
 
@@ -1504,6 +1504,12 @@ input[type="checkbox"]:checked::after {
 .daily-diario-loyalty-toggle label {
   margin: 0;
   font-weight: 500;
+}
+
+.daily-diario-loyalty-info {
+  margin: 0;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 /* Lista de vendas do dia (Diário) */

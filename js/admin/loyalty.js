@@ -39,18 +39,6 @@ function loyaltyProgressLabel(c) {
   return `${display}/${n} neste ciclo · Faltam ${c.visits_to_reward ?? (n - display)}`;
 }
 
-function loyaltyProgressLabelShort(c) {
-  const n = loyaltyVisitsPerReward;
-  const display = c.display_progress ?? c.progress ?? 0;
-  if (c.cycle_complete) {
-    return `${n}/${n} · Prêmio!`;
-  }
-  if ((c.total_visits || 0) === 0) {
-    return `0/${n} · faltam ${n}`;
-  }
-  return `${display}/${n} · faltam ${c.visits_to_reward ?? (n - display)}`;
-}
-
 function loyaltyAvatarHtml(c, sizeClass = 'loyalty-card-avatar') {
   const initial = escapeAttr((c.name || '?').charAt(0).toUpperCase());
   if (c.avatar) {
@@ -59,15 +47,100 @@ function loyaltyAvatarHtml(c, sizeClass = 'loyalty-card-avatar') {
   return `<span class="${sizeClass} loyalty-card-avatar--initial">${initial}</span>`;
 }
 
+function formatLoyaltyVisitAt(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const datePart = date.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+  const timePart = date.toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  return `${datePart} · ${timePart}`;
+}
+
+function loyaltyCycleHint(c) {
+  const n = loyaltyVisitsPerReward;
+  if (c.cycle_complete) return 'Prêmio!';
+  const remaining = c.visits_to_reward ?? (n - (c.display_progress ?? c.progress ?? 0));
+  return `Faltam ${remaining}`;
+}
+
+function loyaltyVisitSourceLabel(source) {
+  if (source === 'daily_sales') return 'Venda';
+  return 'Admin';
+}
+
+function renderLoyaltyHistoryEvent(event) {
+  const when = formatLoyaltyVisitAt(event.created_at) || '—';
+  const deltaClass = event.delta > 0 ? 'loyalty-history-delta--add' : 'loyalty-history-delta--remove';
+  const deltaLabel = event.delta > 0 ? '+1' : '−1';
+  return `
+    <li class="loyalty-history-item">
+      <span class="loyalty-history-when">${escapeHtml(when)}</span>
+      <span class="loyalty-history-delta ${deltaClass}">${deltaLabel}</span>
+      <span class="loyalty-history-source">${escapeHtml(loyaltyVisitSourceLabel(event.source))}</span>
+    </li>`;
+}
+
+async function openLoyaltyHistoryModal(id) {
+  const modal = document.getElementById('loyalty-history-modal');
+  const title = document.getElementById('loyalty-history-title');
+  const summaryEl = document.getElementById('loyalty-history-summary');
+  const bodyEl = document.getElementById('loyalty-history-body');
+  if (!modal || !bodyEl) return;
+
+  title.textContent = 'Histórico de visitas';
+  summaryEl.innerHTML = '';
+  bodyEl.innerHTML = '<p class="text-sm text-black/50">Carregando…</p>';
+  modal.classList.add('active');
+
+  try {
+    const data = await DB.getLoyaltyVisitHistory(id, { limit: 30 });
+    const name = data.customer?.name || 'Cliente';
+    title.textContent = name;
+
+    const summary = data.summary || {};
+    const lastPositive = formatLoyaltyVisitAt(summary.last_positive_visit_at);
+    summaryEl.innerHTML = `
+      <p class="loyalty-history-summary-line">Últimas visitas</p>
+      <p class="loyalty-history-summary-meta">
+        Última visita: ${lastPositive ? escapeHtml(lastPositive) : '—'}
+      </p>`;
+
+    const events = data.events || [];
+    if (events.length === 0) {
+      bodyEl.innerHTML = '<p class="text-sm text-black/50">Nenhum registro ainda.</p>';
+    } else {
+      bodyEl.innerHTML = `<ul class="loyalty-history-list">${events.map(renderLoyaltyHistoryEvent).join('')}</ul>`;
+    }
+  } catch (error) {
+    if (!handleAuthError(error)) {
+      bodyEl.innerHTML = `<p class="text-sm text-red-600">Erro: ${escapeHtml(error.message)}</p>`;
+    }
+  }
+}
+
+function closeLoyaltyHistoryModal() {
+  document.getElementById('loyalty-history-modal')?.classList.remove('active');
+}
+
 function renderLoyaltyCustomerCard(c) {
   const n = loyaltyVisitsPerReward;
   const display = c.display_progress ?? c.progress ?? 0;
   const progressPct = Math.round((display / n) * 100);
-  const cycleChip = c.cycle_complete
-    ? '<span class="chip loyalty-chip-cycle">Ciclo completo!</span>'
+  const lastVisit = formatLoyaltyVisitAt(c.last_visit_at);
+  const statusBadges = [
+    c.cycle_complete ? '<span class="chip loyalty-chip-cycle">Ciclo completo</span>' : '',
+    !c.active ? '<span class="chip loyalty-chip-inactive">Inativo</span>' : ''
+  ].filter(Boolean).join('');
+  const inactiveIcon = c.inactive_visit
+    ? `<span class="loyalty-card-inactive-icon" title="Sem visita há mais de 3 dias" aria-label="Sem visita há mais de 3 dias"><i data-lucide="alert-circle"></i></span>`
     : '';
-  const progressFull = loyaltyProgressLabel(c);
-  const progressShort = loyaltyProgressLabelShort(c);
 
   return `
     <div class="card loyalty-card" data-loyalty-id="${c.id}">
@@ -75,11 +148,17 @@ function renderLoyaltyCustomerCard(c) {
         <div class="loyalty-card-identity">
           ${loyaltyAvatarHtml(c)}
           <div class="loyalty-card-info">
-            <h3 class="loyalty-card-name">${escapeHtml(c.name)}</h3>
+            <h3 class="loyalty-card-name">
+              <span class="loyalty-card-name-text">${escapeHtml(c.name)}</span>
+              ${inactiveIcon}
+            </h3>
             <p class="loyalty-card-phone">${formatPhoneDisplay(c.phone)}</p>
           </div>
         </div>
         <div class="loyalty-card-actions">
+          <button type="button" onclick="openLoyaltyHistoryModal(${c.id})" class="btn btn-outline btn-sm btn-icon" title="Histórico de visitas">
+            <i data-lucide="history"></i>
+          </button>
           <button type="button" onclick="editLoyaltyCustomer(${c.id})" class="btn btn-outline btn-sm btn-icon" title="Editar">
             <i data-lucide="edit"></i>
           </button>
@@ -88,24 +167,26 @@ function renderLoyaltyCustomerCard(c) {
           </button>
         </div>
       </div>
-      <div class="loyalty-card-chips">
-        <span class="chip">${c.total_visits} visita(s)</span>
-        <span class="chip loyalty-chip-progress" title="${escapeAttr(progressFull)}">
-          <span class="loyalty-chip-progress-full">${progressFull}</span>
-          <span class="loyalty-chip-progress-short">${progressShort}</span>
-        </span>
-        <span class="chip loyalty-chip-rewards">${c.total_rewards} prêmio(s)</span>
-        ${cycleChip}
-        ${!c.active ? '<span class="chip loyalty-chip-inactive">Inativo</span>' : ''}
+      <div class="loyalty-card-status">
+        <div class="loyalty-card-cycle">
+          <span class="loyalty-card-cycle-count" title="${escapeAttr(loyaltyProgressLabel(c))}">${display}/${n}</span>
+          <div class="loyalty-card-progress" role="progressbar" aria-valuenow="${display}" aria-valuemin="0" aria-valuemax="${n}">
+            <div class="loyalty-card-progress-bar ${c.cycle_complete ? 'loyalty-card-progress-bar--complete' : ''}" style="width: ${progressPct}%"></div>
+          </div>
+          <span class="loyalty-card-cycle-hint">${escapeHtml(loyaltyCycleHint(c))}</span>
+        </div>
+        <div class="loyalty-card-meta">
+          <span>${c.total_visits} visita${c.total_visits === 1 ? '' : 's'} · ${c.total_rewards} prêmio${c.total_rewards === 1 ? '' : 's'}</span>
+          ${statusBadges}
+        </div>
       </div>
-      <div class="loyalty-card-progress" role="progressbar" aria-valuenow="${display}" aria-valuemin="0" aria-valuemax="${n}">
-        <div class="loyalty-card-progress-bar ${c.cycle_complete ? 'loyalty-card-progress-bar--complete' : ''}" style="width: ${progressPct}%"></div>
-      </div>
-      <div class="loyalty-visit-row">
-        <span class="loyalty-visit-label">Registrar visita:</span>
+      <div class="loyalty-card-footer">
+        ${lastVisit
+          ? `<span class="loyalty-card-last-visit" title="Última alteração de visita">${escapeHtml(lastVisit)}</span>`
+          : '<span class="loyalty-card-last-visit loyalty-card-last-visit--empty"></span>'}
         <div class="loyalty-visit-stepper">
           <button type="button" onclick="applyLoyaltyVisitDelta(event, ${c.id}, -1)" class="btn btn-outline btn-sm loyalty-visit-btn" title="Remover 1 visita" aria-label="Remover 1 visita">−1</button>
-          <button type="button" onclick="applyLoyaltyVisitDelta(event, ${c.id}, 1)" class="btn btn-outline btn-sm loyalty-visit-btn" title="Adicionar 1 visita" aria-label="Adicionar 1 visita">+1</button>
+          <button type="button" onclick="applyLoyaltyVisitDelta(event, ${c.id}, 1)" class="btn btn-sm loyalty-visit-btn loyalty-visit-btn--add" title="Adicionar 1 visita" aria-label="Adicionar 1 visita">+1</button>
         </div>
       </div>
     </div>`;

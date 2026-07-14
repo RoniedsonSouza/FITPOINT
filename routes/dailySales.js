@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { query, getClient, table } = require('../config/database');
 const { authenticateToken } = require('../config/auth');
-const { applyVisitDelta } = require('./loyaltyHelpers');
+const { applyVisitDelta, insertVisitEvents } = require('./loyaltyHelpers');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -256,7 +256,7 @@ router.post('/batch', authenticateToken, async (req, res) => {
         await client.query(`SELECT * FROM ${table('loyalty_customers')} WHERE id = $1`, [customerId])
       ).rows[0];
 
-      const { visits, rewards, rewards_earned } = applyVisitDelta(
+      const { visits, rewards, rewards_earned, delta_applied } = applyVisitDelta(
         customerRow.total_visits,
         customerRow.total_rewards,
         1,
@@ -265,10 +265,18 @@ router.post('/batch', authenticateToken, async (req, res) => {
 
       await client.query(
         `UPDATE ${table('loyalty_customers')}
-         SET total_visits = $1, total_rewards = $2, updated_at = NOW()
+         SET total_visits = $1,
+             total_rewards = $2,
+             updated_at = NOW(),
+             last_visit_at = NOW(),
+             last_positive_visit_at = NOW()
          WHERE id = $3`,
         [visits, rewards, customerId]
       );
+
+      if (delta_applied !== 0) {
+        await insertVisitEvents(client, customerId, delta_applied, 'daily_sales');
+      }
 
       loyaltyApplied = true;
       rewardsEarned = rewards_earned;
@@ -379,7 +387,7 @@ router.post('/', authenticateToken, async (req, res) => {
         await client.query(`SELECT * FROM ${table('loyalty_customers')} WHERE id = $1`, [customerId])
       ).rows[0];
 
-      const { visits, rewards, rewards_earned } = applyVisitDelta(
+      const { visits, rewards, rewards_earned, delta_applied } = applyVisitDelta(
         customerRow.total_visits,
         customerRow.total_rewards,
         1,
@@ -388,10 +396,18 @@ router.post('/', authenticateToken, async (req, res) => {
 
       await client.query(
         `UPDATE ${table('loyalty_customers')}
-         SET total_visits = $1, total_rewards = $2, updated_at = NOW()
+         SET total_visits = $1,
+             total_rewards = $2,
+             updated_at = NOW(),
+             last_visit_at = NOW(),
+             last_positive_visit_at = NOW()
          WHERE id = $3`,
         [visits, rewards, customerId]
       );
+
+      if (delta_applied !== 0) {
+        await insertVisitEvents(client, customerId, delta_applied, 'daily_sales');
+      }
 
       loyaltyApplied = true;
       rewardsEarned = rewards_earned;

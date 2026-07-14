@@ -69,9 +69,32 @@ async function ensureLoyaltySchema(client) {
     )
   `);
 
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.loyalty_customers
+      ADD COLUMN IF NOT EXISTS avatar TEXT
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.loyalty_customers
+      ADD COLUMN IF NOT EXISTS last_visit_at TIMESTAMP
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.loyalty_customers
+      ADD COLUMN IF NOT EXISTS last_positive_visit_at TIMESTAMP
+    `);
+
   await client.query(`
-    ALTER TABLE ${SCHEMA}.loyalty_customers
-    ADD COLUMN IF NOT EXISTS avatar TEXT
+    CREATE TABLE IF NOT EXISTS ${SCHEMA}.loyalty_visit_events (
+      id SERIAL PRIMARY KEY,
+      customer_id INTEGER NOT NULL REFERENCES ${SCHEMA}.loyalty_customers(id) ON DELETE CASCADE,
+      delta SMALLINT NOT NULL CHECK (delta IN (-1, 1)),
+      source VARCHAR(20) NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await client.query(`
+    CREATE INDEX IF NOT EXISTS idx_loyalty_visit_events_customer_created
+    ON ${SCHEMA}.loyalty_visit_events (customer_id, created_at DESC)
   `);
 
   await client.query(`

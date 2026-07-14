@@ -328,6 +328,20 @@ const DB = {
     return response.json();
   },
 
+  async getLoyaltyVisitHistory(id, { limit = 30 } = {}) {
+    const qs = limit ? `?limit=${encodeURIComponent(limit)}` : '';
+    const response = await fetch(`${getApiBaseUrl()}/loyalty/customers/${id}/visits${qs}`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao buscar histórico de visitas';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
   async uploadLoyaltyAvatar(file) {
     const formData = new FormData();
     formData.append('image', file);

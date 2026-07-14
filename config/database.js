@@ -79,6 +79,27 @@ async function ensureDatabase() {
       ADD COLUMN IF NOT EXISTS avatar TEXT
     `);
     await client.query(`
+      ALTER TABLE ${SCHEMA}.loyalty_customers
+      ADD COLUMN IF NOT EXISTS last_visit_at TIMESTAMP
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.loyalty_customers
+      ADD COLUMN IF NOT EXISTS last_positive_visit_at TIMESTAMP
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA}.loyalty_visit_events (
+        id SERIAL PRIMARY KEY,
+        customer_id INTEGER NOT NULL REFERENCES ${SCHEMA}.loyalty_customers(id) ON DELETE CASCADE,
+        delta SMALLINT NOT NULL CHECK (delta IN (-1, 1)),
+        source VARCHAR(20) NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_loyalty_visit_events_customer_created
+      ON ${SCHEMA}.loyalty_visit_events (customer_id, created_at DESC)
+    `);
+    await client.query(`
       CREATE TABLE IF NOT EXISTS ${SCHEMA}.loyalty_settings (
         id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
         visits_per_reward INTEGER NOT NULL DEFAULT 10

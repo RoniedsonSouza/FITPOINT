@@ -356,84 +356,110 @@
 
       <!-- Eventos / Ingressos -->
       <section id="view-events" class="admin-view">
-        <div class="admin-view-header">
-          <h1>Eventos</h1>
-          <p>Gerencie eventos, lotes de ingressos e validação na entrada.</p>
-        </div>
-        <div class="module-toolbar">
-          <a href="/eventos.html" target="_blank" class="btn btn-outline btn-md">
-            <i data-lucide="external-link"></i> Página pública
-          </a>
-          <div class="module-toolbar-actions">
-            <button type="button" onclick="openEventModal()" class="btn btn-primary btn-md">
-              <i data-lucide="plus"></i> Novo evento
-            </button>
+        <!-- Lista de eventos -->
+        <div id="events-list-panel">
+          <div class="admin-view-header">
+            <h1>Eventos</h1>
+            <p>Liste e gerencie os eventos. Lotes, validação e ingressos ficam dentro de cada evento.</p>
+          </div>
+          <div class="module-toolbar">
+            <a href="/eventos.html" target="_blank" class="btn btn-outline btn-md">
+              <i data-lucide="external-link"></i> Página pública
+            </a>
+            <div class="module-toolbar-actions">
+              <button type="button" onclick="openEventModal()" class="btn btn-primary btn-md">
+                <i data-lucide="plus"></i> Novo evento
+              </button>
+            </div>
+          </div>
+          <div id="events-list" class="events-list-grid">
+            <p class="text-black/60">Selecione este módulo para carregar.</p>
           </div>
         </div>
 
-        <div class="grid gap-4 lg:grid-cols-2">
-          <div>
-            <h2 class="font-semibold text-sm mb-2">Eventos</h2>
-            <div id="events-list" class="grid gap-3">
-              <p class="text-black/60">Selecione este módulo para carregar.</p>
+        <!-- Detalhe do evento -->
+        <div id="event-detail-panel" class="hidden">
+          <button type="button" class="event-detail-back" onclick="backToEventsList()">
+            <i data-lucide="arrow-left"></i> Todos os eventos
+          </button>
+          <div class="admin-view-header event-detail-header">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h1 id="event-detail-title">Evento</h1>
+                <p id="event-detail-meta" class="mt-1"></p>
+              </div>
+              <button type="button" id="event-detail-edit-btn" onclick="editSelectedEvent()" class="btn btn-outline btn-md">
+                <i data-lucide="edit"></i> Editar evento
+              </button>
             </div>
           </div>
-          <div id="event-detail-panel" class="hidden">
-            <div class="flex items-center justify-between gap-2 mb-2">
-              <h2 class="font-semibold text-sm" id="event-detail-title">Lotes</h2>
+
+          <nav class="event-detail-tabs" aria-label="Seções do evento">
+            <button type="button" class="event-detail-tab is-active" data-event-tab="lotes" onclick="setEventTab('lotes')">
+              <i data-lucide="layers"></i> Lotes
+            </button>
+            <button type="button" class="event-detail-tab" data-event-tab="validar" onclick="setEventTab('validar')">
+              <i data-lucide="scan-line"></i> Validar
+            </button>
+            <button type="button" class="event-detail-tab" data-event-tab="ingressos" onclick="setEventTab('ingressos')">
+              <i data-lucide="ticket"></i> Ingressos
+            </button>
+          </nav>
+
+          <div id="event-tab-lotes" class="event-detail-tab-panel" data-event-tab-panel="lotes">
+            <div class="flex items-center justify-between gap-2 mb-3">
+              <h2 class="font-semibold text-sm">Lotes de ingressos</h2>
               <button type="button" onclick="openLotModal()" class="btn btn-outline btn-sm">
                 <i data-lucide="plus"></i> Novo lote
               </button>
             </div>
-            <div id="event-lots-list" class="grid gap-3 mb-6"></div>
+            <div id="event-lots-list" class="grid gap-3"></div>
           </div>
-        </div>
 
-        <div class="card mt-6">
-          <h2 class="font-semibold text-sm mb-4">Validar ingresso</h2>
-          <div class="ticket-qr-scanner-actions mb-3">
-            <button type="button" id="ticket-qr-start-btn" class="btn btn-outline btn-md" onclick="startTicketQrScanner()">
-              <i data-lucide="camera"></i> Escanear QR
-            </button>
+          <div id="event-tab-validar" class="event-detail-tab-panel hidden" data-event-tab-panel="validar">
+            <div class="card">
+              <h2 class="font-semibold text-sm mb-4">Validar ingresso</h2>
+              <div class="ticket-qr-scanner-actions mb-3">
+                <button type="button" id="ticket-qr-start-btn" class="btn btn-outline btn-md" onclick="startTicketQrScanner()">
+                  <i data-lucide="camera"></i> Escanear QR
+                </button>
+              </div>
+              <form id="ticket-validate-form" class="events-validate-form" onsubmit="validateTicketCode(event)">
+                <p class="text-xs text-black/50 w-full sm:w-auto sm:mb-0 mb-1">Ou informe o código manualmente:</p>
+                <input type="text" id="ticket-validate-code" placeholder="Cole ou digite o código" autocomplete="off" required>
+                <button type="submit" class="btn btn-primary btn-md">
+                  <i data-lucide="check-circle"></i> Validar
+                </button>
+              </form>
+              <p id="ticket-validate-result" class="mt-3 text-sm"></p>
+            </div>
           </div>
-          <form id="ticket-validate-form" class="events-validate-form" onsubmit="validateTicketCode(event)">
-            <p class="text-xs text-black/50 w-full sm:w-auto sm:mb-0 mb-1">Ou informe o código manualmente:</p>
-            <input type="text" id="ticket-validate-code" placeholder="Cole ou digite o código" autocomplete="off" required>
-            <button type="submit" class="btn btn-primary btn-md">
-              <i data-lucide="check-circle"></i> Validar
-            </button>
-          </form>
-          <p id="ticket-validate-result" class="mt-3 text-sm"></p>
-        </div>
 
-        <div class="card mt-4">
-          <div class="events-filters">
-            <div class="field">
-              <label for="tickets-event-filter">Evento</label>
-              <select id="tickets-event-filter" onchange="loadTicketsAdmin()">
-                <option value="">Todos os eventos</option>
-              </select>
+          <div id="event-tab-ingressos" class="event-detail-tab-panel hidden" data-event-tab-panel="ingressos">
+            <div class="card">
+              <div class="events-filters events-filters--detail">
+                <div class="field">
+                  <label for="tickets-status-filter">Status</label>
+                  <select id="tickets-status-filter" onchange="loadTicketsAdmin()">
+                    <option value="">Todos</option>
+                    <option value="valid">Válido</option>
+                    <option value="used">Usado</option>
+                    <option value="cancelled">Cancelado</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="tickets-search">Buscar</label>
+                  <input type="search" id="tickets-search" placeholder="Código, nome ou e-mail" onkeydown="if(event.key==='Enter'){event.preventDefault();loadTicketsAdmin();}">
+                </div>
+                <button type="button" onclick="loadTicketsAdmin()" class="btn btn-outline btn-md">
+                  <i data-lucide="search"></i> Filtrar
+                </button>
+              </div>
+              <h2 class="font-semibold text-sm mb-3">Ingressos vendidos</h2>
+              <div id="tickets-admin-list">
+                <p class="text-black/60 text-sm">Carregue o evento para ver os ingressos.</p>
+              </div>
             </div>
-            <div class="field">
-              <label for="tickets-status-filter">Status</label>
-              <select id="tickets-status-filter" onchange="loadTicketsAdmin()">
-                <option value="">Todos</option>
-                <option value="valid">Válido</option>
-                <option value="used">Usado</option>
-                <option value="cancelled">Cancelado</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="tickets-search">Buscar</label>
-              <input type="search" id="tickets-search" placeholder="Código, nome ou e-mail" onkeydown="if(event.key==='Enter'){event.preventDefault();loadTicketsAdmin();}">
-            </div>
-            <button type="button" onclick="loadTicketsAdmin()" class="btn btn-outline btn-md">
-              <i data-lucide="search"></i> Filtrar
-            </button>
-          </div>
-          <h2 class="font-semibold text-sm mb-3">Ingressos vendidos</h2>
-          <div id="tickets-admin-list">
-            <p class="text-black/60 text-sm">Carregue o módulo para ver os ingressos.</p>
           </div>
         </div>
       </section>

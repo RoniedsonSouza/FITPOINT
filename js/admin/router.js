@@ -115,7 +115,7 @@ const AdminRouter = {
 
     const loaderName = route.loader;
     if (loaderName && typeof window[loaderName] === 'function') {
-      const alwaysReload = module === 'vendas' || module === 'diario';
+      const alwaysReload = module === 'vendas' || module === 'diario' || module === 'fidelidade';
       if (forceReload || alwaysReload || !this.loadedModules.has(module)) {
         window[loaderName]();
         this.loadedModules.add(module);

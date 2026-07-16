@@ -77,6 +77,13 @@ DB_SCHEMA=fitpoint
 **Outras configurações:**
 - `JWT_SECRET`: String aleatória segura (ex: gere com `openssl rand -hex 32`)
 - `ADMIN_PASSWORD`: Senha forte para o usuário admin
+- `APP_URL`: URL pública do site (ex: `https://seudominio.com`) — usada no retorno e webhook do Mercado Pago
+- `MP_ACCESS_TOKEN`: Access Token do Mercado Pago (Checkout Pro — Pix + cartão)
+- `MP_WEBHOOK_SECRET`: (opcional) segredo para validar notificações do Mercado Pago
+- `RESEND_API_KEY`: chave da API Resend para envio dos ingressos por e-mail
+- `RESEND_FROM`: remetente verificado no Resend (ex: `FitPoint <ingressos@seudominio.com>`)
+
+Guia completo (passo a passo para obter as chaves): **[docs/INGRESSOS-CONFIG.md](docs/INGRESSOS-CONFIG.md)**
 
 ### 4. Instalar Dependências
 

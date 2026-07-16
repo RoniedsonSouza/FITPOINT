@@ -13,6 +13,8 @@ const productsRoutes = require('./routes/products');
 const categoriesRoutes = require('./routes/categories');
 const loyaltyRoutes = require('./routes/loyalty');
 const dailySalesRoutes = require('./routes/dailySales');
+const eventsRoutes = require('./routes/events');
+const ticketsRoutes = require('./routes/tickets');
 const authRoutes = require('./routes/auth');
 
 const app = express();
@@ -43,6 +45,8 @@ app.use('/api/products', productsRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/loyalty', loyaltyRoutes);
 app.use('/api/daily-sales', dailySalesRoutes);
+app.use('/api/events', eventsRoutes);
+app.use('/api/tickets', ticketsRoutes);
 app.use('/api/auth', authRoutes);
 
 // Rota de health check

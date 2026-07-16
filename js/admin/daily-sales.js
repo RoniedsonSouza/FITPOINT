@@ -4,6 +4,7 @@ let dailySalesSelectedDate = null;
 let dailySalesProductsCache = [];
 let dailySalesCustomersCache = [];
 let diarioCart = [];
+let diarioCartDiscount = 0;
 let diarioSelectedCustomer = null;
 let diarioAccessValue = 27;
 let diarioComboboxesBound = false;
@@ -89,6 +90,7 @@ function updateDiarioCartRowTotal(productId) {
   );
   const totalEl = row.querySelector('.daily-diario-cart-total strong');
   if (totalEl) totalEl.textContent = formatCurrency(computeDiarioLineTotal(preview));
+  updateDiarioCartSummary();
 }
 
 function normalizeSearchText(text) {
@@ -241,8 +243,18 @@ function removeFromDiarioCart(productId) {
   updateDiarioLoyaltyUI();
 }
 
-function computeDiarioSaleTotal() {
+function computeDiarioSubtotal() {
   return diarioCart.reduce((sum, line) => sum + computeDiarioLineTotal(line), 0);
+}
+
+function getDiarioCartDiscountApplied(subtotal = computeDiarioSubtotal()) {
+  const disc = Math.max(0, Number(diarioCartDiscount) || 0);
+  return Math.min(disc, Math.max(0, subtotal));
+}
+
+function computeDiarioSaleTotal() {
+  const subtotal = computeDiarioSubtotal();
+  return Math.max(0, Math.round((subtotal - getDiarioCartDiscountApplied(subtotal)) * 100) / 100);
 }
 
 function computeDiarioLoyaltyVisits() {
@@ -250,6 +262,66 @@ function computeDiarioLoyaltyVisits() {
   const access = diarioAccessValue > 0 ? diarioAccessValue : 27;
   if (total <= 0 || access <= 0) return 0;
   return Math.floor(total / access);
+}
+
+function buildDiarioPayloadItems() {
+  const lines = diarioCart.map(line => ({
+    productId: line.productId,
+    quantity: Math.max(1, Number(line.quantity) || 1),
+    unitPrice: computeDiarioFinalPrice(line.basePrice, line.discount),
+    lineTotal: computeDiarioLineTotal(line)
+  }));
+
+  const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
+  const cartDisc = getDiarioCartDiscountApplied(subtotal);
+
+  if (cartDisc <= 0 || subtotal <= 0) {
+    return lines.map(line => ({
+      product_id: line.productId,
+      quantity: line.quantity,
+      unit_price: line.unitPrice
+    }));
+  }
+
+  let remaining = cartDisc;
+  return lines.map((line, index) => {
+    const isLast = index === lines.length - 1;
+    const share = isLast
+      ? remaining
+      : Math.min(remaining, Math.round((line.lineTotal / subtotal) * cartDisc * 100) / 100);
+    remaining = Math.round((remaining - share) * 100) / 100;
+    const discountedTotal = Math.max(0, Math.round((line.lineTotal - share) * 100) / 100);
+    const unitPrice = Math.round((discountedTotal / line.quantity) * 100) / 100;
+    return {
+      product_id: line.productId,
+      quantity: line.quantity,
+      unit_price: unitPrice
+    };
+  });
+}
+
+function updateDiarioCartSummary() {
+  const wrap = document.getElementById('daily-diario-cart-summary');
+  const subtotalEl = document.getElementById('daily-diario-subtotal');
+  const totalEl = document.getElementById('daily-diario-total');
+  const discountInput = document.getElementById('daily-diario-cart-discount');
+  if (!wrap) return;
+
+  if (diarioCart.length === 0) {
+    wrap.classList.add('hidden');
+    diarioCartDiscount = 0;
+    if (discountInput) discountInput.value = formatDecimalInput(0, MONEY_DECIMALS);
+    return;
+  }
+
+  wrap.classList.remove('hidden');
+  const subtotal = computeDiarioSubtotal();
+  diarioCartDiscount = clampDecimal(diarioCartDiscount, 0, subtotal, 0, MONEY_DECIMALS);
+  if (discountInput && document.activeElement !== discountInput) {
+    discountInput.value = formatDecimalInput(diarioCartDiscount, MONEY_DECIMALS);
+  }
+  if (subtotalEl) subtotalEl.textContent = formatCurrency(subtotal);
+  if (totalEl) totalEl.textContent = formatCurrency(computeDiarioSaleTotal());
 }
 
 function updateDiarioLoyaltyUI() {
@@ -273,9 +345,9 @@ function updateDiarioLoyaltyUI() {
 
   if (visits > 0) {
     const visitLabel = visits === 1 ? 'visita será contada' : 'visitas serão contadas';
-    info.textContent = `${visits} ${visitLabel} (${formatCurrency(total)} ÷ ${formatCurrency(access)})`;
+    info.textContent = `${visits} ${visitLabel} automaticamente (${formatCurrency(total)} ÷ ${formatCurrency(access)})`;
   } else {
-    info.textContent = `Valor abaixo do acesso — fidelidade não contabilizada (${formatCurrency(total)} de ${formatCurrency(access)})`;
+    info.textContent = `Ainda sem visita — falta atingir ${formatCurrency(access)} (total atual: ${formatCurrency(total)})`;
   }
 }
 
@@ -285,6 +357,7 @@ function renderDiarioCart() {
 
   if (diarioCart.length === 0) {
     container.innerHTML = '<p class="daily-diario-cart-empty">Nenhum produto adicionado.</p>';
+    updateDiarioCartSummary();
     return;
   }
 
@@ -302,8 +375,8 @@ function renderDiarioCart() {
             <input type="number" min="1" step="1" value="${line.quantity}" data-cart-qty inputmode="numeric">
           </label>
           <label class="daily-diario-cart-field">
-            <span>Desc. R$</span>
-            <input type="number" min="0" step="0.01" value="${formatDecimalInput(line.discount, MONEY_DECIMALS)}" data-cart-discount inputmode="decimal">
+            <span>Desc. item</span>
+            <input type="number" min="0" step="0.01" value="${formatDecimalInput(line.discount, MONEY_DECIMALS)}" data-cart-discount inputmode="decimal" title="Desconto por unidade (R$)">
           </label>
           <div class="daily-diario-cart-total">
             <span>Total</span>
@@ -316,6 +389,7 @@ function renderDiarioCart() {
       </div>
     `;
   }).join('');
+  updateDiarioCartSummary();
   refreshIcons();
 }
 
@@ -400,6 +474,36 @@ function onDiarioCustomerResultsClick(e) {
   if (customer) selectDiarioCustomer(customer);
 }
 
+function onDiarioCartDiscountInput(e) {
+  const input = e.target;
+  if (!input || input.id !== 'daily-diario-cart-discount') return;
+
+  const restricted = restrictDecimalString(input.value, MONEY_DECIMALS);
+  if (input.value !== restricted) input.value = restricted;
+  const parsed = parseLooseDecimal(restricted, MONEY_DECIMALS);
+  if (parsed != null && parsed >= 0) {
+    diarioCartDiscount = Math.min(parsed, computeDiarioSubtotal());
+  }
+  updateDiarioCartSummary();
+  updateDiarioLoyaltyUI();
+}
+
+function onDiarioCartDiscountBlur(e) {
+  const input = e.target;
+  if (!input || input.id !== 'daily-diario-cart-discount') return;
+
+  diarioCartDiscount = clampDecimal(
+    parseLooseDecimal(input.value, MONEY_DECIMALS),
+    0,
+    computeDiarioSubtotal(),
+    0,
+    MONEY_DECIMALS
+  );
+  input.value = formatDecimalInput(diarioCartDiscount, MONEY_DECIMALS);
+  updateDiarioCartSummary();
+  updateDiarioLoyaltyUI();
+}
+
 function initDiarioComboboxes() {
   if (diarioComboboxesBound) return;
   diarioComboboxesBound = true;
@@ -407,6 +511,7 @@ function initDiarioComboboxes() {
   const productSearch = document.getElementById('daily-diario-product-search');
   const customerSearch = document.getElementById('daily-diario-customer-search');
   const cart = document.getElementById('daily-diario-cart');
+  const cartDiscount = document.getElementById('daily-diario-cart-discount');
   const productResults = document.getElementById('daily-diario-product-results');
   const customerResults = document.getElementById('daily-diario-customer-results');
   const customerSelected = document.getElementById('daily-diario-customer-selected');
@@ -454,6 +559,10 @@ function initDiarioComboboxes() {
     cart.addEventListener('click', onDiarioCartClick);
     cart.addEventListener('input', onDiarioCartInput);
     cart.addEventListener('blur', onDiarioCartBlur, true);
+  }
+  if (cartDiscount) {
+    cartDiscount.addEventListener('input', onDiarioCartDiscountInput);
+    cartDiscount.addEventListener('blur', onDiarioCartDiscountBlur);
   }
 
   document.addEventListener('click', (e) => {
@@ -540,11 +649,13 @@ async function loadDailyDiario() {
   if (typeof DB === 'undefined') return;
 
   diarioCart = [];
+  diarioCartDiscount = 0;
   diarioSelectedCustomer = null;
 
   const productSearch = document.getElementById('daily-diario-product-search');
   const customerSearch = document.getElementById('daily-diario-customer-search');
   const customerSelected = document.getElementById('daily-diario-customer-selected');
+  const cartDiscount = document.getElementById('daily-diario-cart-discount');
 
   if (productSearch) productSearch.value = '';
   if (customerSearch) {
@@ -555,6 +666,7 @@ async function loadDailyDiario() {
     customerSelected.classList.add('hidden');
     customerSelected.innerHTML = '';
   }
+  if (cartDiscount) cartDiscount.value = formatDecimalInput(0, MONEY_DECIMALS);
 
   hideDiarioResults('product');
   hideDiarioResults('customer');
@@ -650,16 +762,19 @@ async function submitDailyDiario(event) {
     line.quantity = clampInt(line.quantity, 1, 1);
     line.discount = clampDecimal(line.discount, 0, line.basePrice, 0, MONEY_DECIMALS);
   });
+  diarioCartDiscount = clampDecimal(
+    diarioCartDiscount,
+    0,
+    computeDiarioSubtotal(),
+    0,
+    MONEY_DECIMALS
+  );
 
   await withButtonLoading(btn, async () => {
     try {
       const payload = {
         sale_date: getLocalDateString(),
-        items: diarioCart.map(line => ({
-          product_id: line.productId,
-          quantity: line.quantity,
-          unit_price: computeDiarioFinalPrice(line.basePrice, line.discount)
-        }))
+        items: buildDiarioPayloadItems()
       };
       if (diarioSelectedCustomer) {
         payload.loyalty_customer_id = diarioSelectedCustomer.id;
@@ -668,6 +783,7 @@ async function submitDailyDiario(event) {
       const result = await DB.addDailySalesBatch(payload);
 
       diarioCart = [];
+      diarioCartDiscount = 0;
       renderDiarioCart();
       updateDiarioLoyaltyUI();
 

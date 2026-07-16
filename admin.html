@@ -99,6 +99,9 @@
       <button type="button" class="admin-nav-item" data-admin-nav="vendas">
         <i data-lucide="receipt"></i> Vendas do dia
       </button>
+      <button type="button" class="admin-nav-item" data-admin-nav="eventos">
+        <i data-lucide="ticket"></i> Eventos
+      </button>
 
       <div class="admin-sidebar-footer">
         <button type="button" onclick="logout()" class="admin-nav-item text-red-600">
@@ -138,6 +141,12 @@
             <h2>Vendas do dia</h2>
             <p>Registre vendas e acompanhe o levantamento diário.</p>
             <span class="module-card-stat" id="stat-daily-sales">—</span>
+          </button>
+          <button type="button" class="module-card" data-module-card="eventos">
+            <span class="module-card-icon"><i data-lucide="ticket"></i></span>
+            <h2>Eventos</h2>
+            <p>Ingressos, lotes, validação e vendas online.</p>
+            <span class="module-card-stat" id="stat-events">—</span>
           </button>
         </div>
         <div id="dashboard-daily-summary" class="card mt-4 hidden">
@@ -302,6 +311,22 @@
             <div id="daily-diario-cart" class="daily-diario-cart">
               <p class="daily-diario-cart-empty">Nenhum produto adicionado.</p>
             </div>
+            <div id="daily-diario-cart-summary" class="daily-diario-cart-summary hidden">
+              <label class="daily-diario-cart-field daily-diario-cart-discount-field">
+                <span>Desc. compra R$</span>
+                <input type="number" id="daily-diario-cart-discount" min="0" step="0.01" value="0" inputmode="decimal" aria-label="Desconto na compra">
+              </label>
+              <div class="daily-diario-cart-summary-totals">
+                <p class="daily-diario-cart-summary-line">
+                  <span>Subtotal</span>
+                  <strong id="daily-diario-subtotal">R$&nbsp;0,00</strong>
+                </p>
+                <p class="daily-diario-cart-summary-line daily-diario-cart-summary-line--total">
+                  <span>Total</span>
+                  <strong id="daily-diario-total">R$&nbsp;0,00</strong>
+                </p>
+              </div>
+            </div>
             <div class="daily-diario-field">
               <label for="daily-diario-customer-search">Cliente (opcional)</label>
               <div class="diario-combobox" id="diario-customer-combobox">
@@ -310,7 +335,7 @@
                 <div id="daily-diario-customer-selected" class="diario-combobox-selected hidden"></div>
               </div>
             </div>
-            <div id="daily-diario-loyalty-wrap" class="daily-diario-loyalty-toggle hidden">
+            <div id="daily-diario-loyalty-wrap" class="daily-diario-loyalty-info-wrap hidden">
               <p id="daily-diario-loyalty-info" class="daily-diario-loyalty-info"></p>
             </div>
             <button type="submit" id="daily-diario-submit-btn" class="btn btn-primary btn-lg daily-diario-submit-btn">
@@ -325,6 +350,84 @@
             <div id="daily-diario-list" class="daily-diario-list">
               <p class="daily-diario-list-empty">Nenhuma venda hoje.</p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Eventos / Ingressos -->
+      <section id="view-events" class="admin-view">
+        <div class="admin-view-header">
+          <h1>Eventos</h1>
+          <p>Gerencie eventos, lotes de ingressos e validação na entrada.</p>
+        </div>
+        <div class="module-toolbar">
+          <a href="/eventos.html" target="_blank" class="btn btn-outline btn-md">
+            <i data-lucide="external-link"></i> Página pública
+          </a>
+          <div class="module-toolbar-actions">
+            <button type="button" onclick="openEventModal()" class="btn btn-primary btn-md">
+              <i data-lucide="plus"></i> Novo evento
+            </button>
+          </div>
+        </div>
+
+        <div class="grid gap-4 lg:grid-cols-2">
+          <div>
+            <h2 class="font-semibold text-sm mb-2">Eventos</h2>
+            <div id="events-list" class="grid gap-3">
+              <p class="text-black/60">Selecione este módulo para carregar.</p>
+            </div>
+          </div>
+          <div id="event-detail-panel" class="hidden">
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <h2 class="font-semibold text-sm" id="event-detail-title">Lotes</h2>
+              <button type="button" onclick="openLotModal()" class="btn btn-outline btn-sm">
+                <i data-lucide="plus"></i> Novo lote
+              </button>
+            </div>
+            <div id="event-lots-list" class="grid gap-3 mb-6"></div>
+          </div>
+        </div>
+
+        <div class="card mt-6">
+          <h2 class="font-semibold text-sm mb-4">Validar ingresso</h2>
+          <form id="ticket-validate-form" class="events-validate-form" onsubmit="validateTicketCode(event)">
+            <input type="text" id="ticket-validate-code" placeholder="Cole ou digite o código do QR" autocomplete="off" required>
+            <button type="submit" class="btn btn-primary btn-md">
+              <i data-lucide="check-circle"></i> Validar
+            </button>
+          </form>
+          <p id="ticket-validate-result" class="mt-3 text-sm"></p>
+        </div>
+
+        <div class="card mt-4">
+          <div class="events-filters">
+            <div class="field">
+              <label for="tickets-event-filter">Evento</label>
+              <select id="tickets-event-filter" onchange="loadTicketsAdmin()">
+                <option value="">Todos os eventos</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="tickets-status-filter">Status</label>
+              <select id="tickets-status-filter" onchange="loadTicketsAdmin()">
+                <option value="">Todos</option>
+                <option value="valid">Válido</option>
+                <option value="used">Usado</option>
+                <option value="cancelled">Cancelado</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="tickets-search">Buscar</label>
+              <input type="search" id="tickets-search" placeholder="Código, nome ou e-mail" onkeydown="if(event.key==='Enter'){event.preventDefault();loadTicketsAdmin();}">
+            </div>
+            <button type="button" onclick="loadTicketsAdmin()" class="btn btn-outline btn-md">
+              <i data-lucide="search"></i> Filtrar
+            </button>
+          </div>
+          <h2 class="font-semibold text-sm mb-3">Ingressos vendidos</h2>
+          <div id="tickets-admin-list">
+            <p class="text-black/60 text-sm">Carregue o módulo para ver os ingressos.</p>
           </div>
         </div>
       </section>
@@ -465,6 +568,94 @@
     </div>
   </div>
 
+  <!-- Modal Evento -->
+  <div id="event-modal" class="modal">
+    <div class="modal-content modal-content--sm">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-display text-xl font-bold" id="event-modal-title">Novo evento</h3>
+        <button type="button" onclick="closeEventModal()" class="modal-close" aria-label="Fechar">&times;</button>
+      </div>
+      <form id="event-form" onsubmit="saveEvent(event)">
+        <input type="hidden" id="event-id-input">
+        <div class="form-group">
+          <label>Título</label>
+          <input type="text" id="event-title" required placeholder="Ex.: Open FitPoint">
+        </div>
+        <div class="form-group">
+          <label>Descrição</label>
+          <textarea id="event-description" rows="3" placeholder="Detalhes do evento…"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Local</label>
+          <input type="text" id="event-venue" placeholder="Ex.: Unidade Centro">
+        </div>
+        <div class="form-group">
+          <label>Data e hora</label>
+          <input type="datetime-local" id="event-starts-at" required>
+        </div>
+        <div class="form-group">
+          <label>URL da imagem (opcional)</label>
+          <input type="text" id="event-image-url" placeholder="https://… ou /uploads/…">
+        </div>
+        <div class="form-group">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="event-active" checked> Ativo (visível no site)
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" onclick="closeEventModal()" class="btn btn-secondary btn-md">Cancelar</button>
+          <button type="submit" class="btn btn-primary btn-lg">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Lote -->
+  <div id="lot-modal" class="modal">
+    <div class="modal-content modal-content--sm">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-display text-xl font-bold" id="lot-modal-title">Novo lote</h3>
+        <button type="button" onclick="closeLotModal()" class="modal-close" aria-label="Fechar">&times;</button>
+      </div>
+      <form id="lot-form" onsubmit="saveLot(event)">
+        <input type="hidden" id="lot-id-input">
+        <div class="form-group">
+          <label for="lot-name">Nome do lote</label>
+          <input type="text" id="lot-name" required placeholder="Ex.: 1º lote">
+        </div>
+        <div class="form-group field-row">
+          <div class="field">
+            <label for="lot-price">Preço (R$)</label>
+            <input type="number" id="lot-price" step="0.01" min="0" required>
+          </div>
+          <div class="field">
+            <label for="lot-quantity">Quantidade total</label>
+            <input type="number" id="lot-quantity" min="1" step="1" required>
+          </div>
+        </div>
+        <div class="form-group field-row">
+          <div class="field">
+            <label for="lot-sales-start">Início das vendas</label>
+            <input type="datetime-local" id="lot-sales-start">
+          </div>
+          <div class="field">
+            <label for="lot-sales-end">Fim das vendas</label>
+            <input type="datetime-local" id="lot-sales-end">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="lot-active" checked> Ativo
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" onclick="closeLotModal()" class="btn btn-secondary btn-md">Cancelar</button>
+          <button type="submit" class="btn btn-primary btn-lg">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Modal Fidelidade -->
   <div id="loyalty-modal" class="modal">
     <div class="modal-content modal-content--sm">
@@ -527,6 +718,7 @@
   <script src="/js/admin/products.js"></script>
   <script src="/js/admin/loyalty.js"></script>
   <script src="/js/admin/daily-sales.js"></script>
+  <script src="/js/admin/events.js"></script>
   <script src="/js/admin/router.js"></script>
   <script>
     window.addEventListener('DOMContentLoaded', () => {

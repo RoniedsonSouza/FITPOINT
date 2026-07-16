@@ -15,6 +15,7 @@ const loyaltyRoutes = require('./routes/loyalty');
 const dailySalesRoutes = require('./routes/dailySales');
 const eventsRoutes = require('./routes/events');
 const ticketsRoutes = require('./routes/tickets');
+const distributorsRoutes = require('./routes/distributors');
 const authRoutes = require('./routes/auth');
 
 const app = express();
@@ -47,6 +48,7 @@ app.use('/api/loyalty', loyaltyRoutes);
 app.use('/api/daily-sales', dailySalesRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/tickets', ticketsRoutes);
+app.use('/api/distributors', distributorsRoutes);
 app.use('/api/auth', authRoutes);
 
 // Rota de health check

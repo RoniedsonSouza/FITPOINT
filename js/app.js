@@ -356,9 +356,17 @@ function refreshIcons() {
 async function initHome() {
     const box = document.getElementById('home-best');
     if (!box) return;
-    const data = await loadProductsData();
-    const best = data.filter(p => p.active !== false).slice(0, 4).map(p => p.name).join(' · ');
-    box.textContent = best || 'Em breve novidades';
+    try {
+        let names = [];
+        if (typeof DB !== 'undefined' && DB.getBestSellers) {
+            const items = await DB.getBestSellers(4);
+            names = items.map(p => p.name).filter(Boolean);
+        }
+        box.textContent = names.length ? names.join(' · ') : 'Em breve novidades';
+    } catch (e) {
+        console.warn('Erro ao carregar mais vendidos', e);
+        box.textContent = 'Em breve novidades';
+    }
     refreshIcons();
 }
 

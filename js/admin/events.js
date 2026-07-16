@@ -102,27 +102,45 @@ function formatEventDate(value) {
   return d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+function getDefaultEventTab() {
+  if (typeof AdminPermissions !== 'undefined') {
+    return AdminPermissions.defaultEventTab();
+  }
+  return 'lotes';
+}
+
+function resolveAllowedEventTab(tab) {
+  const fallback = getDefaultEventTab();
+  if (!EVENT_TABS.includes(tab)) return fallback;
+  if (typeof AdminPermissions !== 'undefined' && !AdminPermissions.canAccessEventTab(tab)) {
+    return fallback;
+  }
+  return tab;
+}
+
 function parseEventsHash() {
   if (typeof AdminRouter !== 'undefined' && typeof AdminRouter.parseHash === 'function') {
     const parsed = AdminRouter.parseHash();
     if (parsed.module === 'eventos') {
+      const rawTab = EVENT_TABS.includes(parsed.eventTab) ? parsed.eventTab : getDefaultEventTab();
       return {
         eventId: parsed.eventId || null,
-        tab: EVENT_TABS.includes(parsed.eventTab) ? parsed.eventTab : 'lotes'
+        tab: resolveAllowedEventTab(rawTab)
       };
     }
   }
   const hash = window.location.hash || '#/eventos';
   const match = hash.match(/^#\/eventos(?:\/(\d+)(?:\/(lotes|validar|ingressos))?)?\/?$/);
-  if (!match) return { eventId: null, tab: 'lotes' };
+  if (!match) return { eventId: null, tab: getDefaultEventTab() };
+  const rawTab = EVENT_TABS.includes(match[2]) ? match[2] : getDefaultEventTab();
   return {
     eventId: match[1] ? Number(match[1]) : null,
-    tab: EVENT_TABS.includes(match[2]) ? match[2] : 'lotes'
+    tab: resolveAllowedEventTab(rawTab)
   };
 }
 
 function buildEventDetailHash(id, tab = 'lotes') {
-  const safeTab = EVENT_TABS.includes(tab) ? tab : 'lotes';
+  const safeTab = resolveAllowedEventTab(tab);
   if (safeTab === 'lotes') return `#/eventos/${id}`;
   return `#/eventos/${id}/${safeTab}`;
 }
@@ -135,11 +153,12 @@ function stopEventsQrCamera() {
 function showEventsListView() {
   stopEventsQrCamera();
   selectedEventId = null;
-  currentEventTab = 'lotes';
+  currentEventTab = getDefaultEventTab();
   document.getElementById('events-list-panel')?.classList.remove('hidden');
   document.getElementById('event-detail-panel')?.classList.add('hidden');
   const resultEl = document.getElementById('ticket-validate-result');
   if (resultEl) resultEl.textContent = '';
+  if (typeof AdminPermissions !== 'undefined') AdminPermissions.applyUi();
 }
 
 function backToEventsList() {
@@ -152,18 +171,23 @@ function backToEventsList() {
   }
 }
 
-function openEventDetail(id, tab = 'lotes') {
-  const nextHash = buildEventDetailHash(id, tab);
+function openEventDetail(id, tab = null) {
+  const safeTab = resolveAllowedEventTab(tab || getDefaultEventTab());
+  const nextHash = buildEventDetailHash(id, safeTab);
   if (window.location.hash !== nextHash) {
     window.location.hash = nextHash;
   } else {
-    loadEventDetail(id, tab);
+    loadEventDetail(id, safeTab);
   }
 }
 
 function setEventTab(tab) {
   if (!selectedEventId) return;
-  const safeTab = EVENT_TABS.includes(tab) ? tab : 'lotes';
+  const safeTab = resolveAllowedEventTab(tab);
+  if (typeof AdminPermissions !== 'undefined' && !AdminPermissions.canAccessEventTab(safeTab)) {
+    showToast('Sem permissão para esta aba', 'error');
+    return;
+  }
   const nextHash = buildEventDetailHash(selectedEventId, safeTab);
   if (window.location.hash !== nextHash) {
     window.location.hash = nextHash;
@@ -173,13 +197,15 @@ function setEventTab(tab) {
 }
 
 function applyEventTab(tab) {
-  const safeTab = EVENT_TABS.includes(tab) ? tab : 'lotes';
+  const safeTab = resolveAllowedEventTab(tab);
   const previousTab = currentEventTab;
   currentEventTab = safeTab;
 
   if (previousTab === 'validar' && safeTab !== 'validar') {
     stopEventsQrCamera();
   }
+
+  if (typeof AdminPermissions !== 'undefined') AdminPermissions.applyUi();
 
   document.querySelectorAll('[data-event-tab]').forEach((btn) => {
     btn.classList.toggle('is-active', btn.dataset.eventTab === safeTab);
@@ -235,15 +261,22 @@ async function loadEvents() {
   }
 }
 
+function canManageLotsUi() {
+  return typeof AdminPermissions === 'undefined' || AdminPermissions.canManageEventLots();
+}
+
 function renderEventsList() {
   const container = document.getElementById('events-list');
   if (!container) return;
 
   if (!eventsCache.length) {
-    container.innerHTML = '<p class="text-black/60">Nenhum evento. Clique em "Novo evento".</p>';
+    container.innerHTML = canManageLotsUi()
+      ? '<p class="text-black/60">Nenhum evento. Clique em "Novo evento".</p>'
+      : '<p class="text-black/60">Nenhum evento disponível.</p>';
     return;
   }
 
+  const canEdit = canManageLotsUi();
   container.innerHTML = eventsCache.map((ev) => `
     <div class="card">
       <div class="flex flex-col gap-3">
@@ -253,6 +286,7 @@ function renderEventsList() {
             <p class="text-xs text-black/50 mt-1">${formatEventDate(ev.starts_at)}${ev.venue ? ' · ' + escapeHtml(ev.venue) : ''}</p>
             <p class="text-xs mt-1 ${ev.active === false ? 'text-red-600' : 'text-fp-green'}">${ev.active === false ? 'Inativo' : 'Ativo'}</p>
           </div>
+          ${canEdit ? `
           <div class="flex gap-2 shrink-0">
             <button type="button" onclick="editEvent(${ev.id})" class="btn btn-outline btn-sm btn-icon" title="Editar">
               <i data-lucide="edit"></i>
@@ -260,7 +294,7 @@ function renderEventsList() {
             <button type="button" onclick="deleteEvent(${ev.id})" class="btn btn-danger btn-sm btn-icon" title="Excluir">
               <i data-lucide="trash"></i>
             </button>
-          </div>
+          </div>` : ''}
         </div>
         <button type="button" onclick="openEventDetail(${ev.id})" class="btn btn-primary btn-sm w-full sm:w-auto">
           <i data-lucide="settings-2"></i> Gerenciar
@@ -268,9 +302,12 @@ function renderEventsList() {
       </div>
     </div>
   `).join('');
+  if (typeof AdminPermissions !== 'undefined') AdminPermissions.applyUi();
 }
 
-async function loadEventDetail(id, tab = 'lotes') {
+async function loadEventDetail(id, tab = null) {
+  tab = resolveAllowedEventTab(tab || getDefaultEventTab());
+  if (typeof AdminPermissions !== 'undefined') AdminPermissions.applyUi();
   const listPanel = document.getElementById('events-list-panel');
   const panel = document.getElementById('event-detail-panel');
   const titleEl = document.getElementById('event-detail-title');
@@ -296,8 +333,11 @@ async function loadEventDetail(id, tab = 'lotes') {
   try {
     const lots = await DB.getEventLots(id);
     if (!lots.length) {
-      lotsEl.innerHTML = '<p class="text-black/60 text-sm">Nenhum lote. Crie o primeiro lote de ingressos.</p>';
+      lotsEl.innerHTML = canManageLotsUi()
+        ? '<p class="text-black/60 text-sm">Nenhum lote. Crie o primeiro lote de ingressos.</p>'
+        : '<p class="text-black/60 text-sm">Nenhum lote cadastrado.</p>';
     } else {
+      const canEdit = canManageLotsUi();
       lotsEl.innerHTML = lots.map((lot) => `
         <div class="card flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
@@ -309,6 +349,7 @@ async function loadEventDetail(id, tab = 'lotes') {
             </p>
             ${lotHasPromo(lot) ? `<p class="text-xs text-fp-green font-semibold mt-1">Promo: ${lot.promo_qty} por ${formatBRL(lot.promo_price)} (${LOT_PROMO_MODE_LABELS[lot.promo_mode] || lot.promo_mode})</p>` : ''}
           </div>
+          ${canEdit ? `
           <div class="flex gap-2 shrink-0">
             <button type="button" onclick="editLot(${lot.id})" class="btn btn-outline btn-sm btn-icon" title="Editar lote">
               <i data-lucide="edit"></i>
@@ -316,7 +357,7 @@ async function loadEventDetail(id, tab = 'lotes') {
             <button type="button" onclick="deleteLot(${lot.id})" class="btn btn-danger btn-sm btn-icon" title="Excluir lote">
               <i data-lucide="trash"></i>
             </button>
-          </div>
+          </div>` : ''}
         </div>
       `).join('');
     }
@@ -481,6 +522,10 @@ async function collectEventSponsorsWithUploads() {
 }
 
 function openEventModal(eventId = null) {
+  if (!canManageLotsUi()) {
+    showToast('Sem permissão para gerenciar eventos', 'error');
+    return;
+  }
   editingEventId = eventId;
   const modal = document.getElementById('event-modal');
   const title = document.getElementById('event-modal-title');
@@ -621,6 +666,10 @@ function wireEventImagePreviews() {
 }
 
 async function deleteEvent(id) {
+  if (!canManageLotsUi()) {
+    showToast('Sem permissão para gerenciar eventos', 'error');
+    return;
+  }
   if (!confirm('Excluir este evento? Lotes sem vendas também serão removidos.')) return;
   try {
     await DB.deleteEvent(id);
@@ -637,6 +686,10 @@ async function deleteEvent(id) {
 }
 
 function openLotModal(lotId = null) {
+  if (!canManageLotsUi()) {
+    showToast('Sem permissão para gerenciar lotes', 'error');
+    return;
+  }
   if (!selectedEventId) {
     showToast('Abra um evento para gerenciar lotes', 'error');
     return;
@@ -749,6 +802,21 @@ async function deleteLot(id) {
   }
 }
 
+function ticketStatusInfo(status) {
+  if (status === 'used') return { label: 'Usado', cls: 'tickets-admin-status--used' };
+  if (status === 'cancelled') return { label: 'Cancelado', cls: 'tickets-admin-status--cancelled' };
+  return { label: 'Válido', cls: 'tickets-admin-status--valid' };
+}
+
+function renderTicketStatusBadge(status) {
+  const { label, cls } = ticketStatusInfo(status);
+  return `<span class="tickets-admin-status ${cls}">${label}</span>`;
+}
+
+function renderTicketStatusText(status) {
+  return ticketStatusInfo(status).label;
+}
+
 async function loadTicketsAdmin() {
   const container = document.getElementById('tickets-admin-list');
   const statusFilter = document.getElementById('tickets-status-filter');
@@ -769,8 +837,25 @@ async function loadTicketsAdmin() {
       return;
     }
     container.innerHTML = `
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+      <div class="tickets-admin-mobile">
+        ${items
+          .map(
+            (t) => `
+          <article class="tickets-admin-card">
+            <div class="tickets-admin-card-head">
+              <span class="tickets-admin-card-code" title="${escapeHtml(t.code)}">${escapeHtml(t.code)}</span>
+              ${renderTicketStatusBadge(t.status)}
+            </div>
+            <p class="tickets-admin-card-buyer" title="${escapeHtml(t.buyer_name)}">${escapeHtml(t.buyer_name)}</p>
+            <p class="tickets-admin-card-meta" title="${escapeHtml(t.buyer_email)} · ${escapeHtml(t.lot_name)}">
+              ${escapeHtml(t.buyer_email)} · ${escapeHtml(t.lot_name)}
+            </p>
+          </article>`
+          )
+          .join('')}
+      </div>
+      <div class="tickets-admin-table-wrap overflow-x-auto">
+        <table class="tickets-admin-table w-full text-sm">
           <thead>
             <tr class="text-left text-black/50 border-b border-black/10">
               <th class="py-2 pr-3">Código</th>
@@ -787,14 +872,14 @@ async function loadTicketsAdmin() {
                 <td class="py-2 pr-3 font-mono text-xs">${escapeHtml(t.code)}</td>
                 <td class="py-2 pr-3">${escapeHtml(t.buyer_name)}<br><span class="text-xs text-black/50">${escapeHtml(t.buyer_email)}</span></td>
                 <td class="py-2 pr-3">${escapeHtml(t.lot_name)}</td>
-                <td class="py-2">${t.status === 'used' ? 'Usado' : t.status === 'cancelled' ? 'Cancelado' : 'Válido'}</td>
+                <td class="py-2">${renderTicketStatusText(t.status)}</td>
               </tr>`
               )
               .join('')}
           </tbody>
         </table>
       </div>
-      <p class="text-xs text-black/50 mt-2">${data.total} ingresso(s)</p>
+      <p class="tickets-admin-total">${data.total} ingresso(s)</p>
     `;
   } catch (error) {
     if (handleAuthError(error)) return;

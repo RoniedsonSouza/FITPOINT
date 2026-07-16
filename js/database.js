@@ -381,6 +381,14 @@ const DB = {
 
   // === VENDAS DO DIA ===
 
+  async getBestSellers(limit = 4) {
+    const qs = limit ? `?limit=${encodeURIComponent(limit)}` : '';
+    const response = await fetch(`${getApiBaseUrl()}/daily-sales/bestsellers${qs}`);
+    if (!response.ok) throw new Error('Erro ao buscar mais vendidos');
+    const data = await response.json();
+    return data.items || [];
+  },
+
   async getDailySales(date) {
     const qs = date ? `?date=${encodeURIComponent(date)}` : '';
     const response = await fetch(`${getApiBaseUrl()}/daily-sales${qs}`, {
@@ -460,6 +468,90 @@ const DB = {
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       const errorMsg = error.error || 'Erro ao excluir venda';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  // === DISTRIBUIDORES ===
+
+  async getDistributorLevels() {
+    const response = await fetch(`${getApiBaseUrl()}/distributors/levels`);
+    if (!response.ok) throw new Error('Erro ao buscar níveis Herbalife');
+    return response.json();
+  },
+
+  async getDistributors(params = {}) {
+    const qs = new URLSearchParams();
+    if (params.all) qs.set('all', '1');
+    const query = qs.toString();
+    const response = await fetch(`${getApiBaseUrl()}/distributors${query ? `?${query}` : ''}`, {
+      headers: params.all ? getAuthHeaders() : undefined
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao buscar distribuidores';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async addDistributor(payload) {
+    const response = await fetch(`${getApiBaseUrl()}/distributors`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao criar distribuidor';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async updateDistributor(id, updates) {
+    const response = await fetch(`${getApiBaseUrl()}/distributors/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(updates)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao atualizar distribuidor';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async deleteDistributor(id) {
+    const response = await fetch(`${getApiBaseUrl()}/distributors/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao excluir distribuidor';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+  },
+
+  async uploadDistributorPhoto(file) {
+    const formData = new FormData();
+    formData.append('image', file);
+    const response = await fetch(`${getApiBaseUrl()}/distributors/upload-photo`, {
+      method: 'POST',
+      headers: getAuthHeadersMultipart(),
+      body: formData
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      const errorMsg = err.error || 'Erro ao enviar foto';
       if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
       throw new Error(errorMsg);
     }
@@ -670,5 +762,77 @@ const DB = {
       console.error('Erro ao deletar produto:', error);
       throw error;
     }
+  },
+
+  // === USUÁRIOS ADMIN ===
+
+  _throwHttpError(response, error, fallback) {
+    const msg = error.error || fallback;
+    if (response.status === 401 || response.status === 403) {
+      throw new Error(`${response.status}: ${msg}`);
+    }
+    throw new Error(msg);
+  },
+
+  async getAdminUsers() {
+    const response = await fetch(`${getApiBaseUrl()}/auth/users`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      this._throwHttpError(response, error, 'Erro ao listar usuários');
+    }
+    return response.json();
+  },
+
+  async createAdminUser(payload) {
+    const response = await fetch(`${getApiBaseUrl()}/auth/users`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      this._throwHttpError(response, error, 'Erro ao criar usuário');
+    }
+    return response.json();
+  },
+
+  async updateAdminUser(id, payload) {
+    const response = await fetch(`${getApiBaseUrl()}/auth/users/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      this._throwHttpError(response, error, 'Erro ao atualizar usuário');
+    }
+    return response.json();
+  },
+
+  async deleteAdminUser(id) {
+    const response = await fetch(`${getApiBaseUrl()}/auth/users/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      this._throwHttpError(response, error, 'Erro ao desativar usuário');
+    }
+    return response.json();
+  },
+
+  async changeAdminPassword(payload) {
+    const response = await fetch(`${getApiBaseUrl()}/auth/change-password`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      this._throwHttpError(response, error, 'Erro ao alterar senha');
+    }
+    return response.json();
   }
 };

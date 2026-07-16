@@ -111,8 +111,43 @@ async function migrate() {
         id SERIAL PRIMARY KEY,
         username VARCHAR(100) UNIQUE NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
+        email VARCHAR(255),
+        is_super_admin BOOLEAN NOT NULL DEFAULT false,
+        must_change_password BOOLEAN NOT NULL DEFAULT false,
+        active BOOLEAN NOT NULL DEFAULT true,
+        permissions JSONB NOT NULL DEFAULT '{}'::jsonb,
         created_at TIMESTAMP DEFAULT NOW()
       )
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.admin_users
+      ADD COLUMN IF NOT EXISTS email VARCHAR(255)
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.admin_users
+      ADD COLUMN IF NOT EXISTS is_super_admin BOOLEAN NOT NULL DEFAULT false
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.admin_users
+      ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT false
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.admin_users
+      ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.admin_users
+      ADD COLUMN IF NOT EXISTS permissions JSONB NOT NULL DEFAULT '{}'::jsonb
+    `);
+    await client.query(`
+      UPDATE ${SCHEMA}.admin_users
+      SET email = username
+      WHERE email IS NULL OR email = ''
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_users_email
+      ON ${SCHEMA}.admin_users (LOWER(email))
+      WHERE email IS NOT NULL AND email <> ''
     `);
 
     await client.query(`
@@ -335,6 +370,31 @@ async function migrate() {
       CREATE INDEX IF NOT EXISTS idx_tickets_event ON ${SCHEMA}.tickets(event_id)
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA}.distributors (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(120) NOT NULL,
+        photo_url TEXT,
+        herbalife_level VARCHAR(80) NOT NULL,
+        region_label VARCHAR(200) NOT NULL,
+        lat DOUBLE PRECISION NOT NULL,
+        lng DOUBLE PRECISION NOT NULL,
+        whatsapp VARCHAR(30),
+        phone VARCHAR(30),
+        instagram VARCHAR(120),
+        description TEXT,
+        active BOOLEAN DEFAULT true,
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_distributors_active_sort
+      ON ${SCHEMA}.distributors (active, sort_order, name)
+    `);
+
     console.log('✅ Tabelas criadas no schema\n');
 
     // Criar usuário admin padrão
@@ -348,13 +408,25 @@ async function migrate() {
 
     if (existingAdmin.rows.length === 0) {
       const passwordHash = await bcrypt.hash(adminPassword, 10);
+      const adminEmail = adminUsername.includes('@') ? adminUsername : `${adminUsername}@fitpoint.local`;
       await client.query(
-        `INSERT INTO ${SCHEMA}.admin_users (username, password_hash) VALUES ($1, $2)`,
-        [adminUsername, passwordHash]
+        `INSERT INTO ${SCHEMA}.admin_users
+          (username, email, password_hash, is_super_admin, must_change_password, active, permissions)
+         VALUES ($1, $2, $3, true, false, true, '{}'::jsonb)`,
+        [adminUsername, adminEmail, passwordHash]
       );
-      console.log(`👤 Usuário admin criado: ${adminUsername} / ${adminPassword}`);
+      console.log(`👤 Usuário admin criado: ${adminEmail} / ${adminPassword}`);
       console.log('⚠️  ALTERE A SENHA PADRÃO EM PRODUÇÃO!\n');
     } else {
+      await client.query(`
+        UPDATE ${SCHEMA}.admin_users
+        SET is_super_admin = true,
+            email = COALESCE(NULLIF(email, ''), username)
+        WHERE id = (SELECT MIN(id) FROM ${SCHEMA}.admin_users)
+          AND NOT EXISTS (
+            SELECT 1 FROM ${SCHEMA}.admin_users WHERE is_super_admin = true
+          )
+      `);
       console.log(`👤 Usuário admin já existe: ${adminUsername}\n`);
     }
 

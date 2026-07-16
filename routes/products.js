@@ -4,7 +4,7 @@ const fs = require('fs');
 const multer = require('multer');
 const router = express.Router();
 const { query, table } = require('../config/database');
-const { authenticateToken } = require('../config/auth');
+const { authenticateToken, requirePermission } = require('../config/auth');
 const {
   normalizeNutrition,
   normalizeOptions,
@@ -54,7 +54,7 @@ async function validateCategoryName(category) {
 }
 
 // POST /api/products/upload-image — enviar imagem (autenticado)
-router.post('/upload-image', authenticateToken, uploadProductImageMiddleware, (req, res) => {
+router.post('/upload-image', authenticateToken, requirePermission('produtos'), uploadProductImageMiddleware, (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -95,7 +95,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/products - Criar novo produto (requer autenticação)
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, requirePermission('produtos'), async (req, res) => {
   try {
     const {
       id,
@@ -182,7 +182,7 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // PUT /api/products/:id - Atualizar produto (requer autenticação)
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', authenticateToken, requirePermission('produtos'), async (req, res) => {
   try {
     const {
       name,
@@ -310,7 +310,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 // DELETE /api/products/:id - Deletar produto (requer autenticação)
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, requirePermission('produtos'), async (req, res) => {
   try {
     const result = await query(
       `DELETE FROM ${table('products')} WHERE id = $1`,

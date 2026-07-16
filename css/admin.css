@@ -800,6 +800,133 @@ body.ticket-qr-open {
   color: #ff9b9b;
 }
 
+/* Lista de ingressos vendidos — mobile compacto */
+.tickets-admin-mobile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.tickets-admin-table-wrap {
+  display: none;
+}
+
+.tickets-admin-card {
+  padding: 0.5625rem 0.6875rem;
+  border: 1px solid rgba(14, 31, 22, 0.08);
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.tickets-admin-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.1875rem;
+}
+
+.tickets-admin-card-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(14, 31, 22, 0.88);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.tickets-admin-status {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.4375rem;
+  border-radius: 999px;
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+}
+
+.tickets-admin-status--valid {
+  background: rgba(29, 107, 58, 0.12);
+  color: var(--fp-green);
+}
+
+.tickets-admin-status--used {
+  background: rgba(14, 31, 22, 0.08);
+  color: rgba(14, 31, 22, 0.58);
+}
+
+.tickets-admin-status--cancelled {
+  background: rgba(220, 38, 38, 0.1);
+  color: #b91c1c;
+}
+
+.tickets-admin-card-buyer {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: rgba(14, 31, 22, 0.92);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tickets-admin-card-meta {
+  margin: 0.125rem 0 0;
+  font-size: 0.6875rem;
+  line-height: 1.35;
+  color: rgba(14, 31, 22, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tickets-admin-total {
+  margin: 0.375rem 0 0;
+  font-size: 0.6875rem;
+  color: rgba(14, 31, 22, 0.45);
+  text-align: center;
+}
+
+@media (min-width: 640px) {
+  .tickets-admin-mobile {
+    display: none;
+  }
+
+  .tickets-admin-table-wrap {
+    display: block;
+  }
+
+  .tickets-admin-total {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    text-align: left;
+  }
+}
+
+@media (max-width: 639px) {
+  .events-filters--detail {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    gap: 0.625rem;
+    margin-bottom: 0.875rem;
+  }
+
+  .events-filters--detail .btn {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-content: center;
+  }
+
+  #event-tab-ingressos .card > h2 {
+    margin-bottom: 0.625rem;
+  }
+}
+
 .event-sponsors-list .event-sponsor-row {
   display: flex;
   flex-direction: row;

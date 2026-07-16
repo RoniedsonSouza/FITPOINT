@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { query, getClient, table } = require('../config/database');
-const { authenticateToken } = require('../config/auth');
+const { authenticateToken, requirePermission } = require('../config/auth');
 const { applyVisitDelta, insertVisitEvents, computeLoyaltyVisitsFromAmount, DEFAULT_ACCESS_VALUE, DEFAULT_VISITS_PER_REWARD } = require('./loyaltyHelpers');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -75,6 +75,28 @@ async function fetchDaySummary(saleDate) {
     total_revenue: Number(row.total_revenue) || 0,
     top_product: topResult.rows[0]?.name || null
   };
+}
+
+async function fetchBestSellers(limit = 4) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 4, 1), 4);
+  const result = await query(
+    `SELECT
+       p.id,
+       p.name,
+       SUM(ds.quantity)::int AS total_qty
+     FROM ${table('daily_sales')} ds
+     JOIN ${table('products')} p ON p.id = ds.product_id
+     WHERE p.active IS DISTINCT FROM false
+     GROUP BY p.id, p.name
+     ORDER BY total_qty DESC, p.name ASC
+     LIMIT $1`,
+    [safeLimit]
+  );
+  return result.rows.map(row => ({
+    id: row.id,
+    name: row.name,
+    total_qty: Number(row.total_qty) || 0
+  }));
 }
 
 async function fetchDayItems(saleDate) {
@@ -170,8 +192,20 @@ async function applyLoyaltyForSale(client, customerId, validatedItems) {
   };
 }
 
+// GET /api/daily-sales/bestsellers?limit= — público (home)
+router.get('/bestsellers', async (req, res) => {
+  try {
+    const limit = req.query.limit;
+    const items = await fetchBestSellers(limit);
+    res.json({ items });
+  } catch (error) {
+    console.error('Erro ao buscar mais vendidos:', error);
+    res.status(500).json({ error: 'Erro ao buscar mais vendidos' });
+  }
+});
+
 // GET /api/daily-sales/summary/today — admin
-router.get('/summary/today', authenticateToken, async (req, res) => {
+router.get('/summary/today', authenticateToken, requirePermission('vendas'), async (req, res) => {
   try {
     const parsed = parseSaleDate();
     const summary = await fetchDaySummary(parsed.value);
@@ -183,7 +217,7 @@ router.get('/summary/today', authenticateToken, async (req, res) => {
 });
 
 // GET /api/daily-sales/summary?date= — admin
-router.get('/summary', authenticateToken, async (req, res) => {
+router.get('/summary', authenticateToken, requirePermission('vendas'), async (req, res) => {
   try {
     const parsed = parseSaleDate(req.query.date);
     if (parsed.error) return res.status(400).json({ error: parsed.error });
@@ -196,7 +230,7 @@ router.get('/summary', authenticateToken, async (req, res) => {
 });
 
 // GET /api/daily-sales?date= — admin
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, requirePermission('vendas'), async (req, res) => {
   try {
     const parsed = parseSaleDate(req.query.date);
     if (parsed.error) return res.status(400).json({ error: parsed.error });
@@ -214,7 +248,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // POST /api/daily-sales/batch — admin (vários itens, fidelidade proporcional ao total)
-router.post('/batch', authenticateToken, async (req, res) => {
+router.post('/batch', authenticateToken, requirePermission('vendas'), async (req, res) => {
   const client = await getClient();
   try {
     const { loyalty_customer_id, sale_date, items } = req.body || {};
@@ -331,7 +365,7 @@ router.post('/batch', authenticateToken, async (req, res) => {
 });
 
 // POST /api/daily-sales — admin
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, requirePermission('vendas'), async (req, res) => {
   const client = await getClient();
   try {
     const { product_id, loyalty_customer_id, quantity, sale_date } = req.body || {};
@@ -429,7 +463,7 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // DELETE /api/daily-sales/:id — admin
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, requirePermission('vendas'), async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
     if (!Number.isInteger(id) || id < 1) {

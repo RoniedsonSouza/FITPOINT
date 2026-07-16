@@ -64,8 +64,8 @@
       <p class="text-black/70 mb-6">Faça login para acessar</p>
       <form id="login-form" onsubmit="handleLogin(event)">
         <div class="form-group text-left">
-          <label>Usuário</label>
-          <input type="text" id="login-username" required autocomplete="username">
+          <label>E-mail</label>
+          <input type="text" id="login-username" required autocomplete="username" placeholder="seu@email.com" inputmode="email">
         </div>
         <div class="form-group text-left">
           <label>Senha</label>
@@ -74,6 +74,26 @@
         <div id="login-error" class="text-red-600 text-sm mb-4" style="display: none;"></div>
         <div id="login-checking" class="text-black/60 text-sm mb-4" style="display: none;">Verificando sessão…</div>
         <button type="submit" id="login-submit-btn" class="btn btn-primary btn-lg w-full">Entrar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Troca obrigatória de senha (primeiro acesso) -->
+  <div id="change-password-screen" class="login-screen" style="display: none;">
+    <div class="login-card card">
+      <h1 class="font-display text-2xl font-bold mb-2">Definir nova senha</h1>
+      <p class="text-black/70 mb-6">No primeiro acesso, é necessário criar sua própria senha.</p>
+      <form id="change-password-form" onsubmit="handleChangePassword(event)">
+        <div class="form-group text-left">
+          <label>Nova senha</label>
+          <input type="password" id="change-password-new" required minlength="6" autocomplete="new-password">
+        </div>
+        <div class="form-group text-left">
+          <label>Confirmar senha</label>
+          <input type="password" id="change-password-confirm" required minlength="6" autocomplete="new-password">
+        </div>
+        <div id="change-password-error" class="text-red-600 text-sm mb-4" style="display: none;"></div>
+        <button type="submit" id="change-password-submit-btn" class="btn btn-primary btn-lg w-full">Salvar e continuar</button>
       </form>
     </div>
   </div>
@@ -101,6 +121,12 @@
       </button>
       <button type="button" class="admin-nav-item" data-admin-nav="eventos">
         <i data-lucide="ticket"></i> Eventos
+      </button>
+      <button type="button" class="admin-nav-item" data-admin-nav="distribuidores">
+        <i data-lucide="map-pin"></i> Distribuidores
+      </button>
+      <button type="button" class="admin-nav-item" data-admin-nav="usuarios" style="display: none;">
+        <i data-lucide="users"></i> Usuários
       </button>
 
       <div class="admin-sidebar-footer">
@@ -147,6 +173,12 @@
             <h2>Eventos</h2>
             <p>Ingressos, lotes, validação e vendas online.</p>
             <span class="module-card-stat" id="stat-events">—</span>
+          </button>
+          <button type="button" class="module-card" data-module-card="distribuidores">
+            <span class="module-card-icon"><i data-lucide="map-pin"></i></span>
+            <h2>Distribuidores</h2>
+            <p>Cadastre pontos de venda e contatos no mapa.</p>
+            <span class="module-card-stat" id="stat-distributors">—</span>
           </button>
         </div>
         <div id="dashboard-daily-summary" class="card mt-4 hidden">
@@ -367,7 +399,7 @@
               <i data-lucide="external-link"></i> Página pública
             </a>
             <div class="module-toolbar-actions">
-              <button type="button" onclick="openEventModal()" class="btn btn-primary btn-md">
+              <button type="button" onclick="openEventModal()" class="btn btn-primary btn-md" data-requires-event-lotes>
                 <i data-lucide="plus"></i> Novo evento
               </button>
             </div>
@@ -388,7 +420,7 @@
                 <h1 id="event-detail-title">Evento</h1>
                 <p id="event-detail-meta" class="mt-1"></p>
               </div>
-              <button type="button" id="event-detail-edit-btn" onclick="editSelectedEvent()" class="btn btn-outline btn-md">
+              <button type="button" id="event-detail-edit-btn" onclick="editSelectedEvent()" class="btn btn-outline btn-md" data-requires-event-lotes>
                 <i data-lucide="edit"></i> Editar evento
               </button>
             </div>
@@ -409,7 +441,7 @@
           <div id="event-tab-lotes" class="event-detail-tab-panel" data-event-tab-panel="lotes">
             <div class="flex items-center justify-between gap-2 mb-3">
               <h2 class="font-semibold text-sm">Lotes de ingressos</h2>
-              <button type="button" onclick="openLotModal()" class="btn btn-outline btn-sm">
+              <button type="button" onclick="openLotModal()" class="btn btn-outline btn-sm" data-requires-event-lotes>
                 <i data-lucide="plus"></i> Novo lote
               </button>
             </div>
@@ -461,6 +493,44 @@
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- Distribuidores -->
+      <section id="view-distributors" class="admin-view">
+        <div class="admin-view-header">
+          <h1>Distribuidores</h1>
+          <p>Cadastre contatos e localização aproximada para exibir no mapa do site.</p>
+        </div>
+        <div class="module-toolbar">
+          <span></span>
+          <div class="module-toolbar-actions">
+            <button type="button" onclick="openDistributorModal()" class="btn btn-primary btn-md">
+              <i data-lucide="plus"></i> Novo distribuidor
+            </button>
+          </div>
+        </div>
+        <div id="distributors-list" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <p class="text-black/60">Selecione este módulo para carregar.</p>
+        </div>
+      </section>
+
+      <!-- Usuários (super-admin) -->
+      <section id="view-users" class="admin-view">
+        <div class="admin-view-header">
+          <h1>Usuários</h1>
+          <p>Crie acessos por e-mail e escolha manualmente quais módulos cada pessoa pode ver.</p>
+        </div>
+        <div class="module-toolbar">
+          <span></span>
+          <div class="module-toolbar-actions">
+            <button type="button" onclick="openUserModal()" class="btn btn-primary btn-md">
+              <i data-lucide="user-plus"></i> Novo usuário
+            </button>
+          </div>
+        </div>
+        <div id="users-list" class="grid gap-3">
+          <p class="text-black/60">Selecione este módulo para carregar.</p>
         </div>
       </section>
     </main>
@@ -594,6 +664,86 @@
         </div>
         <div class="modal-footer">
           <button type="button" onclick="closeCategoryModal()" class="btn btn-secondary btn-md">Cancelar</button>
+          <button type="submit" class="btn btn-primary btn-lg">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Distribuidor -->
+  <div id="distributor-modal" class="modal">
+    <div class="modal-content">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-display text-xl font-bold" id="distributor-modal-title">Novo distribuidor</h3>
+        <button type="button" onclick="closeDistributorModal()" class="modal-close" aria-label="Fechar">&times;</button>
+      </div>
+      <form id="distributor-form" onsubmit="saveDistributor(event)">
+        <input type="hidden" id="distributor-id-input">
+        <div class="form-group">
+          <label for="distributor-name">Nome</label>
+          <input type="text" id="distributor-name" required placeholder="Ex.: Duda" maxlength="120">
+        </div>
+        <div class="form-group">
+          <label for="distributor-level">Nível Herbalife</label>
+          <select id="distributor-level" required>
+            <option value="">Selecione…</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="distributor-region">Região / área de atuação</label>
+          <input type="text" id="distributor-region" required placeholder="Ex.: Itacibá — Cariacica/ES" maxlength="200">
+        </div>
+        <div class="form-group field-row">
+          <div class="field">
+            <label for="distributor-lat">Latitude</label>
+            <input type="number" id="distributor-lat" step="any" required placeholder="-20.32">
+          </div>
+          <div class="field">
+            <label for="distributor-lng">Longitude</label>
+            <input type="number" id="distributor-lng" step="any" required placeholder="-40.38">
+          </div>
+        </div>
+        <p class="text-xs text-black/50 -mt-2 mb-3">Use localização aproximada da área de atendimento (não precisa ser endereço residencial).</p>
+        <div class="form-group">
+          <label>Foto do contato</label>
+          <input type="file" id="distributor-photo-file" accept="image/jpeg,image/png,image/webp,image/gif">
+          <p class="text-xs text-black/50 mt-1">JPG, PNG, WebP ou GIF · máx. 5 MB</p>
+          <div class="mt-3 flex items-center gap-3">
+            <img id="distributor-photo-preview" alt="Pré-visualização" class="hidden h-16 w-16 rounded-full object-cover border border-black/10 bg-black/5">
+            <input type="hidden" id="distributor-photo">
+          </div>
+        </div>
+        <div class="form-group field-row">
+          <div class="field">
+            <label for="distributor-whatsapp">WhatsApp</label>
+            <input type="text" id="distributor-whatsapp" placeholder="27999999999" maxlength="30">
+          </div>
+          <div class="field">
+            <label for="distributor-phone">Telefone (opcional)</label>
+            <input type="text" id="distributor-phone" placeholder="2733333333" maxlength="30">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="distributor-instagram">Instagram</label>
+          <input type="text" id="distributor-instagram" placeholder="@usuario ou URL" maxlength="120">
+        </div>
+        <div class="form-group">
+          <label for="distributor-description">Observação (opcional)</label>
+          <textarea class="p-4" id="distributor-description" rows="2" placeholder="Horários, bairros atendidos…"></textarea>
+        </div>
+        <div class="form-group field-row">
+          <div class="field">
+            <label for="distributor-sort-order">Ordem de exibição</label>
+            <input type="number" id="distributor-sort-order" min="0" step="1" value="0">
+          </div>
+          <div class="field flex items-end pb-1">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="distributor-active" checked> Ativo (visível no site)
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" onclick="closeDistributorModal()" class="btn btn-secondary btn-md">Cancelar</button>
           <button type="submit" class="btn btn-primary btn-lg">Salvar</button>
         </div>
       </form>
@@ -791,6 +941,78 @@
   </div>
 
   <!-- Modal histórico de visitas -->
+  <!-- Modal Usuário -->
+  <div id="user-modal" class="modal">
+    <div class="modal-content modal-content--sm">
+      <div class="flex items-start justify-between gap-3 mb-4">
+        <h3 class="font-display text-xl font-bold" id="user-modal-title">Novo usuário</h3>
+        <button type="button" onclick="closeUserModal()" class="modal-close" aria-label="Fechar">&times;</button>
+      </div>
+      <form id="user-form" onsubmit="saveUser(event)">
+        <div class="form-group">
+          <label for="user-email">E-mail</label>
+          <input type="email" id="user-email" required autocomplete="email" placeholder="pessoa@empresa.com">
+        </div>
+
+        <div class="form-group">
+          <label class="block mb-2">Permissões de visualização</label>
+          <div class="grid gap-2 text-sm">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="user-perm-produtos"> Produtos
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="user-perm-vendas"> Vendas do dia
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="user-perm-fidelidade"> Fidelidade
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="user-perm-distribuidores"> Distribuidores
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="user-perm-eventos"> Eventos
+            </label>
+          </div>
+          <div id="user-eventos-subperms" class="mt-3 ml-4 pl-3 border-l-2 border-fp-green/30" style="display: none;">
+            <p class="text-xs text-black/50 mb-2">Com Eventos, a aba <strong>Ingressos</strong> é sempre incluída.</p>
+            <label class="flex items-center gap-2 cursor-pointer text-sm mb-1">
+              <input type="checkbox" id="user-perm-eventos-lotes"> Lotes (criar/editar eventos e lotes)
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer text-sm">
+              <input type="checkbox" id="user-perm-eventos-validar"> Validar (check-in de ingressos)
+            </label>
+          </div>
+        </div>
+
+        <div id="user-password-section">
+          <div class="form-group">
+            <label class="flex items-center gap-2 cursor-pointer text-sm">
+              <input type="checkbox" id="user-use-default-password" checked>
+              Usar senha padrão do sistema (fit@123)
+            </label>
+          </div>
+          <div class="form-group" id="user-custom-password-wrap" style="display: none;">
+            <label for="user-custom-password">Senha inicial personalizada</label>
+            <input type="password" id="user-custom-password" minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres">
+          </div>
+          <p class="text-xs text-black/50 mb-3">No primeiro login, a pessoa deverá definir uma nova senha.</p>
+        </div>
+
+        <div class="form-group">
+          <label class="flex items-center gap-2 cursor-pointer text-sm">
+            <input type="checkbox" id="user-active" checked> Usuário ativo
+          </label>
+        </div>
+
+        <div id="user-form-error" class="text-red-600 text-sm mb-3" style="display: none;"></div>
+        <div class="modal-footer">
+          <button type="button" onclick="closeUserModal()" class="btn btn-outline btn-md">Cancelar</button>
+          <button type="submit" id="user-save-btn" class="btn btn-primary btn-md">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div id="loyalty-history-modal" class="modal">
     <div class="modal-content modal-content--sm">
       <div class="flex justify-between items-center mb-4">
@@ -830,11 +1052,14 @@
   <script src="/js/database.js"></script>
   <script src="/js/admin/shared.js"></script>
   <script src="/js/admin/ui.js"></script>
+  <script src="/js/admin/permissions.js"></script>
   <script src="/js/admin/categories.js"></script>
   <script src="/js/admin/products.js"></script>
   <script src="/js/admin/loyalty.js"></script>
   <script src="/js/admin/daily-sales.js"></script>
   <script src="/js/admin/events.js"></script>
+  <script src="/js/admin/distributors.js"></script>
+  <script src="/js/admin/users.js"></script>
   <script src="/js/admin/router.js"></script>
   <script>
     window.addEventListener('DOMContentLoaded', () => {
@@ -871,12 +1096,21 @@
 
       document.addEventListener('visibilitychange', async () => {
         if (document.visibilityState !== 'visible') return;
-        if (!Auth.isAuthenticated() || !isAdminPanelVisible()) return;
+        if (!Auth.isAuthenticated()) return;
+        if (!isAdminPanelVisible() && document.getElementById('change-password-screen')?.style.display === 'none') return;
 
         const user = await Auth.validateSession();
         if (!user) {
           showToast('Sessão expirada. Faça login novamente.', 'error');
           logout();
+          return;
+        }
+        if (Auth.mustChangePassword()) {
+          showChangePasswordScreen();
+          return;
+        }
+        if (typeof AdminPermissions !== 'undefined') {
+          AdminPermissions.init(user);
         }
       });
     }
@@ -905,20 +1139,42 @@
       setLoginChecking(false);
 
       if (user) {
-        showAdminPanel();
-        initAdminAfterLogin();
+        enterAfterAuth();
       } else {
         showLoginScreen();
       }
     }
 
+    function enterAfterAuth() {
+      if (Auth.mustChangePassword()) {
+        showChangePasswordScreen();
+        return;
+      }
+      if (typeof AdminPermissions !== 'undefined') {
+        AdminPermissions.init(Auth.currentUser);
+      }
+      showAdminPanel();
+      initAdminAfterLogin();
+    }
+
     function showLoginScreen() {
       document.getElementById('login-screen').style.display = 'flex';
+      document.getElementById('change-password-screen').style.display = 'none';
       document.getElementById('admin-panel').style.display = 'none';
+    }
+
+    function showChangePasswordScreen() {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('change-password-screen').style.display = 'flex';
+      document.getElementById('admin-panel').style.display = 'none';
+      document.getElementById('change-password-form')?.reset();
+      const err = document.getElementById('change-password-error');
+      if (err) err.style.display = 'none';
     }
 
     function showAdminPanel() {
       document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('change-password-screen').style.display = 'none';
       document.getElementById('admin-panel').style.display = 'flex';
       refreshIcons();
     }
@@ -930,7 +1186,7 @@
         return;
       }
 
-      const username = document.getElementById('login-username').value;
+      const email = document.getElementById('login-username').value;
       const password = document.getElementById('login-password').value;
       const errorDiv = document.getElementById('login-error');
       const btn = document.getElementById('login-submit-btn');
@@ -939,9 +1195,8 @@
 
       await withButtonLoading(btn, async () => {
         try {
-          await Auth.login(username, password);
-          showAdminPanel();
-          initAdminAfterLogin();
+          await Auth.login(email, password);
+          enterAfterAuth();
         } catch (error) {
           errorDiv.textContent = error.message;
           errorDiv.style.display = 'block';
@@ -949,13 +1204,47 @@
       }, 'Entrando…');
     }
 
+    async function handleChangePassword(event) {
+      event.preventDefault();
+      const newPassword = document.getElementById('change-password-new').value;
+      const confirmPassword = document.getElementById('change-password-confirm').value;
+      const errorDiv = document.getElementById('change-password-error');
+      const btn = document.getElementById('change-password-submit-btn');
+
+      errorDiv.style.display = 'none';
+
+      if (newPassword.length < 6) {
+        errorDiv.textContent = 'A senha deve ter pelo menos 6 caracteres';
+        errorDiv.style.display = 'block';
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        errorDiv.textContent = 'As senhas não coincidem';
+        errorDiv.style.display = 'block';
+        return;
+      }
+
+      await withButtonLoading(btn, async () => {
+        try {
+          await Auth.changePassword(newPassword);
+          showToast('Senha definida com sucesso', 'success');
+          enterAfterAuth();
+        } catch (error) {
+          errorDiv.textContent = error.message;
+          errorDiv.style.display = 'block';
+        }
+      }, 'Salvando…');
+    }
+
     function logout() {
       if (typeof releaseTicketQrCameraSync === 'function') releaseTicketQrCameraSync();
       if (typeof stopTicketQrScanner === 'function') stopTicketQrScanner({ reason: 'logout' });
       Auth.logout();
+      if (typeof AdminPermissions !== 'undefined') AdminPermissions.clear();
       AdminRouter.reset();
       showLoginScreen();
       document.getElementById('login-form').reset();
+      document.getElementById('change-password-form')?.reset();
       window.location.hash = '';
     }
   </script>

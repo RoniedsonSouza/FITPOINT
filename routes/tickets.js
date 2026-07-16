@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 const { query, table, getClient } = require('../config/database');
-const { authenticateToken } = require('../config/auth');
+const { authenticateToken, requirePermission } = require('../config/auth');
 const {
   createPixPayment,
   createCardPayment,
@@ -498,7 +498,7 @@ router.post('/webhooks/mercadopago', async (req, res) => {
 });
 
 // GET /api/tickets — admin
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, requirePermission('eventos'), async (req, res) => {
   try {
     const { event_id, status, q, page = 1, limit = 50 } = req.query;
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
@@ -569,7 +569,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // POST /api/tickets/validate — admin
-router.post('/validate', authenticateToken, async (req, res) => {
+router.post('/validate', authenticateToken, requirePermission('eventos', 'validar'), async (req, res) => {
   try {
     const code = req.body.code ? String(req.body.code).trim().toUpperCase() : '';
     if (!code) {

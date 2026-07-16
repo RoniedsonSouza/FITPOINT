@@ -11,7 +11,9 @@ const AdminRouter = {
     produtos: { hash: '#/produtos', viewId: 'view-products', label: 'Produtos', loader: 'loadProducts' },
     vendas: { hash: '#/vendas', viewId: 'view-daily-sales', label: 'Vendas do dia', loader: 'loadDailySales' },
     diario: { hash: '#/diario', viewId: 'view-daily-diario', label: 'Diário', loader: 'loadDailyDiario' },
-    eventos: { hash: '#/eventos', viewId: 'view-events', label: 'Eventos', loader: 'loadEvents' }
+    eventos: { hash: '#/eventos', viewId: 'view-events', label: 'Eventos', loader: 'loadEvents' },
+    distribuidores: { hash: '#/distribuidores', viewId: 'view-distributors', label: 'Distribuidores', loader: 'loadDistributors' },
+    usuarios: { hash: '#/usuarios', viewId: 'view-users', label: 'Usuários', loader: 'loadUsers' }
   },
 
   init() {
@@ -23,6 +25,11 @@ const AdminRouter = {
 
   isAuthenticated() {
     return typeof Auth !== 'undefined' && Auth.isAuthenticated();
+  },
+
+  canAccessModule(module) {
+    if (typeof AdminPermissions === 'undefined') return true;
+    return AdminPermissions.canAccess(module);
   },
 
   bindSidebar() {
@@ -74,6 +81,7 @@ const AdminRouter = {
     if (hash.startsWith('#/produtos')) return { module: 'produtos' };
     if (hash.startsWith('#/diario')) return { module: 'diario' };
     if (hash.startsWith('#/vendas')) return { module: 'vendas' };
+    if (hash.startsWith('#/usuarios')) return { module: 'usuarios' };
     if (hash.startsWith('#/eventos')) {
       const match = hash.match(/^#\/eventos(?:\/(\d+)(?:\/(lotes|validar|ingressos))?)?\/?$/);
       if (match) {
@@ -88,11 +96,42 @@ const AdminRouter = {
 
   handleHash() {
     if (!this.isAuthenticated()) return;
-    const { module } = this.parseHash();
+    if (typeof Auth !== 'undefined' && Auth.mustChangePassword()) return;
+
+    const parsed = this.parseHash();
+    let { module } = parsed;
+
+    if (!this.canAccessModule(module)) {
+      window.location.hash = '#/';
+      this.showModule('dashboard', true);
+      return;
+    }
+
+    // Ajustar aba de evento sem permissão
+    if (module === 'eventos' && parsed.eventId && typeof AdminPermissions !== 'undefined') {
+      const tab = parsed.eventTab || 'lotes';
+      if (!AdminPermissions.canAccessEventTab(tab)) {
+        const fallback = AdminPermissions.defaultEventTab();
+        const nextHash = fallback === 'lotes'
+          ? `#/eventos/${parsed.eventId}`
+          : `#/eventos/${parsed.eventId}/${fallback}`;
+        if (window.location.hash !== nextHash) {
+          window.location.hash = nextHash;
+          return;
+        }
+      }
+    }
+
     this.showModule(module, false);
   },
 
   navigate(module) {
+    if (!this.canAccessModule(module)) {
+      if (typeof showToast === 'function') {
+        showToast('Sem permissão para este módulo', 'error');
+      }
+      return;
+    }
     const route = this.routes[module];
     if (!route) return;
     // Sidebar "Eventos" sempre abre a lista, não o último evento
@@ -112,6 +151,11 @@ const AdminRouter = {
 
   showModule(module, forceReload) {
     if (!this.isAuthenticated()) return;
+    if (typeof Auth !== 'undefined' && Auth.mustChangePassword()) return;
+
+    if (!this.canAccessModule(module)) {
+      module = 'dashboard';
+    }
 
     const route = this.routes[module];
     if (!route) return;
@@ -129,6 +173,10 @@ const AdminRouter = {
       el.classList.toggle('is-active', el.dataset.adminNav === navModule);
     });
 
+    if (typeof AdminPermissions !== 'undefined') {
+      AdminPermissions.applyUi();
+    }
+
     if (module === 'dashboard') {
       this.loadDashboardStats();
       return;
@@ -136,7 +184,7 @@ const AdminRouter = {
 
     const loaderName = route.loader;
     if (loaderName && typeof window[loaderName] === 'function') {
-      const alwaysReload = module === 'vendas' || module === 'diario' || module === 'fidelidade' || module === 'eventos';
+      const alwaysReload = module === 'vendas' || module === 'diario' || module === 'fidelidade' || module === 'eventos' || module === 'usuarios';
       if (forceReload || alwaysReload || !this.loadedModules.has(module)) {
         window[loaderName]();
         this.loadedModules.add(module);
@@ -150,54 +198,79 @@ const AdminRouter = {
     const prodEl = document.getElementById('stat-products');
     const salesEl = document.getElementById('stat-daily-sales');
     const eventsEl = document.getElementById('stat-events');
+    const distEl = document.getElementById('stat-distributors');
     const dashItems = document.getElementById('dashboard-stat-items');
     const dashRevenue = document.getElementById('dashboard-stat-revenue');
     const dashTop = document.getElementById('dashboard-stat-top');
     const dashSummary = document.getElementById('dashboard-daily-summary');
 
-    if (catEl) catEl.textContent = 'Carregando…';
-    if (loyEl) loyEl.textContent = 'Carregando…';
-    if (prodEl) prodEl.textContent = 'Carregando…';
-    if (salesEl) salesEl.textContent = 'Carregando…';
-    if (eventsEl) eventsEl.textContent = 'Carregando…';
+    const canCat = this.canAccessModule('categorias');
+    const canLoy = this.canAccessModule('fidelidade');
+    const canProd = this.canAccessModule('produtos');
+    const canSales = this.canAccessModule('vendas');
+    const canEvents = this.canAccessModule('eventos');
+    const canDist = this.canAccessModule('distribuidores');
+
+    if (catEl && canCat) catEl.textContent = 'Carregando…';
+    if (loyEl && canLoy) loyEl.textContent = 'Carregando…';
+    if (prodEl && canProd) prodEl.textContent = 'Carregando…';
+    if (salesEl && canSales) salesEl.textContent = 'Carregando…';
+    if (eventsEl && canEvents) eventsEl.textContent = 'Carregando…';
+    if (distEl && canDist) distEl.textContent = 'Carregando…';
 
     const formatBRL = (value) =>
       new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value) || 0);
 
     try {
-      const [categories, products, loyaltyData, salesToday, events] = await Promise.all([
-        DB.getCategories().catch(() => []),
-        DB.getProducts().catch(() => []),
-        DB.getLoyaltyCustomers({ page: 1, limit: 1 }),
-        DB.getTodaySalesSummary().catch(() => null),
-        DB.getEvents({ all: true }).catch(() => [])
+      const [categories, products, loyaltyData, salesToday, events, distributors] = await Promise.all([
+        canCat ? DB.getCategories().catch(() => []) : Promise.resolve([]),
+        canProd ? DB.getProducts().catch(() => []) : Promise.resolve([]),
+        canLoy ? DB.getLoyaltyCustomers({ page: 1, limit: 1 }).catch(() => ({ total: 0, items: [] })) : Promise.resolve({ total: 0, items: [] }),
+        canSales ? DB.getTodaySalesSummary().catch(() => null) : Promise.resolve(null),
+        canEvents ? DB.getEvents({ all: true }).catch(() => []) : Promise.resolve([]),
+        canDist ? DB.getDistributors({ all: true }).catch(() => []) : Promise.resolve([])
       ]);
 
-      const activeCats = (categories || []).filter(c => c.active !== false).length;
-      if (catEl) catEl.textContent = `${activeCats} categoria${activeCats !== 1 ? 's' : ''} ativa${activeCats !== 1 ? 's' : ''}`;
-      if (prodEl) prodEl.textContent = `${(products || []).length} produto${(products || []).length !== 1 ? 's' : ''}`;
-      const totalCustomers = loyaltyData.total ?? (loyaltyData.items || []).length;
-      if (loyEl) loyEl.textContent = `${totalCustomers} cliente${totalCustomers !== 1 ? 's' : ''}`;
-
-      const totalItems = salesToday?.total_items ?? 0;
-      const totalRevenue = salesToday?.total_revenue ?? 0;
-      const topProduct = salesToday?.top_product;
-
-      if (salesEl) {
-        salesEl.textContent = totalItems > 0
-          ? `${totalItems} venda${totalItems !== 1 ? 's' : ''} · ${formatBRL(totalRevenue)} hoje`
-          : 'Nenhuma venda hoje';
+      if (canCat && catEl) {
+        const activeCats = (categories || []).filter(c => c.active !== false).length;
+        catEl.textContent = `${activeCats} categoria${activeCats !== 1 ? 's' : ''} ativa${activeCats !== 1 ? 's' : ''}`;
+      }
+      if (canProd && prodEl) {
+        prodEl.textContent = `${(products || []).length} produto${(products || []).length !== 1 ? 's' : ''}`;
+      }
+      if (canLoy && loyEl) {
+        const totalCustomers = loyaltyData.total ?? (loyaltyData.items || []).length;
+        loyEl.textContent = `${totalCustomers} cliente${totalCustomers !== 1 ? 's' : ''}`;
       }
 
-      const activeEvents = (events || []).filter(e => e.active !== false).length;
-      if (eventsEl) {
+      if (canSales) {
+        const totalItems = salesToday?.total_items ?? 0;
+        const totalRevenue = salesToday?.total_revenue ?? 0;
+        const topProduct = salesToday?.top_product;
+
+        if (salesEl) {
+          salesEl.textContent = totalItems > 0
+            ? `${totalItems} venda${totalItems !== 1 ? 's' : ''} · ${formatBRL(totalRevenue)} hoje`
+            : 'Nenhuma venda hoje';
+        }
+
+        if (dashSummary) dashSummary.classList.remove('hidden');
+        if (dashItems) dashItems.textContent = String(totalItems);
+        if (dashRevenue) dashRevenue.textContent = formatBRL(totalRevenue);
+        if (dashTop) dashTop.textContent = topProduct || '—';
+      } else if (dashSummary) {
+        dashSummary.classList.add('hidden');
+      }
+
+      if (canEvents && eventsEl) {
+        const activeEvents = (events || []).filter(e => e.active !== false).length;
         eventsEl.textContent = `${activeEvents} evento${activeEvents !== 1 ? 's' : ''} ativo${activeEvents !== 1 ? 's' : ''}`;
       }
 
-      if (dashSummary) dashSummary.classList.remove('hidden');
-      if (dashItems) dashItems.textContent = String(totalItems);
-      if (dashRevenue) dashRevenue.textContent = formatBRL(totalRevenue);
-      if (dashTop) dashTop.textContent = topProduct || '—';
+      if (canDist && distEl) {
+        const activeDist = (distributors || []).filter(d => d.active !== false).length;
+        distEl.textContent = `${activeDist} distribuidor${activeDist !== 1 ? 'es' : ''} ativo${activeDist !== 1 ? 's' : ''}`;
+      }
     } catch (error) {
       if (handleAuthError(error)) return;
       if (catEl) catEl.textContent = '—';
@@ -205,6 +278,7 @@ const AdminRouter = {
       if (prodEl) prodEl.textContent = '—';
       if (salesEl) salesEl.textContent = '—';
       if (eventsEl) eventsEl.textContent = '—';
+      if (distEl) distEl.textContent = '—';
       if (dashItems) dashItems.textContent = '—';
       if (dashRevenue) dashRevenue.textContent = '—';
       if (dashTop) dashTop.textContent = '—';
@@ -218,9 +292,13 @@ const AdminRouter = {
 };
 
 function initAdminAfterLogin() {
+  if (typeof Auth !== 'undefined' && Auth.currentUser && typeof AdminPermissions !== 'undefined') {
+    AdminPermissions.init(Auth.currentUser);
+  }
+
   AdminRouter.reset();
   const parsed = AdminRouter.parseHash();
-  if (window.location.hash && parsed.module !== 'dashboard') {
+  if (window.location.hash && parsed.module !== 'dashboard' && AdminRouter.canAccessModule(parsed.module)) {
     AdminRouter.handleHash();
   } else {
     window.location.hash = '#/';

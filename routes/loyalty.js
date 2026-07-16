@@ -4,7 +4,7 @@ const fs = require('fs');
 const multer = require('multer');
 const router = express.Router();
 const { query, table, getClient } = require('../config/database');
-const { authenticateToken } = require('../config/auth');
+const { authenticateToken, requirePermission } = require('../config/auth');
 const {
   DEFAULT_VISITS_PER_REWARD,
   DEFAULT_ACCESS_VALUE,
@@ -114,7 +114,7 @@ router.get('/settings', async (req, res) => {
 });
 
 // PUT /api/loyalty/settings — admin
-router.put('/settings', authenticateToken, async (req, res) => {
+router.put('/settings', authenticateToken, requirePermission('fidelidade'), async (req, res) => {
   try {
     const parsedVisits = parseVisitsPerReward(req.body?.visits_per_reward);
     if (parsedVisits.error) {
@@ -146,7 +146,7 @@ router.put('/settings', authenticateToken, async (req, res) => {
 });
 
 // POST /api/loyalty/upload-avatar — admin
-router.post('/upload-avatar', authenticateToken, uploadAvatarMiddleware, (req, res) => {
+router.post('/upload-avatar', authenticateToken, requirePermission('fidelidade'), uploadAvatarMiddleware, (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -220,7 +220,7 @@ router.get('/rankings', async (req, res) => {
 });
 
 // GET /api/loyalty/customers — admin
-router.get('/customers', authenticateToken, async (req, res) => {
+router.get('/customers', authenticateToken, requirePermission('fidelidade'), async (req, res) => {
   try {
     const visitsPerReward = await getVisitsPerReward();
     const { page, limit, offset } = parsePaginationQuery(req.query);
@@ -263,7 +263,7 @@ router.get('/customers', authenticateToken, async (req, res) => {
 });
 
 // GET /api/loyalty/customers/:id — admin
-router.get('/customers/:id', authenticateToken, async (req, res) => {
+router.get('/customers/:id', authenticateToken, requirePermission('fidelidade'), async (req, res) => {
   try {
     const visitsPerReward = await getVisitsPerReward();
     const result = await query(
@@ -281,7 +281,7 @@ router.get('/customers/:id', authenticateToken, async (req, res) => {
 });
 
 // POST /api/loyalty/customers — admin
-router.post('/customers', authenticateToken, async (req, res) => {
+router.post('/customers', authenticateToken, requirePermission('fidelidade'), async (req, res) => {
   try {
     const visitsPerReward = await getVisitsPerReward();
     const { name, phone, avatar, total_visits, total_rewards } = req.body;
@@ -329,7 +329,7 @@ router.post('/customers', authenticateToken, async (req, res) => {
 });
 
 // PUT /api/loyalty/customers/:id — admin
-router.put('/customers/:id', authenticateToken, async (req, res) => {
+router.put('/customers/:id', authenticateToken, requirePermission('fidelidade'), async (req, res) => {
   try {
     const visitsPerReward = await getVisitsPerReward();
     const { name, phone, active, avatar, total_visits, total_rewards } = req.body;
@@ -410,7 +410,7 @@ router.put('/customers/:id', authenticateToken, async (req, res) => {
 });
 
 // DELETE /api/loyalty/customers/:id — admin
-router.delete('/customers/:id', authenticateToken, async (req, res) => {
+router.delete('/customers/:id', authenticateToken, requirePermission('fidelidade'), async (req, res) => {
   try {
     const result = await query(
       `DELETE FROM ${table('loyalty_customers')} WHERE id = $1`,
@@ -427,7 +427,7 @@ router.delete('/customers/:id', authenticateToken, async (req, res) => {
 });
 
 // GET /api/loyalty/customers/:id/visits — histórico de visitas (admin)
-router.get('/customers/:id/visits', authenticateToken, async (req, res) => {
+router.get('/customers/:id/visits', authenticateToken, requirePermission('fidelidade'), async (req, res) => {
   try {
     const visitsPerReward = await getVisitsPerReward();
     let limit = parseInt(String(req.query?.limit), 10);
@@ -481,7 +481,7 @@ router.get('/customers/:id/visits', authenticateToken, async (req, res) => {
 });
 
 // POST /api/loyalty/customers/:id/visit — admin (delta de visitas, default +1)
-router.post('/customers/:id/visit', authenticateToken, async (req, res) => {
+router.post('/customers/:id/visit', authenticateToken, requirePermission('fidelidade'), async (req, res) => {
   const client = await getClient();
   try {
     const visitsPerReward = await getVisitsPerReward();

@@ -53,7 +53,24 @@ function showToast(message, type = 'success') {
 }
 
 function handleAuthError(error) {
-  if (error.message && (error.message.includes('401') || error.message.includes('403'))) {
+  const msg = error?.message || '';
+  const isPermissionDenied =
+    msg.includes('403') ||
+    msg.includes('Sem permissão') ||
+    msg.includes('Usuário inativo');
+
+  if (isPermissionDenied && !msg.startsWith('401:')) {
+    showToast(msg.replace(/^\d+:\s*/, '') || 'Sem permissão para este recurso', 'error');
+    return true;
+  }
+
+  // 403 mapeado como "401: Sem permissão…" nos clients antigos
+  if (msg.includes('401:') && (msg.includes('Sem permissão') || msg.includes('Usuário inativo'))) {
+    showToast(msg.replace(/^401:\s*/, '') || 'Sem permissão para este recurso', 'error');
+    return true;
+  }
+
+  if (msg.includes('401')) {
     showToast('Sessão expirada. Faça login novamente.', 'error');
     if (typeof logout === 'function') logout();
     return true;

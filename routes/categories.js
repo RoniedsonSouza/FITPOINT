@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { query, table } = require('../config/database');
-const { authenticateToken } = require('../config/auth');
+const { authenticateToken, requireSuperAdmin } = require('../config/auth');
 
 function slugify(name) {
   return String(name)
@@ -37,7 +37,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/categories — criar (autenticado)
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
     const { name, sort_order = 0, active = true } = req.body;
     if (!name || !String(name).trim()) {
@@ -68,7 +68,7 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // PUT /api/categories/:id — atualizar (autenticado)
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
     const { name, sort_order, active } = req.body;
 
@@ -129,7 +129,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 // DELETE /api/categories/:id — excluir (autenticado)
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
     const cat = await query(
       `SELECT name FROM ${table('categories')} WHERE id = $1`,

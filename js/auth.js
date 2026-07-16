@@ -10,15 +10,17 @@ function getApiBaseUrl() {
 const TOKEN_KEY = 'fitpoint_admin_token';
 
 const Auth = {
-  // Login
-  async login(username, password) {
+  currentUser: null,
+
+  // Login (email ou username legado)
+  async login(email, password) {
     try {
       const response = await fetch(`${getApiBaseUrl()}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ email, password })
       });
 
       if (!response.ok) {
@@ -28,6 +30,7 @@ const Auth = {
 
       const data = await response.json();
       localStorage.setItem(TOKEN_KEY, data.token);
+      this.currentUser = data.user || null;
       return data;
     } catch (error) {
       console.error('Erro no login:', error);
@@ -38,6 +41,10 @@ const Auth = {
   // Logout
   logout() {
     localStorage.removeItem(TOKEN_KEY);
+    this.currentUser = null;
+    if (typeof AdminPermissions !== 'undefined') {
+      AdminPermissions.clear();
+    }
   },
 
   // Verificar se está autenticado (checagem local rápida)
@@ -48,7 +55,10 @@ const Auth = {
   // Validar sessão no servidor
   async validateSession() {
     const token = this.getToken();
-    if (!token) return null;
+    if (!token) {
+      this.currentUser = null;
+      return null;
+    }
 
     try {
       const response = await fetch(`${getApiBaseUrl()}/auth/me`, {
@@ -61,12 +71,41 @@ const Auth = {
       }
 
       const data = await response.json();
-      return data.user || null;
+      this.currentUser = data.user || null;
+      return this.currentUser;
     } catch (error) {
       console.error('Erro ao validar sessão:', error);
       this.logout();
       return null;
     }
+  },
+
+  async changePassword(newPassword, currentPassword) {
+    const payload = { newPassword };
+    if (currentPassword) payload.currentPassword = currentPassword;
+
+    const response = await fetch(`${getApiBaseUrl()}/auth/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...this.getAuthHeader()
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Erro ao alterar senha');
+    }
+
+    if (this.currentUser) {
+      this.currentUser.mustChangePassword = false;
+    }
+    return response.json();
+  },
+
+  mustChangePassword() {
+    return !!(this.currentUser && this.currentUser.mustChangePassword);
   },
 
   // Obter token

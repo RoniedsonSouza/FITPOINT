@@ -4,7 +4,13 @@ const path = require('path');
 const fs = require('fs');
 const router = express.Router();
 const { query, table, getClient } = require('../config/database');
-const { authenticateToken, JWT_SECRET } = require('../config/auth');
+const {
+  authenticateToken,
+  requirePermission,
+  JWT_SECRET,
+  userHasPermission,
+  loadUserById
+} = require('../config/auth');
 const { validatePromoConfig } = require('../services/ticketPricing');
 const jwt = require('jsonwebtoken');
 
@@ -193,20 +199,27 @@ async function getLotsForEvent(eventId, { onlyAvailable = false } = {}) {
   return lots;
 }
 
-function tryAdminFromAuth(req) {
+async function tryAdminFromAuth(req) {
   const authHeader = req.headers.authorization;
   if (!authHeader) return false;
   try {
     const token = authHeader.split(' ')[1];
-    jwt.verify(token, JWT_SECRET);
-    return true;
+    const payload = jwt.verify(token, JWT_SECRET);
+    const row = await loadUserById(payload.id);
+    if (!row || row.active === false) return false;
+    const user = {
+      id: row.id,
+      isSuperAdmin: !!row.is_super_admin,
+      permissions: row.permissions
+    };
+    return userHasPermission(user, 'eventos');
   } catch (_) {
     return false;
   }
 }
 
 // POST /api/events/upload-image — enviar imagem (autenticado)
-router.post('/upload-image', authenticateToken, uploadEventImageMiddleware, (req, res) => {
+router.post('/upload-image', authenticateToken, requirePermission('eventos', 'lotes'), uploadEventImageMiddleware, (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -221,7 +234,7 @@ router.get('/', async (req, res) => {
     let isAdmin = false;
 
     if (wantAll && req.headers.authorization) {
-      isAdmin = tryAdminFromAuth(req);
+      isAdmin = await tryAdminFromAuth(req);
     }
 
     const sql = isAdmin
@@ -257,7 +270,7 @@ router.get('/:id', async (req, res) => {
     }
 
     const event = mapEventRow(result.rows[0]);
-    const isAdmin = tryAdminFromAuth(req);
+    const isAdmin = await tryAdminFromAuth(req);
 
     if (!isAdmin && !event.active) {
       return res.status(404).json({ error: 'Evento não encontrado' });
@@ -273,7 +286,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/events
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, requirePermission('eventos', 'lotes'), async (req, res) => {
   const client = await getClient();
   try {
     const { title, description, venue, starts_at, active = true } = req.body;
@@ -324,7 +337,7 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // PUT /api/events/:id
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', authenticateToken, requirePermission('eventos', 'lotes'), async (req, res) => {
   const client = await getClient();
   try {
     const existing = await client.query(
@@ -397,7 +410,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 // DELETE /api/events/:id
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, requirePermission('eventos', 'lotes'), async (req, res) => {
   try {
     const paid = await query(
       `SELECT id FROM ${table('ticket_orders')}
@@ -425,7 +438,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 });
 
 // GET /api/events/:id/lots
-router.get('/:id/lots', authenticateToken, async (req, res) => {
+router.get('/:id/lots', authenticateToken, requirePermission('eventos'), async (req, res) => {
   try {
     const event = await query(
       `SELECT id FROM ${table('events')} WHERE id = $1`,
@@ -443,7 +456,7 @@ router.get('/:id/lots', authenticateToken, async (req, res) => {
 });
 
 // POST /api/events/:id/lots
-router.post('/:id/lots', authenticateToken, async (req, res) => {
+router.post('/:id/lots', authenticateToken, requirePermission('eventos', 'lotes'), async (req, res) => {
   try {
     const event = await query(
       `SELECT id FROM ${table('events')} WHERE id = $1`,
@@ -515,7 +528,7 @@ router.post('/:id/lots', authenticateToken, async (req, res) => {
 });
 
 // PUT /api/events/:eventId/lots/:lotId
-router.put('/:eventId/lots/:lotId', authenticateToken, async (req, res) => {
+router.put('/:eventId/lots/:lotId', authenticateToken, requirePermission('eventos', 'lotes'), async (req, res) => {
   try {
     const existing = await query(
       `SELECT * FROM ${table('ticket_lots')} WHERE id = $1 AND event_id = $2`,
@@ -608,7 +621,7 @@ router.put('/:eventId/lots/:lotId', authenticateToken, async (req, res) => {
 });
 
 // DELETE /api/events/:eventId/lots/:lotId
-router.delete('/:eventId/lots/:lotId', authenticateToken, async (req, res) => {
+router.delete('/:eventId/lots/:lotId', authenticateToken, requirePermission('eventos', 'lotes'), async (req, res) => {
   try {
     const existing = await query(
       `SELECT * FROM ${table('ticket_lots')} WHERE id = $1 AND event_id = $2`,

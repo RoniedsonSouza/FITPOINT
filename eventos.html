@@ -264,44 +264,6 @@
     <div id="events-public-list" class="grid gap-6 md:grid-cols-2">
       <p class="text-black/60">Carregando eventos…</p>
     </div>
-
-    <div id="checkout-panel" class="hidden mt-10">
-      <div class="card checkout-card">
-        <button type="button" id="checkout-back" class="text-sm text-fp-green mb-5 hover:underline">&larr; Voltar aos eventos</button>
-        <h2 class="font-display text-2xl font-bold" id="checkout-event-title">Checkout</h2>
-        <p class="text-sm text-black/60 mt-2 leading-relaxed" id="checkout-event-meta"></p>
-        <form id="checkout-form">
-          <input type="hidden" id="checkout-lot-id">
-          <div class="field">
-            <label for="checkout-lot">Lote</label>
-            <select id="checkout-lot" required></select>
-          </div>
-          <div class="field">
-            <label for="checkout-qty">Quantidade</label>
-            <input type="number" id="checkout-qty" min="1" max="10" value="1" required>
-          </div>
-          <div class="field">
-            <label for="checkout-name">Nome completo</label>
-            <input type="text" id="checkout-name" required autocomplete="name" placeholder="Como no documento">
-          </div>
-          <div class="field">
-            <label for="checkout-email">E-mail</label>
-            <input type="email" id="checkout-email" required autocomplete="email" placeholder="para receber o ingresso">
-            <p class="field-hint">Enviaremos o QR Code neste e-mail após a confirmação do pagamento.</p>
-          </div>
-          <div class="field">
-            <label for="checkout-phone">Telefone <span class="font-normal text-black/40">(opcional)</span></label>
-            <input type="tel" id="checkout-phone" autocomplete="tel" placeholder="(00) 00000-0000">
-          </div>
-          <p class="checkout-total" id="checkout-total">Total: R$&nbsp;0,00</p>
-          <button type="submit" id="checkout-submit" class="btn w-full">
-            Pagar com Mercado Pago
-          </button>
-          <p class="checkout-note">Pix e cartão de crédito · pagamento seguro via Mercado Pago</p>
-          <p id="checkout-error" class="text-sm text-red-600 hidden m-0"></p>
-        </form>
-      </div>
-    </div>
   </main>
 
   <footer class="border-t border-black/5 mt-16 py-8">

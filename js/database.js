@@ -83,6 +83,26 @@ const DB = {
     return response.json();
   },
 
+  // Envia imagem do evento (multipart); retorna { url: '/uploads/events/...' }
+  async uploadEventImage(file) {
+    const formData = new FormData();
+    formData.append('image', file);
+    const response = await fetch(`${getApiBaseUrl()}/events/upload-image`, {
+      method: 'POST',
+      headers: getAuthHeadersMultipart(),
+      body: formData
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      const errorMsg = err.error || 'Erro ao enviar imagem';
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(`401: ${errorMsg}`);
+      }
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
   // Adiciona um novo produto
   async addProduct(product) {
     try {

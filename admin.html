@@ -391,6 +391,18 @@
 
         <div class="card mt-6">
           <h2 class="font-semibold text-sm mb-4">Validar ingresso</h2>
+          <div class="ticket-qr-scanner-actions mb-3">
+            <button type="button" id="ticket-qr-start-btn" class="btn btn-outline btn-md" onclick="startTicketQrScanner()">
+              <i data-lucide="camera"></i> Escanear QR
+            </button>
+            <button type="button" id="ticket-qr-stop-btn" class="btn btn-secondary btn-md hidden" onclick="stopTicketQrScanner()">
+              <i data-lucide="camera-off"></i> Fechar câmera
+            </button>
+          </div>
+          <div id="ticket-qr-reader-wrap" class="ticket-qr-reader-wrap hidden">
+            <div id="ticket-qr-reader"></div>
+            <p class="ticket-qr-hint text-xs text-black/50 mt-2">Aponte a câmera para o QR do ingresso. A validação ocorre automaticamente.</p>
+          </div>
           <form id="ticket-validate-form" class="events-validate-form" onsubmit="validateTicketCode(event)">
             <input type="text" id="ticket-validate-code" placeholder="Cole ou digite o código do QR" autocomplete="off" required>
             <button type="submit" class="btn btn-primary btn-md">
@@ -570,7 +582,7 @@
 
   <!-- Modal Evento -->
   <div id="event-modal" class="modal">
-    <div class="modal-content modal-content--sm">
+    <div class="modal-content">
       <div class="flex justify-between items-center mb-4">
         <h3 class="font-display text-xl font-bold" id="event-modal-title">Novo evento</h3>
         <button type="button" onclick="closeEventModal()" class="modal-close" aria-label="Fechar">&times;</button>
@@ -593,9 +605,31 @@
           <label>Data e hora</label>
           <input type="datetime-local" id="event-starts-at" required>
         </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div class="form-group">
+            <label>Logo do evento (opcional)</label>
+            <input type="file" id="event-logo-file" accept="image/jpeg,image/png,image/webp,image/gif">
+            <p class="text-xs text-black/50 mt-1">JPG, PNG, WebP ou GIF · máx. 5 MB</p>
+            <div class="mt-3">
+              <img id="event-logo-preview" alt="Pré-visualização do logo" class="hidden h-24 w-24 rounded-lg object-cover border border-black/10 bg-black/5">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Imagem de capa (opcional)</label>
+            <input type="file" id="event-cover-file" accept="image/jpeg,image/png,image/webp,image/gif">
+            <p class="text-xs text-black/50 mt-1">JPG, PNG, WebP ou GIF · máx. 5 MB</p>
+            <div class="mt-3">
+              <img id="event-cover-preview" alt="Pré-visualização da capa" class="hidden max-h-28 w-full rounded-lg object-cover border border-black/10 bg-black/5">
+            </div>
+          </div>
+        </div>
         <div class="form-group">
-          <label>URL da imagem (opcional)</label>
-          <input type="text" id="event-image-url" placeholder="https://… ou /uploads/…">
+          <label>Patrocinadores</label>
+          <p class="text-xs text-black/50 mb-2">Nome e Instagram (@marca ou URL).</p>
+          <div id="event-sponsors-list" class="event-sponsors-list space-y-1.5"></div>
+          <button type="button" onclick="addEventSponsorRow()" class="btn btn-outline btn-sm mt-2">
+            <i data-lucide="plus"></i> Adicionar patrocinador
+          </button>
         </div>
         <div class="form-group">
           <label class="flex items-center gap-2 cursor-pointer">
@@ -626,7 +660,7 @@
         <div class="form-group field-row">
           <div class="field">
             <label for="lot-price">Preço (R$)</label>
-            <input type="number" id="lot-price" step="0.01" min="0" required>
+            <input type="number" id="lot-price" step="0.01" min="0" required oninput="updateLotPromoPreview()">
           </div>
           <div class="field">
             <label for="lot-quantity">Quantidade total</label>
@@ -641,6 +675,33 @@
           <div class="field">
             <label for="lot-sales-end">Fim das vendas</label>
             <input type="datetime-local" id="lot-sales-end">
+          </div>
+        </div>
+        <div class="form-group border border-black/10 rounded-lg p-3">
+          <label class="flex items-center gap-2 cursor-pointer font-semibold">
+            <input type="checkbox" id="lot-promo-enabled" onchange="toggleLotPromoFields()"> Promoção por quantidade
+          </label>
+          <p class="text-xs text-black/50 mt-1">Ex.: ingresso a R$ 50, mas 2 por R$ 75.</p>
+          <div id="lot-promo-fields" class="hidden mt-3">
+            <div class="field-row">
+              <div class="field">
+                <label for="lot-promo-qty">Quantidade do pacote</label>
+                <input type="number" id="lot-promo-qty" min="2" step="1" placeholder="Ex.: 2" oninput="updateLotPromoPreview()">
+              </div>
+              <div class="field">
+                <label for="lot-promo-price">Preço do pacote (R$)</label>
+                <input type="number" id="lot-promo-price" step="0.01" min="0.01" placeholder="Ex.: 75,00" oninput="updateLotPromoPreview()">
+              </div>
+            </div>
+            <div class="field mt-2">
+              <label for="lot-promo-mode">Para quantidades maiores</label>
+              <select id="lot-promo-mode" onchange="updateLotPromoPreview()">
+                <option value="repeat">Repetir pacote — cada pacote completo sai pelo preço promocional (3 = pacote + 1 cheio)</option>
+                <option value="once">Aplicar uma vez — só o primeiro pacote tem desconto, o resto paga preço cheio</option>
+                <option value="proportional">Preço unitário cai — a partir do pacote, todos pagam o unitário promocional</option>
+              </select>
+              <p class="text-xs text-black/50 mt-1" id="lot-promo-preview"></p>
+            </div>
           </div>
         </div>
         <div class="form-group">
@@ -726,6 +787,7 @@
     </div>
   </div>
 
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="/js/config.js"></script>
   <script src="/js/auth.js"></script>
   <script src="/js/database.js"></script>

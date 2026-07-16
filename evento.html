@@ -108,6 +108,28 @@
       height: 100%;
       object-fit: cover;
       display: block;
+      transition: opacity 0.15s ease;
+    }
+
+    .event-image-trigger {
+      display: block;
+      width: 100%;
+      height: 100%;
+      padding: 0;
+      border: none;
+      background: transparent;
+      cursor: zoom-in;
+      font: inherit;
+      text-align: inherit;
+    }
+
+    .event-image-trigger:hover img {
+      opacity: 0.92;
+    }
+
+    .event-image-trigger:focus-visible {
+      outline: 2px solid var(--fp-green);
+      outline-offset: 2px;
     }
 
     .event-logo {
@@ -130,6 +152,7 @@
       height: 100%;
       object-fit: cover;
       display: block;
+      transition: opacity 0.15s ease;
     }
 
     .lot-row {
@@ -412,6 +435,7 @@
     .success-check svg { width: 2.4rem; height: 2.4rem; }
   </style>
   <link rel="stylesheet" href="/css/page-bg.css">
+  <link rel="stylesheet" href="/css/image-viewer.css">
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://sdk.mercadopago.com/js/v2"></script>
 </head>
@@ -604,6 +628,7 @@
 
   <script src="/js/config.js"></script>
   <script src="/js/database.js"></script>
+  <script src="/js/image-viewer.js"></script>
   <script src="/js/events-page.js"></script>
   <script>
     lucide.createIcons();

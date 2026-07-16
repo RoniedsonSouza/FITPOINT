@@ -297,14 +297,23 @@
       const lots = ev.lots || [];
       const hasStock = lots.some((l) => l.quantity_available > 0);
 
+      const titleEscaped = escapeHtml(ev.title);
       root.innerHTML = `
         <article>
           <div class="event-cover rounded-2xl overflow-hidden">
-            ${cover ? `<img src="${escapeHtml(cover)}" alt="">` : ''}
+            ${cover
+              ? `<button type="button" class="event-image-trigger" data-zoom-image="${escapeHtml(cover)}" data-zoom-alt="Capa de ${titleEscaped}" data-zoom-caption="${titleEscaped}" aria-label="Ampliar capa do evento">
+                  <img src="${escapeHtml(cover)}" alt="">
+                </button>`
+              : ''}
           </div>
           <div class="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start -mt-10 sm:-mt-12 px-1 relative z-10">
             <div class="event-logo ml-3 sm:ml-6">
-              ${logo ? `<img src="${escapeHtml(logo)}" alt="Logo do evento">` : ''}
+              ${logo
+                ? `<button type="button" class="event-image-trigger" data-zoom-image="${escapeHtml(logo)}" data-zoom-alt="Logo de ${titleEscaped}" data-zoom-caption="${titleEscaped}" aria-label="Ampliar logo do evento">
+                    <img src="${escapeHtml(logo)}" alt="Logo do evento">
+                  </button>`
+                : ''}
             </div>
             <div class="pt-2 sm:pt-14 flex-1 min-w-0">
               <h1 class="font-display text-3xl md:text-4xl font-bold">${escapeHtml(ev.title)}</h1>
@@ -335,6 +344,8 @@
             : ''}
         </article>
       `;
+
+      window.FitPointImageViewer?.bindZoomable(root);
 
       root.querySelectorAll('[data-select-lot]').forEach((btn) => {
         btn.addEventListener('click', () => {

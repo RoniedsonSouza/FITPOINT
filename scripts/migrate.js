@@ -167,6 +167,91 @@ async function migrate() {
       CREATE INDEX IF NOT EXISTS idx_daily_sales_date ON ${SCHEMA}.daily_sales(sale_date)
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA}.events (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        venue VARCHAR(255),
+        starts_at TIMESTAMP NOT NULL,
+        image_url TEXT,
+        active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA}.ticket_lots (
+        id SERIAL PRIMARY KEY,
+        event_id INTEGER NOT NULL REFERENCES ${SCHEMA}.events(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        price DECIMAL(10,2) NOT NULL CHECK (price >= 0),
+        quantity_total INTEGER NOT NULL CHECK (quantity_total > 0),
+        quantity_sold INTEGER NOT NULL DEFAULT 0 CHECK (quantity_sold >= 0),
+        sales_start TIMESTAMP,
+        sales_end TIMESTAMP,
+        active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_ticket_lots_event ON ${SCHEMA}.ticket_lots(event_id)
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA}.ticket_orders (
+        id SERIAL PRIMARY KEY,
+        event_id INTEGER NOT NULL REFERENCES ${SCHEMA}.events(id) ON DELETE RESTRICT,
+        lot_id INTEGER NOT NULL REFERENCES ${SCHEMA}.ticket_lots(id) ON DELETE RESTRICT,
+        buyer_name VARCHAR(255) NOT NULL,
+        buyer_email VARCHAR(255) NOT NULL,
+        buyer_phone VARCHAR(50),
+        quantity INTEGER NOT NULL CHECK (quantity > 0),
+        amount DECIMAL(10,2) NOT NULL CHECK (amount >= 0),
+        status VARCHAR(20) NOT NULL DEFAULT 'pending'
+          CHECK (status IN ('pending', 'paid', 'cancelled', 'expired')),
+        mp_preference_id VARCHAR(255),
+        mp_payment_id VARCHAR(255),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_ticket_orders_status ON ${SCHEMA}.ticket_orders(status)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_ticket_orders_mp_payment ON ${SCHEMA}.ticket_orders(mp_payment_id)
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA}.tickets (
+        id SERIAL PRIMARY KEY,
+        order_id INTEGER NOT NULL REFERENCES ${SCHEMA}.ticket_orders(id) ON DELETE CASCADE,
+        event_id INTEGER NOT NULL REFERENCES ${SCHEMA}.events(id) ON DELETE RESTRICT,
+        lot_id INTEGER NOT NULL REFERENCES ${SCHEMA}.ticket_lots(id) ON DELETE RESTRICT,
+        code VARCHAR(64) NOT NULL UNIQUE,
+        status VARCHAR(20) NOT NULL DEFAULT 'valid'
+          CHECK (status IN ('valid', 'used', 'cancelled')),
+        used_at TIMESTAMP,
+        buyer_name VARCHAR(255) NOT NULL,
+        buyer_email VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_tickets_code ON ${SCHEMA}.tickets(code)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_tickets_event ON ${SCHEMA}.tickets(event_id)
+    `);
+
     console.log('✅ Tabelas criadas no schema\n');
 
     // Criar usuário admin padrão

@@ -10,7 +10,8 @@ const AdminRouter = {
     fidelidade: { hash: '#/fidelidade', viewId: 'view-loyalty', label: 'Fidelidade', loader: 'loadLoyaltyCustomers' },
     produtos: { hash: '#/produtos', viewId: 'view-products', label: 'Produtos', loader: 'loadProducts' },
     vendas: { hash: '#/vendas', viewId: 'view-daily-sales', label: 'Vendas do dia', loader: 'loadDailySales' },
-    diario: { hash: '#/diario', viewId: 'view-daily-diario', label: 'Diário', loader: 'loadDailyDiario' }
+    diario: { hash: '#/diario', viewId: 'view-daily-diario', label: 'Diário', loader: 'loadDailyDiario' },
+    eventos: { hash: '#/eventos', viewId: 'view-events', label: 'Eventos', loader: 'loadEvents' }
   },
 
   init() {
@@ -73,6 +74,7 @@ const AdminRouter = {
     if (hash.startsWith('#/produtos')) return 'produtos';
     if (hash.startsWith('#/diario')) return 'diario';
     if (hash.startsWith('#/vendas')) return 'vendas';
+    if (hash.startsWith('#/eventos')) return 'eventos';
     return 'dashboard';
   },
 
@@ -115,7 +117,7 @@ const AdminRouter = {
 
     const loaderName = route.loader;
     if (loaderName && typeof window[loaderName] === 'function') {
-      const alwaysReload = module === 'vendas' || module === 'diario' || module === 'fidelidade';
+      const alwaysReload = module === 'vendas' || module === 'diario' || module === 'fidelidade' || module === 'eventos';
       if (forceReload || alwaysReload || !this.loadedModules.has(module)) {
         window[loaderName]();
         this.loadedModules.add(module);
@@ -128,6 +130,7 @@ const AdminRouter = {
     const loyEl = document.getElementById('stat-loyalty');
     const prodEl = document.getElementById('stat-products');
     const salesEl = document.getElementById('stat-daily-sales');
+    const eventsEl = document.getElementById('stat-events');
     const dashItems = document.getElementById('dashboard-stat-items');
     const dashRevenue = document.getElementById('dashboard-stat-revenue');
     const dashTop = document.getElementById('dashboard-stat-top');
@@ -137,16 +140,18 @@ const AdminRouter = {
     if (loyEl) loyEl.textContent = 'Carregando…';
     if (prodEl) prodEl.textContent = 'Carregando…';
     if (salesEl) salesEl.textContent = 'Carregando…';
+    if (eventsEl) eventsEl.textContent = 'Carregando…';
 
     const formatBRL = (value) =>
       new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value) || 0);
 
     try {
-      const [categories, products, loyaltyData, salesToday] = await Promise.all([
+      const [categories, products, loyaltyData, salesToday, events] = await Promise.all([
         DB.getCategories().catch(() => []),
         DB.getProducts().catch(() => []),
         DB.getLoyaltyCustomers({ page: 1, limit: 1 }),
-        DB.getTodaySalesSummary().catch(() => null)
+        DB.getTodaySalesSummary().catch(() => null),
+        DB.getEvents({ all: true }).catch(() => [])
       ]);
 
       const activeCats = (categories || []).filter(c => c.active !== false).length;
@@ -165,6 +170,11 @@ const AdminRouter = {
           : 'Nenhuma venda hoje';
       }
 
+      const activeEvents = (events || []).filter(e => e.active !== false).length;
+      if (eventsEl) {
+        eventsEl.textContent = `${activeEvents} evento${activeEvents !== 1 ? 's' : ''} ativo${activeEvents !== 1 ? 's' : ''}`;
+      }
+
       if (dashSummary) dashSummary.classList.remove('hidden');
       if (dashItems) dashItems.textContent = String(totalItems);
       if (dashRevenue) dashRevenue.textContent = formatBRL(totalRevenue);
@@ -175,6 +185,7 @@ const AdminRouter = {
       if (loyEl) loyEl.textContent = '—';
       if (prodEl) prodEl.textContent = '—';
       if (salesEl) salesEl.textContent = '—';
+      if (eventsEl) eventsEl.textContent = '—';
       if (dashItems) dashItems.textContent = '—';
       if (dashRevenue) dashRevenue.textContent = '—';
       if (dashTop) dashTop.textContent = '—';

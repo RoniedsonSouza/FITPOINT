@@ -432,6 +432,187 @@ const DB = {
     return response.json();
   },
 
+  // === EVENTOS / INGRESSOS ===
+
+  async getEvents(params = {}) {
+    const qs = new URLSearchParams();
+    if (params.all) qs.set('all', '1');
+    const query = qs.toString();
+    const response = await fetch(`${getApiBaseUrl()}/events${query ? `?${query}` : ''}`, {
+      headers: params.all ? getAuthHeaders() : undefined
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao buscar eventos';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async getEvent(id) {
+    const response = await fetch(`${getApiBaseUrl()}/events/${id}`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao buscar evento';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async addEvent(payload) {
+    const response = await fetch(`${getApiBaseUrl()}/events`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao criar evento';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async updateEvent(id, updates) {
+    const response = await fetch(`${getApiBaseUrl()}/events/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(updates)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao atualizar evento';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async deleteEvent(id) {
+    const response = await fetch(`${getApiBaseUrl()}/events/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao excluir evento';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+  },
+
+  async getEventLots(eventId) {
+    const response = await fetch(`${getApiBaseUrl()}/events/${eventId}/lots`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao buscar lotes';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async addEventLot(eventId, payload) {
+    const response = await fetch(`${getApiBaseUrl()}/events/${eventId}/lots`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao criar lote';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async updateEventLot(eventId, lotId, updates) {
+    const response = await fetch(`${getApiBaseUrl()}/events/${eventId}/lots/${lotId}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(updates)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao atualizar lote';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async deleteEventLot(eventId, lotId) {
+    const response = await fetch(`${getApiBaseUrl()}/events/${eventId}/lots/${lotId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao excluir lote';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+  },
+
+  async getTickets(params = {}) {
+    const qs = new URLSearchParams();
+    if (params.event_id) qs.set('event_id', String(params.event_id));
+    if (params.status) qs.set('status', params.status);
+    if (params.q) qs.set('q', params.q);
+    if (params.page) qs.set('page', String(params.page));
+    if (params.limit) qs.set('limit', String(params.limit));
+    const query = qs.toString();
+    const response = await fetch(`${getApiBaseUrl()}/tickets${query ? `?${query}` : ''}`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao buscar ingressos';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async validateTicket(code) {
+    const response = await fetch(`${getApiBaseUrl()}/tickets/validate`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ code })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const errorMsg = data.error || 'Erro ao validar ingresso';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      const err = new Error(errorMsg);
+      err.data = data;
+      err.status = response.status;
+      throw err;
+    }
+    return data;
+  },
+
+  async checkoutTicket(payload) {
+    const response = await fetch(`${getApiBaseUrl()}/tickets/checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Erro ao iniciar pagamento');
+    }
+    return response.json();
+  },
+
   // Remove um produto
   async deleteProduct(id) {
     try {

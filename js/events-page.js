@@ -420,6 +420,23 @@
     return String(value || '').replace(/\D/g, '');
   }
 
+  function formatPhoneMask(value) {
+    const d = onlyDigits(value).slice(0, 11);
+    if (d.length > 10) {
+      return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+    }
+    if (d.length > 6) {
+      return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+    }
+    if (d.length > 2) {
+      return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+    }
+    if (d.length > 0) {
+      return `(${d}`;
+    }
+    return '';
+  }
+
   function currentTotal() {
     const lotId = Number(document.getElementById('checkout-lot')?.value);
     const qty = parseInt(document.getElementById('checkout-qty')?.value, 10) || 1;
@@ -541,6 +558,13 @@
     } catch (_) {
       cardPaymentMethodId = null;
     }
+  }
+
+  function setupPhoneInputMask() {
+    const phoneEl = document.getElementById('checkout-phone');
+    phoneEl?.addEventListener('input', () => {
+      phoneEl.value = formatPhoneMask(phoneEl.value);
+    });
   }
 
   function setupCardInputMasks() {
@@ -781,7 +805,7 @@
       quantity: parseInt(document.getElementById('checkout-qty').value, 10) || 1,
       buyer_name: document.getElementById('checkout-name').value.trim(),
       buyer_email: document.getElementById('checkout-email').value.trim(),
-      buyer_phone: document.getElementById('checkout-phone').value.trim() || undefined,
+      buyer_phone: onlyDigits(document.getElementById('checkout-phone').value) || undefined,
       payment_method: paymentMethod
     };
 
@@ -840,6 +864,7 @@
     if (isDetail) {
       loadEventDetail();
       loadPaymentConfig();
+      setupPhoneInputMask();
       setupCardInputMasks();
       fillDefaultInstallments();
     } else {

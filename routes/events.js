@@ -40,6 +40,19 @@ function uploadEventImageMiddleware(req, res, next) {
   });
 }
 
+function normalizeTimestampForDb(value) {
+  if (value == null || value === '') return null;
+  const s = String(value).trim();
+  const naiveMatch = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::\d{2})?$/.exec(s);
+  if (naiveMatch && !s.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(s)) {
+    return `${naiveMatch[1]}:00`;
+  }
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return null;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 function mapEventRow(row) {
   const logo_url = row.logo_url || null;
   const cover_url = row.cover_url || row.image_url || null;
@@ -284,7 +297,7 @@ router.post('/', authenticateToken, async (req, res) => {
         String(title).trim(),
         description ? String(description).trim() : null,
         venue ? String(venue).trim() : null,
-        starts_at,
+        normalizeTimestampForDb(starts_at),
         images.image_url,
         images.logo_url,
         images.cover_url,
@@ -332,7 +345,10 @@ router.put('/:id', authenticateToken, async (req, res) => {
       req.body.venue !== undefined
         ? (req.body.venue ? String(req.body.venue).trim() : null)
         : current.venue;
-    const starts_at = req.body.starts_at != null ? req.body.starts_at : current.starts_at;
+    const starts_at =
+      req.body.starts_at != null
+        ? normalizeTimestampForDb(req.body.starts_at)
+        : current.starts_at;
     const active = req.body.active !== undefined ? req.body.active !== false : current.active;
     const images = resolveEventImages(req.body, current);
 
@@ -481,8 +497,8 @@ router.post('/:id/lots', authenticateToken, async (req, res) => {
         String(name).trim(),
         priceNum,
         qty,
-        sales_start || null,
-        sales_end || null,
+        normalizeTimestampForDb(sales_start),
+        normalizeTimestampForDb(sales_end),
         active !== false,
         promo.value.promo_enabled,
         promo.value.promo_qty,
@@ -518,9 +534,13 @@ router.put('/:eventId/lots/:lotId', authenticateToken, async (req, res) => {
         ? parseInt(req.body.quantity_total, 10)
         : Number(current.quantity_total);
     const sales_start =
-      req.body.sales_start !== undefined ? req.body.sales_start || null : current.sales_start;
+      req.body.sales_start !== undefined
+        ? normalizeTimestampForDb(req.body.sales_start)
+        : current.sales_start;
     const sales_end =
-      req.body.sales_end !== undefined ? req.body.sales_end || null : current.sales_end;
+      req.body.sales_end !== undefined
+        ? normalizeTimestampForDb(req.body.sales_end)
+        : current.sales_end;
     const active =
       req.body.active !== undefined ? req.body.active !== false : current.active;
     const promo_enabled =

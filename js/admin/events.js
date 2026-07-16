@@ -89,9 +89,10 @@ function toDatetimeLocalValue(value) {
 
 function fromDatetimeLocalValue(value) {
   if (!value) return null;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString();
+  // datetime-local já é horário local — gravar como TIMESTAMP WITHOUT TIME ZONE (sem deslocar para UTC).
+  const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})/.exec(String(value).trim());
+  if (!match) return null;
+  return `${match[1]}:00`;
 }
 
 function formatEventDate(value) {

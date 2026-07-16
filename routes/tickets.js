@@ -5,6 +5,7 @@ const { query, table, getClient } = require('../config/database');
 const { authenticateToken } = require('../config/auth');
 const { createTicketPreference, getPaymentById, findApprovedPaymentByOrderId } = require('../services/mercadopago');
 const { sendTicketEmail } = require('../services/email');
+const { computeOrderTotal } = require('../services/ticketPricing');
 
 function generateTicketCode() {
   return crypto.randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase();
@@ -239,8 +240,8 @@ router.post('/checkout', async (req, res) => {
       return res.status(409).json({ error: 'Estoque insuficiente' });
     }
 
-    const unitPrice = Number(lot.price);
-    const amount = unitPrice * qty;
+    const pricing = computeOrderTotal(lot, qty);
+    const amount = pricing.total;
 
     const orderRes = await client.query(
       `INSERT INTO ${table('ticket_orders')}
@@ -265,9 +266,9 @@ router.post('/checkout', async (req, res) => {
     try {
       preference = await createTicketPreference({
         orderId: order.id,
-        title: `${lot.event_title} — ${lot.name}`,
-        unitPrice,
-        quantity: qty,
+        eventId: lot.event_id,
+        title: `${lot.event_title} — ${lot.name} (${qty} ingresso${qty > 1 ? 's' : ''})`,
+        totalAmount: amount,
         buyerEmail: email,
         buyerName: String(buyer_name).trim()
       });
@@ -292,7 +293,9 @@ router.post('/checkout', async (req, res) => {
       order_id: order.id,
       preference_id: preference.id,
       init_point: initPoint,
-      amount
+      amount,
+      savings: pricing.savings,
+      promo_applied: pricing.promoApplied
     });
   } catch (error) {
     try {

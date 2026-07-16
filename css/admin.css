@@ -242,6 +242,8 @@ html {
 
 .admin-view {
   display: none;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .admin-view.is-active {
@@ -587,6 +589,55 @@ input[type="checkbox"]:checked::after {
   }
 }
 
+.ticket-qr-scanner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ticket-qr-reader-wrap {
+  margin-bottom: 0.75rem;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: rgba(14, 31, 22, 0.06);
+  border: 1px solid rgba(14, 31, 22, 0.08);
+  padding: 0.5rem;
+}
+
+.ticket-qr-reader-wrap #ticket-qr-reader {
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.ticket-qr-reader-wrap #ticket-qr-reader video {
+  border-radius: 0.5rem;
+}
+
+.ticket-qr-hint {
+  text-align: center;
+}
+
+.event-sponsors-list .event-sponsor-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.event-sponsors-list .event-sponsor-row input {
+  font-size: 0.875rem;
+  padding: 0.4rem 0.55rem;
+  min-width: 0;
+}
+
+.event-sponsors-list .event-sponsor-row .btn-icon {
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+}
+
 .chip {
   display: inline-flex;
   align-items: center;
@@ -905,6 +956,13 @@ input[type="checkbox"]:checked::after {
 }
 
 /* === Loyalty cards === */
+.loyalty-list {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .loyalty-list.is-loading {
   opacity: 0.55;
   pointer-events: none;
@@ -915,6 +973,11 @@ input[type="checkbox"]:checked::after {
   display: flex;
   flex-direction: column;
   gap: 0.875rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .loyalty-card-header {
@@ -922,6 +985,7 @@ input[type="checkbox"]:checked::after {
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .loyalty-card-identity {
@@ -929,7 +993,7 @@ input[type="checkbox"]:checked::after {
   align-items: center;
   gap: 0.75rem;
   min-width: 0;
-  flex: 1;
+  flex: 1 1 auto;
 }
 
 .loyalty-card-avatar {
@@ -970,6 +1034,7 @@ input[type="checkbox"]:checked::after {
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .loyalty-card-inactive-icon {
@@ -988,6 +1053,9 @@ input[type="checkbox"]:checked::after {
   font-size: 0.8125rem;
   color: rgba(0, 0, 0, 0.55);
   margin-top: 0.125rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .loyalty-card-actions {
@@ -1000,6 +1068,7 @@ input[type="checkbox"]:checked::after {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .loyalty-card-cycle {
@@ -1007,6 +1076,7 @@ input[type="checkbox"]:checked::after {
   align-items: center;
   gap: 0.5rem;
   min-width: 0;
+  width: 100%;
 }
 
 .loyalty-card-cycle-count {
@@ -1021,7 +1091,10 @@ input[type="checkbox"]:checked::after {
 .loyalty-card-cycle-hint {
   font-size: 0.75rem;
   color: rgba(0, 0, 0, 0.55);
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -1071,6 +1144,8 @@ input[type="checkbox"]:checked::after {
   gap: 0.75rem;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
   padding-top: 0.75rem;
+  min-width: 0;
+  width: 100%;
 }
 
 .loyalty-card-last-visit {
@@ -1078,6 +1153,10 @@ input[type="checkbox"]:checked::after {
   color: rgba(0, 0, 0, 0.5);
   line-height: 1.3;
   min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .loyalty-card-last-visit--empty {
@@ -1189,39 +1268,67 @@ input[type="checkbox"]:checked::after {
   }
 
   .loyalty-card-header {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
+  }
+
+  .loyalty-card-identity {
+    flex: 1 1 calc(100% - 7.5rem);
   }
 
   .loyalty-card-actions {
     width: auto;
     justify-content: flex-start;
+    margin-left: auto;
   }
 
   .loyalty-card-name {
     font-size: 1rem;
   }
 
+  /* Progresso em linha própria — evita min-width:100% estourar o flex/grid */
   .loyalty-card-cycle {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "count hint"
+      "bar bar";
+    align-items: center;
+    column-gap: 0.5rem;
+    row-gap: 0.375rem;
+  }
+
+  .loyalty-card-cycle-count {
+    grid-area: count;
+  }
+
+  .loyalty-card-cycle-hint {
+    grid-area: hint;
   }
 
   .loyalty-card-progress {
-    order: 3;
-    flex: 1 1 100%;
-    min-width: 100%;
+    grid-area: bar;
+    width: 100%;
+    min-width: 0;
+    flex: none;
   }
 
   .loyalty-card-footer {
     gap: 0.5rem;
+    flex-wrap: wrap;
   }
 
   .loyalty-card-last-visit {
     font-size: 0.6875rem;
+    flex: 1 1 8rem;
+  }
+
+  .loyalty-visit-stepper {
+    margin-left: 0;
   }
 
   .loyalty-visit-btn {
-    min-width: 2.75rem;
-    min-height: 2.75rem;
+    min-width: 2.5rem;
+    min-height: 2.5rem;
   }
 
   .loyalty-history-item {

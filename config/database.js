@@ -136,10 +136,40 @@ async function ensureDatabase() {
         venue VARCHAR(255),
         starts_at TIMESTAMP NOT NULL,
         image_url TEXT,
+        logo_url TEXT,
+        cover_url TEXT,
         active BOOLEAN DEFAULT true,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       )
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.events
+      ADD COLUMN IF NOT EXISTS logo_url TEXT
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.events
+      ADD COLUMN IF NOT EXISTS cover_url TEXT
+    `);
+    await client.query(`
+      UPDATE ${SCHEMA}.events
+      SET cover_url = image_url
+      WHERE cover_url IS NULL AND image_url IS NOT NULL AND image_url <> ''
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA}.event_sponsors (
+        id SERIAL PRIMARY KEY,
+        event_id INTEGER NOT NULL REFERENCES ${SCHEMA}.events(id) ON DELETE CASCADE,
+        fantasy_name VARCHAR(255) NOT NULL,
+        instagram VARCHAR(255) NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_event_sponsors_event
+      ON ${SCHEMA}.event_sponsors(event_id, sort_order, id)
     `);
     await client.query(`
       CREATE TABLE IF NOT EXISTS ${SCHEMA}.ticket_lots (
@@ -152,9 +182,29 @@ async function ensureDatabase() {
         sales_start TIMESTAMP,
         sales_end TIMESTAMP,
         active BOOLEAN DEFAULT true,
+        promo_enabled BOOLEAN NOT NULL DEFAULT false,
+        promo_qty INTEGER,
+        promo_price DECIMAL(10,2),
+        promo_mode VARCHAR(20) NOT NULL DEFAULT 'repeat',
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       )
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.ticket_lots
+      ADD COLUMN IF NOT EXISTS promo_enabled BOOLEAN NOT NULL DEFAULT false
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.ticket_lots
+      ADD COLUMN IF NOT EXISTS promo_qty INTEGER
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.ticket_lots
+      ADD COLUMN IF NOT EXISTS promo_price DECIMAL(10,2)
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.ticket_lots
+      ADD COLUMN IF NOT EXISTS promo_mode VARCHAR(20) NOT NULL DEFAULT 'repeat'
     `);
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_ticket_lots_event ON ${SCHEMA}.ticket_lots(event_id)

@@ -100,6 +100,11 @@ const AdminRouter = {
     const route = this.routes[module];
     if (!route) return;
 
+    const previousModule = this.currentModule;
+    if (previousModule === 'eventos' && module !== 'eventos' && typeof stopTicketQrScanner === 'function') {
+      stopTicketQrScanner();
+    }
+
     this.currentModule = module;
 
     document.querySelectorAll('.admin-view').forEach(v => v.classList.remove('is-active'));

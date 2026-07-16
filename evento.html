@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Eventos — FitPoint Fitness</title>
+  <title>Evento — FitPoint Fitness</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="icon" type="image/png" href="/assets/logo.png">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500&display=swap"
@@ -92,9 +92,77 @@
       overflow: hidden;
     }
 
+    .event-cover {
+      width: 100%;
+      height: 12rem;
+      background: linear-gradient(135deg, rgba(29, 107, 58, 0.12) 0%, rgba(245, 243, 238, 0.9) 55%, rgba(47, 157, 87, 0.1) 100%);
+      overflow: hidden;
+    }
+
+    @media (min-width: 768px) {
+      .event-cover { height: 18rem; }
+    }
+
+    .event-cover img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .event-logo {
+      width: 7rem;
+      height: 7rem;
+      border-radius: 1rem;
+      border: 3px solid #fff;
+      box-shadow: var(--shadow);
+      background: linear-gradient(160deg, rgba(29, 107, 58, 0.08), #fff 60%);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    @media (min-width: 768px) {
+      .event-logo { width: 9rem; height: 9rem; }
+    }
+
+    .event-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .lot-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem 1rem;
+      padding: 1rem 0;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    .lot-row:last-child { border-bottom: none; }
+
+    .sponsor-chip {
+      display: inline-flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      padding: 0.85rem 1rem;
+      border-radius: var(--field-radius);
+      background: rgba(29, 107, 58, 0.06);
+      text-decoration: none;
+      color: inherit;
+      min-width: 9rem;
+      transition: background 0.15s ease;
+    }
+
+    .sponsor-chip:hover {
+      background: rgba(29, 107, 58, 0.12);
+    }
+
     .checkout-card {
       padding: 1.5rem 1.5rem 1.75rem;
-      max-width: 28rem;
     }
 
     @media (min-width: 640px) {
@@ -219,7 +287,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 
-<body class="page-bg text-fp-ink font-sans" data-page="events">
+<body class="page-bg text-fp-ink font-sans" data-page="event-detail">
   <header class="bg-white/80 backdrop-blur sticky top-0 z-50 border-b border-black/5">
     <div class="container-edge flex items-center justify-between h-16">
       <a href="/" class="flex items-center gap-3">
@@ -253,16 +321,52 @@
     </nav>
   </header>
 
-  <main class="container-edge py-10">
-    <div class="mb-8">
-      <h1 class="font-display text-3xl md:text-4xl font-bold">Eventos</h1>
-      <p class="text-black/60 mt-2 max-w-xl">Compre seu ingresso com Pix ou cartão de crédito. O QR Code chega no seu e-mail após a confirmação.</p>
-    </div>
+  <main class="container-edge py-6 md:py-10">
+    <a href="/eventos.html" class="inline-flex items-center gap-1 text-sm text-fp-green hover:underline mb-5">&larr; Todos os eventos</a>
 
     <div id="payment-status" class="hidden"></div>
 
-    <div id="events-public-list" class="grid gap-6 md:grid-cols-2">
-      <p class="text-black/60">Carregando eventos…</p>
+    <div id="event-detail">
+      <p class="text-black/60">Carregando evento…</p>
+    </div>
+
+    <div id="checkout-panel" class="hidden mt-10 max-w-lg">
+      <div class="card checkout-card">
+        <h2 class="font-display text-2xl font-bold" id="checkout-event-title">Comprar ingresso</h2>
+        <p class="text-sm text-black/60 mt-2 leading-relaxed" id="checkout-event-meta"></p>
+        <form id="checkout-form">
+          <input type="hidden" id="checkout-lot-id">
+          <div class="field">
+            <label for="checkout-lot">Lote</label>
+            <select id="checkout-lot" required></select>
+          </div>
+          <div class="field">
+            <label for="checkout-qty">Quantidade</label>
+            <input type="number" id="checkout-qty" min="1" max="10" value="1" required>
+            <p class="field-hint text-fp-green font-semibold hidden" id="checkout-promo-hint"></p>
+          </div>
+          <div class="field">
+            <label for="checkout-name">Nome completo</label>
+            <input type="text" id="checkout-name" required autocomplete="name" placeholder="Como no documento">
+          </div>
+          <div class="field">
+            <label for="checkout-email">E-mail</label>
+            <input type="email" id="checkout-email" required autocomplete="email" placeholder="para receber o ingresso">
+            <p class="field-hint">Enviaremos o QR Code neste e-mail após a confirmação do pagamento.</p>
+          </div>
+          <div class="field">
+            <label for="checkout-phone">Telefone <span class="font-normal text-black/40">(opcional)</span></label>
+            <input type="tel" id="checkout-phone" autocomplete="tel" placeholder="(00) 00000-0000">
+          </div>
+          <p class="text-sm font-semibold text-fp-green hidden" id="checkout-savings"></p>
+          <p class="checkout-total" id="checkout-total">Total: R$&nbsp;0,00</p>
+          <button type="submit" id="checkout-submit" class="btn w-full">
+            Pagar com Mercado Pago
+          </button>
+          <p class="checkout-note">Pix e cartão de crédito · pagamento seguro via Mercado Pago</p>
+          <p id="checkout-error" class="text-sm text-red-600 hidden m-0"></p>
+        </form>
+      </div>
     </div>
   </main>
 

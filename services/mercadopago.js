@@ -18,18 +18,24 @@ function getAppUrl() {
 
 /**
  * Cria Preference Checkout Pro permitindo apenas Pix e cartão de crédito.
+ * Envia item único com o valor total do pedido (promoções por quantidade
+ * podem gerar totais que não dividem igualmente por ingresso).
  */
-async function createTicketPreference({ orderId, title, unitPrice, quantity, buyerEmail, buyerName }) {
+async function createTicketPreference({ orderId, eventId, title, totalAmount, buyerEmail, buyerName }) {
   const preference = new Preference(getClient());
   const appUrl = getAppUrl();
+  const returnBase = eventId
+    ? `${appUrl}/evento.html?id=${encodeURIComponent(eventId)}`
+    : `${appUrl}/eventos.html`;
+  const join = returnBase.includes('?') ? '&' : '?';
 
   const body = {
     items: [
       {
         id: String(orderId),
         title: String(title).slice(0, 256),
-        quantity: Number(quantity),
-        unit_price: Number(unitPrice),
+        quantity: 1,
+        unit_price: Number(totalAmount),
         currency_id: 'BRL'
       }
     ],
@@ -39,9 +45,9 @@ async function createTicketPreference({ orderId, title, unitPrice, quantity, buy
     },
     external_reference: String(orderId),
     back_urls: {
-      success: `${appUrl}/eventos.html?payment=success&order=${orderId}`,
-      failure: `${appUrl}/eventos.html?payment=failure&order=${orderId}`,
-      pending: `${appUrl}/eventos.html?payment=pending&order=${orderId}`
+      success: `${returnBase}${join}payment=success&order=${orderId}`,
+      failure: `${returnBase}${join}payment=failure&order=${orderId}`,
+      pending: `${returnBase}${join}payment=pending&order=${orderId}`
     },
     auto_return: 'approved',
     payment_methods: {

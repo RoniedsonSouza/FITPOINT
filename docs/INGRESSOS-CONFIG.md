@@ -41,7 +41,7 @@ Depois de salvar o `.env`, **reinicie o servidor** (`npm start` ou `npm run dev`
 
 **Importante**
 
-- Em **localhost**, o webhook do Mercado Pago **não chega** no seu PC (a internet não alcança `localhost`). O sistema ainda tenta confirmar o pagamento quando o comprador volta para `eventos.html?payment=success` (rota de sync).
+- Em **localhost**, o webhook do Mercado Pago **não chega** no seu PC (a internet não alcança `localhost`). O sistema ainda tenta confirmar o pagamento quando o comprador volta para `evento.html?id=…&payment=success` (rota de sync).
 - Em **produção**, use HTTPS. Sem `APP_URL` correta, o retorno após o pagamento e as notificações falham.
 - Para testar o **webhook de verdade** no PC, use o **ngrok** (seção abaixo) e coloque a URL HTTPS do túnel em `APP_URL`.
 
@@ -305,19 +305,26 @@ Documentação: [https://resend.com/docs](https://resend.com/docs)
 
 1. Abra `http://localhost:3000/admin.html` (ou sua `APP_URL`)
 2. Login → menu **Eventos**
-3. Crie um **evento** (título, data, local)
+3. Crie um **evento** (título, data, local; opcional: logo, capa e patrocinadores com nome fantasia + Instagram)
 4. Selecione o evento → **Novo lote** (nome, preço, quantidade)
 5. Deixe evento e lote **ativos**
 
 ### No site
 
 1. Abra `/eventos.html`
-2. Clique em **Comprar**
-3. Preencha nome, e-mail (use o e-mail da conta Resend se ainda estiver em `onboarding@resend.dev`) e quantidade
-4. Clique em **Pagar com Mercado Pago**
-5. Conclua o pagamento (credenciais/cartões de **teste** se estiver com token de teste)
-6. Ao voltar com sucesso, o e-mail com QR Code deve chegar
-7. No admin → **Validar ingresso**: cole o código do e-mail
+2. Clique em **Ver detalhes** no card do evento (página `/evento.html?id=…`)
+3. Confira capa, logo, descrição, lotes e patrocinadores; clique em **Comprar** / escolha um lote
+4. Preencha nome, e-mail (use o e-mail da conta Resend se ainda estiver em `onboarding@resend.dev`) e quantidade
+5. Clique em **Pagar com Mercado Pago**
+6. Conclua o pagamento (credenciais/cartões de **teste** se estiver com token de teste)
+7. Ao voltar com sucesso para `evento.html?id=…&payment=success`, o e-mail com QR Code deve chegar
+8. No admin → **Validar ingresso**: cole o código do e-mail
+
+### Imagens e patrocinadores
+
+- **Logo** e **capa** são opcionais. Sem imagem, a página de detalhe mantém o espaço reservado (placeholder).
+- Upload pelo admin (JPG/PNG/WebP/GIF, máx. 5 MB) ou URL externa.
+- **Patrocinadores:** nome fantasia + Instagram (`@handle` ou URL). Aparecem na página de detalhe com link para o perfil.
 
 ### Se o e-mail não chegar
 
@@ -330,7 +337,7 @@ Documentação: [https://resend.com/docs](https://resend.com/docs)
 
 - Confirme `MP_ACCESS_TOKEN`
 - Em produção, confira se `APP_URL` é HTTPS e se o webhook responde
-- No retorno `?payment=success&order=ID`, o front chama `/api/tickets/orders/:id/sync` para confirmar mesmo sem webhook
+- No retorno `?payment=success&order=ID` (em `/evento.html?id=…`), o front chama `/api/tickets/orders/:id/sync` para confirmar mesmo sem webhook
 - Veja logs do servidor na hora do checkout e do webhook
 
 ---

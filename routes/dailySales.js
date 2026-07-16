@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { query, getClient, table } = require('../config/database');
 const { authenticateToken } = require('../config/auth');
-const { applyVisitDelta, computeLoyaltyVisitsFromAmount, DEFAULT_ACCESS_VALUE, DEFAULT_VISITS_PER_REWARD } = require('./loyaltyHelpers');
+const { applyVisitDelta, insertVisitEvents, computeLoyaltyVisitsFromAmount, DEFAULT_ACCESS_VALUE, DEFAULT_VISITS_PER_REWARD } = require('./loyaltyHelpers');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -138,24 +138,35 @@ async function applyLoyaltyForSale(client, customerId, validatedItems) {
     await client.query(`SELECT * FROM ${table('loyalty_customers')} WHERE id = $1`, [customerId])
   ).rows[0];
 
-  const { visits, rewards, rewards_earned } = applyVisitDelta(
+  const { visits, rewards, rewards_earned, delta_applied } = applyVisitDelta(
     customerRow.total_visits,
     customerRow.total_rewards,
     visitDelta,
     visitsPerReward
   );
 
+  const visitsChanged = delta_applied !== 0;
+  const positiveVisit = delta_applied > 0;
+
   await client.query(
     `UPDATE ${table('loyalty_customers')}
-     SET total_visits = $1, total_rewards = $2, updated_at = NOW()
+     SET total_visits = $1,
+         total_rewards = $2,
+         updated_at = NOW()
+         ${visitsChanged ? ', last_visit_at = NOW()' : ''}
+         ${positiveVisit ? ', last_positive_visit_at = NOW()' : ''}
      WHERE id = $3`,
     [visits, rewards, customerId]
   );
 
+  if (visitsChanged) {
+    await insertVisitEvents(client, customerId, delta_applied, 'daily_sales');
+  }
+
   return {
     loyaltyApplied: true,
     rewardsEarned: rewards_earned,
-    loyaltyVisitsApplied: visitDelta
+    loyaltyVisitsApplied: delta_applied > 0 ? delta_applied : visitDelta
   };
 }
 

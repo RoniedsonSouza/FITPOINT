@@ -1,5 +1,7 @@
 const DEFAULT_VISITS_PER_REWARD = 10;
 const DEFAULT_ACCESS_VALUE = 27;
+const INACTIVE_VISIT_DAYS = 3;
+const { table } = require('../config/database');
 
 function normalizePhone(phone) {
   return String(phone || '').replace(/\D/g, '');
@@ -34,6 +36,15 @@ function getVisitsToReward(totalVisits, visitsPerReward = DEFAULT_VISITS_PER_REW
   return n - progress;
 }
 
+function isInactiveVisit(row) {
+  const totalVisits = Number(row.total_visits) || 0;
+  const lastPositive = row.last_positive_visit_at ? new Date(row.last_positive_visit_at) : null;
+  if (lastPositive && !Number.isNaN(lastPositive.getTime())) {
+    return Date.now() - lastPositive.getTime() > INACTIVE_VISIT_DAYS * 24 * 60 * 60 * 1000;
+  }
+  return totalVisits > 0;
+}
+
 function mapCustomerRow(row, { includePhone = false, visitsPerReward = DEFAULT_VISITS_PER_REWARD } = {}) {
   const n = Math.max(2, Number(visitsPerReward) || DEFAULT_VISITS_PER_REWARD);
   const totalVisits = Number(row.total_visits) || 0;
@@ -41,6 +52,9 @@ function mapCustomerRow(row, { includePhone = false, visitsPerReward = DEFAULT_V
   const rawProgress = getProgress(totalVisits, n);
   const cycleComplete = isCycleComplete(totalVisits, n);
   const displayProgress = getDisplayProgress(totalVisits, n);
+  const lastPositive = row.last_positive_visit_at
+    ? new Date(row.last_positive_visit_at).toISOString()
+    : null;
 
   const out = {
     id: row.id,
@@ -54,6 +68,9 @@ function mapCustomerRow(row, { includePhone = false, visitsPerReward = DEFAULT_V
     cycle_complete: cycleComplete,
     visits_per_reward: n,
     visits_to_reward: getVisitsToReward(totalVisits, n),
+    last_visit_at: row.last_visit_at ? new Date(row.last_visit_at).toISOString() : null,
+    last_positive_visit_at: lastPositive,
+    inactive_visit: isInactiveVisit(row),
     active: row.active !== false
   };
   if (includePhone) {
@@ -64,7 +81,8 @@ function mapCustomerRow(row, { includePhone = false, visitsPerReward = DEFAULT_V
 
 function applyVisitDelta(currentVisits, currentRewards, delta, visitsPerReward = DEFAULT_VISITS_PER_REWARD) {
   const n = Math.max(2, Number(visitsPerReward) || DEFAULT_VISITS_PER_REWARD);
-  let visits = Number(currentVisits) || 0;
+  const startVisits = Number(currentVisits) || 0;
+  let visits = startVisits;
   let rewards = Number(currentRewards) || 0;
   const steps = Math.abs(Math.trunc(Number(delta) || 0));
   const sign = Number(delta) >= 0 ? 1 : -1;
@@ -86,7 +104,40 @@ function applyVisitDelta(currentVisits, currentRewards, delta, visitsPerReward =
     }
   }
 
-  return { visits, rewards, rewards_earned: rewardsEarned };
+  return {
+    visits,
+    rewards,
+    rewards_earned: rewardsEarned,
+    delta_applied: visits - startVisits
+  };
+}
+
+async function insertVisitEvents(db, customerId, appliedDelta, source) {
+  const steps = Math.abs(Math.trunc(Number(appliedDelta) || 0));
+  if (steps === 0) return;
+  const sign = Number(appliedDelta) > 0 ? 1 : -1;
+  const run = typeof db === 'function' ? db : (sql, params) => db.query(sql, params);
+  const placeholders = [];
+  const values = [];
+  for (let i = 0; i < steps; i++) {
+    const base = i * 3;
+    placeholders.push(`($${base + 1}, $${base + 2}, $${base + 3})`);
+    values.push(customerId, sign, source);
+  }
+  await run(
+    `INSERT INTO ${table('loyalty_visit_events')} (customer_id, delta, source)
+     VALUES ${placeholders.join(', ')}`,
+    values
+  );
+}
+
+function mapVisitEventRow(row) {
+  return {
+    id: row.id,
+    delta: Number(row.delta),
+    source: row.source,
+    created_at: row.created_at ? new Date(row.created_at).toISOString() : null
+  };
 }
 
 function parseNonNegativeInt(value, fieldName) {
@@ -172,13 +223,17 @@ function computeTotalPages(total, limit) {
 module.exports = {
   DEFAULT_VISITS_PER_REWARD,
   DEFAULT_ACCESS_VALUE,
+  INACTIVE_VISIT_DAYS,
   normalizePhone,
   getProgress,
   getDisplayProgress,
   isCycleComplete,
   getVisitsToReward,
+  isInactiveVisit,
   mapCustomerRow,
   applyVisitDelta,
+  insertVisitEvents,
+  mapVisitEventRow,
   parseNonNegativeInt,
   parseVisitsPerReward,
   parseAccessValue,

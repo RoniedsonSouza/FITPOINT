@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const router = express.Router();
-const { query, table } = require('../config/database');
+const { query, table, getClient } = require('../config/database');
 const { authenticateToken } = require('../config/auth');
 const {
   DEFAULT_VISITS_PER_REWARD,
@@ -11,6 +11,8 @@ const {
   normalizePhone,
   mapCustomerRow,
   applyVisitDelta,
+  insertVisitEvents,
+  mapVisitEventRow,
   parseNonNegativeInt,
   parseVisitsPerReward,
   parseAccessValue,
@@ -424,14 +426,13 @@ router.delete('/customers/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/loyalty/customers/:id/visit — admin (delta de visitas, default +1)
-router.post('/customers/:id/visit', authenticateToken, async (req, res) => {
+// GET /api/loyalty/customers/:id/visits — histórico de visitas (admin)
+router.get('/customers/:id/visits', authenticateToken, async (req, res) => {
   try {
     const visitsPerReward = await getVisitsPerReward();
-    const delta = req.body?.delta !== undefined ? Number(req.body.delta) : 1;
-    if (!Number.isInteger(delta) || delta === 0) {
-      return res.status(400).json({ error: 'Informe um delta válido (número inteiro diferente de zero)' });
-    }
+    let limit = parseInt(String(req.query?.limit), 10);
+    if (Number.isNaN(limit) || limit < 1) limit = 30;
+    if (limit > 50) limit = 50;
 
     const existing = await query(
       `SELECT * FROM ${table('loyalty_customers')} WHERE id = $1`,
@@ -441,31 +442,106 @@ router.post('/customers/:id/visit', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Cliente não encontrado' });
     }
 
+    const customer = existing.rows[0];
+    const summaryResult = await query(
+      `SELECT
+         COUNT(*)::int AS total_events,
+         COALESCE(SUM(CASE WHEN delta > 0 THEN 1 ELSE 0 END), 0)::int AS added,
+         COALESCE(SUM(CASE WHEN delta < 0 THEN 1 ELSE 0 END), 0)::int AS removed
+       FROM ${table('loyalty_visit_events')}
+       WHERE customer_id = $1`,
+      [req.params.id]
+    );
+    const eventsResult = await query(
+      `SELECT id, delta, source, created_at
+       FROM ${table('loyalty_visit_events')}
+       WHERE customer_id = $1
+       ORDER BY created_at DESC, id DESC
+       LIMIT $2`,
+      [req.params.id, limit]
+    );
+
+    const summaryRow = summaryResult.rows[0] || {};
+    res.json({
+      customer: mapCustomerRow(customer, { includePhone: true, visitsPerReward }),
+      summary: {
+        total_events: summaryRow.total_events || 0,
+        added: summaryRow.added || 0,
+        removed: summaryRow.removed || 0,
+        last_positive_visit_at: customer.last_positive_visit_at
+          ? new Date(customer.last_positive_visit_at).toISOString()
+          : null
+      },
+      events: eventsResult.rows.map(mapVisitEventRow)
+    });
+  } catch (error) {
+    console.error('Erro ao buscar histórico de visitas:', error);
+    res.status(500).json({ error: 'Erro ao buscar histórico de visitas' });
+  }
+});
+
+// POST /api/loyalty/customers/:id/visit — admin (delta de visitas, default +1)
+router.post('/customers/:id/visit', authenticateToken, async (req, res) => {
+  const client = await getClient();
+  try {
+    const visitsPerReward = await getVisitsPerReward();
+    const delta = req.body?.delta !== undefined ? Number(req.body.delta) : 1;
+    if (!Number.isInteger(delta) || delta === 0) {
+      return res.status(400).json({ error: 'Informe um delta válido (número inteiro diferente de zero)' });
+    }
+
+    await client.query('BEGIN');
+
+    const existing = await client.query(
+      `SELECT * FROM ${table('loyalty_customers')} WHERE id = $1 FOR UPDATE`,
+      [req.params.id]
+    );
+    if (existing.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Cliente não encontrado' });
+    }
+
     const row = existing.rows[0];
-    const { visits, rewards, rewards_earned } = applyVisitDelta(
+    const { visits, rewards, rewards_earned, delta_applied } = applyVisitDelta(
       row.total_visits,
       row.total_rewards,
       delta,
       visitsPerReward
     );
 
-    const result = await query(
+    const visitsChanged = delta_applied !== 0;
+    const positiveVisit = delta_applied > 0;
+    const result = await client.query(
       `UPDATE ${table('loyalty_customers')}
-       SET total_visits = $1, total_rewards = $2, updated_at = NOW()
-       WHERE id = $3 RETURNING *`,
+       SET total_visits = $1,
+           total_rewards = $2,
+           updated_at = NOW()
+           ${visitsChanged ? ', last_visit_at = NOW()' : ''}
+           ${positiveVisit ? ', last_positive_visit_at = NOW()' : ''}
+       WHERE id = $3
+       RETURNING *`,
       [visits, rewards, req.params.id]
     );
+
+    if (visitsChanged) {
+      await insertVisitEvents(client, req.params.id, delta_applied, 'admin');
+    }
+
+    await client.query('COMMIT');
 
     res.json({
       customer: mapCustomerRow(result.rows[0], { includePhone: true, visitsPerReward }),
       rewards_earned,
       reward_earned: rewards_earned > 0,
-      delta_applied: delta,
+      delta_applied,
       visits_per_reward: visitsPerReward
     });
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error('Erro ao registrar visita:', error);
     res.status(500).json({ error: 'Erro ao registrar visita' });
+  } finally {
+    client.release();
   }
 });
 

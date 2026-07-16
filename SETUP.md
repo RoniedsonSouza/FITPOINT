@@ -78,7 +78,8 @@ DB_SCHEMA=fitpoint
 - `JWT_SECRET`: String aleatória segura (ex: gere com `openssl rand -hex 32`)
 - `ADMIN_PASSWORD`: Senha forte para o usuário admin
 - `APP_URL`: URL pública do site (ex: `https://seudominio.com`) — usada no retorno e webhook do Mercado Pago
-- `MP_ACCESS_TOKEN`: Access Token do Mercado Pago (Checkout Pro — Pix + cartão)
+- `MP_ACCESS_TOKEN`: Access Token do Mercado Pago (checkout transparente — Pix + cartão dentro do site)
+- `MP_PUBLIC_KEY`: Public Key do Mercado Pago (tokeniza o cartão no navegador; sem ela o site oferece só Pix)
 - `MP_WEBHOOK_SECRET`: (opcional) segredo para validar notificações do Mercado Pago
 - `RESEND_API_KEY`: chave da API Resend para envio dos ingressos por e-mail
 - `RESEND_FROM`: remetente verificado no Resend (ex: `FitPoint <ingressos@seudominio.com>`)

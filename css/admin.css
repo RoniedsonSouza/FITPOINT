@@ -595,27 +595,128 @@ input[type="checkbox"]:checked::after {
   gap: 0.5rem;
 }
 
-.ticket-qr-reader-wrap {
-  margin-bottom: 0.75rem;
-  border-radius: 0.75rem;
+body.ticket-qr-open {
   overflow: hidden;
-  background: rgba(14, 31, 22, 0.06);
-  border: 1px solid rgba(14, 31, 22, 0.08);
-  padding: 0.5rem;
 }
 
-.ticket-qr-reader-wrap #ticket-qr-reader {
+.ticket-qr-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: flex;
+  flex-direction: column;
+  background: #0a1410;
+  color: #fff;
+}
+
+.ticket-qr-overlay.hidden {
+  display: none;
+}
+
+.ticket-qr-overlay-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: max(0.75rem, env(safe-area-inset-top)) 1rem 0.75rem;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.65) 0%, rgba(0, 0, 0, 0) 100%);
+  position: relative;
+  z-index: 2;
+}
+
+.ticket-qr-overlay-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.ticket-qr-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  cursor: pointer;
+}
+
+.ticket-qr-close-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.ticket-qr-overlay-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.ticket-qr-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 1;
+}
+
+.ticket-qr-loading.hidden {
+  display: none;
+}
+
+.ticket-qr-overlay-body #ticket-qr-reader {
   width: 100%;
-  max-width: 420px;
-  margin: 0 auto;
+  height: 100%;
 }
 
-.ticket-qr-reader-wrap #ticket-qr-reader video {
-  border-radius: 0.5rem;
+.ticket-qr-overlay-body #ticket-qr-reader video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+}
+
+.ticket-qr-overlay-footer {
+  padding: 0.75rem 1rem max(1rem, env(safe-area-inset-bottom));
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 100%);
+  position: relative;
+  z-index: 2;
 }
 
 .ticket-qr-hint {
+  margin: 0;
   text-align: center;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.ticket-qr-overlay-result {
+  margin: 0.5rem 0 0;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  min-height: 1.25rem;
+}
+
+.ticket-qr-overlay-result.is-success {
+  color: #7ddea0;
+}
+
+.ticket-qr-overlay-result.is-pending {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.ticket-qr-overlay-result.is-error {
+  color: #ff9b9b;
 }
 
 .event-sponsors-list .event-sponsor-row {
@@ -623,6 +724,54 @@ input[type="checkbox"]:checked::after {
   flex-direction: row;
   align-items: center;
   gap: 0.375rem;
+}
+
+.event-sponsors-list .event-sponsor-image-wrap {
+  position: relative;
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.event-sponsors-list .event-sponsor-preview {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.375rem;
+  object-fit: contain;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.event-sponsors-list .event-sponsor-image-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.375rem;
+  border: 1px dashed rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.03);
+  color: rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.event-sponsors-list .event-sponsor-image-btn:hover {
+  background: rgba(29, 107, 58, 0.08);
+  border-color: rgba(29, 107, 58, 0.35);
+  color: var(--fp-green, #1d6b3a);
+}
+
+.event-sponsors-list .event-sponsor-image-btn input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.event-sponsors-list .event-sponsor-image-btn.hidden {
+  display: none;
 }
 
 .event-sponsors-list .event-sponsor-row input {

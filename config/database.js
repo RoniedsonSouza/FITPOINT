@@ -172,6 +172,10 @@ async function ensureDatabase() {
       ON ${SCHEMA}.event_sponsors(event_id, sort_order, id)
     `);
     await client.query(`
+      ALTER TABLE ${SCHEMA}.event_sponsors
+      ADD COLUMN IF NOT EXISTS image_url TEXT
+    `);
+    await client.query(`
       CREATE TABLE IF NOT EXISTS ${SCHEMA}.ticket_lots (
         id SERIAL PRIMARY KEY,
         event_id INTEGER NOT NULL REFERENCES ${SCHEMA}.events(id) ON DELETE CASCADE,

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { query, getClient, table } = require('../config/database');
 const { authenticateToken } = require('../config/auth');
-const { applyVisitDelta, insertVisitEvents } = require('./loyaltyHelpers');
+const { applyVisitDelta, insertVisitEvents, computeLoyaltyVisitsFromAmount, DEFAULT_ACCESS_VALUE, DEFAULT_VISITS_PER_REWARD } = require('./loyaltyHelpers');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -99,6 +99,77 @@ async function fetchDayItems(saleDate) {
   return result.rows.map(mapSaleRow);
 }
 
+async function getLoyaltySettingsFromDb(client) {
+  const settingsResult = await client.query(
+    `SELECT visits_per_reward, access_value FROM ${table('loyalty_settings')} WHERE id = 1`
+  );
+  let visitsPerReward = DEFAULT_VISITS_PER_REWARD;
+  let accessValue = DEFAULT_ACCESS_VALUE;
+  if (settingsResult.rows.length > 0) {
+    const n = Number(settingsResult.rows[0].visits_per_reward);
+    if (Number.isFinite(n) && n >= 2) visitsPerReward = n;
+    const a = Number(settingsResult.rows[0].access_value);
+    if (Number.isFinite(a) && a > 0) accessValue = a;
+  }
+  return { visitsPerReward, accessValue };
+}
+
+function computeSaleTotal(validatedItems) {
+  return validatedItems.reduce(
+    (sum, { qty, unitPrice }) => sum + Math.round(qty * unitPrice * 100) / 100,
+    0
+  );
+}
+
+async function applyLoyaltyForSale(client, customerId, validatedItems) {
+  if (!customerId) {
+    return { loyaltyApplied: false, rewardsEarned: 0, loyaltyVisitsApplied: 0 };
+  }
+
+  const saleTotal = computeSaleTotal(validatedItems);
+  const { visitsPerReward, accessValue } = await getLoyaltySettingsFromDb(client);
+  const visitDelta = computeLoyaltyVisitsFromAmount(saleTotal, accessValue);
+
+  if (visitDelta <= 0) {
+    return { loyaltyApplied: false, rewardsEarned: 0, loyaltyVisitsApplied: 0 };
+  }
+
+  const customerRow = (
+    await client.query(`SELECT * FROM ${table('loyalty_customers')} WHERE id = $1`, [customerId])
+  ).rows[0];
+
+  const { visits, rewards, rewards_earned, delta_applied } = applyVisitDelta(
+    customerRow.total_visits,
+    customerRow.total_rewards,
+    visitDelta,
+    visitsPerReward
+  );
+
+  const visitsChanged = delta_applied !== 0;
+  const positiveVisit = delta_applied > 0;
+
+  await client.query(
+    `UPDATE ${table('loyalty_customers')}
+     SET total_visits = $1,
+         total_rewards = $2,
+         updated_at = NOW()
+         ${visitsChanged ? ', last_visit_at = NOW()' : ''}
+         ${positiveVisit ? ', last_positive_visit_at = NOW()' : ''}
+     WHERE id = $3`,
+    [visits, rewards, customerId]
+  );
+
+  if (visitsChanged) {
+    await insertVisitEvents(client, customerId, delta_applied, 'daily_sales');
+  }
+
+  return {
+    loyaltyApplied: true,
+    rewardsEarned: rewards_earned,
+    loyaltyVisitsApplied: delta_applied > 0 ? delta_applied : visitDelta
+  };
+}
+
 // GET /api/daily-sales/summary/today — admin
 router.get('/summary/today', authenticateToken, async (req, res) => {
   try {
@@ -142,11 +213,11 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/daily-sales/batch — admin (vários itens, 1 visita de fidelidade opcional)
+// POST /api/daily-sales/batch — admin (vários itens, fidelidade proporcional ao total)
 router.post('/batch', authenticateToken, async (req, res) => {
   const client = await getClient();
   try {
-    const { loyalty_customer_id, sale_date, apply_loyalty_visit, items } = req.body || {};
+    const { loyalty_customer_id, sale_date, items } = req.body || {};
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Informe ao menos um item' });
@@ -219,8 +290,6 @@ router.post('/batch', authenticateToken, async (req, res) => {
       validatedItems.push({ product, qty, unitPrice });
     }
 
-    const shouldApplyLoyalty = Boolean(apply_loyalty_visit) && customerId;
-
     await client.query('BEGIN');
 
     const insertedItems = [];
@@ -239,48 +308,7 @@ router.post('/batch', authenticateToken, async (req, res) => {
       }));
     }
 
-    let loyaltyApplied = false;
-    let rewardsEarned = 0;
-
-    if (shouldApplyLoyalty) {
-      const settingsResult = await client.query(
-        `SELECT visits_per_reward FROM ${table('loyalty_settings')} WHERE id = 1`
-      );
-      let visitsPerReward = 10;
-      if (settingsResult.rows.length > 0) {
-        const n = Number(settingsResult.rows[0].visits_per_reward);
-        if (Number.isFinite(n) && n >= 2) visitsPerReward = n;
-      }
-
-      const customerRow = (
-        await client.query(`SELECT * FROM ${table('loyalty_customers')} WHERE id = $1`, [customerId])
-      ).rows[0];
-
-      const { visits, rewards, rewards_earned, delta_applied } = applyVisitDelta(
-        customerRow.total_visits,
-        customerRow.total_rewards,
-        1,
-        visitsPerReward
-      );
-
-      await client.query(
-        `UPDATE ${table('loyalty_customers')}
-         SET total_visits = $1,
-             total_rewards = $2,
-             updated_at = NOW(),
-             last_visit_at = NOW(),
-             last_positive_visit_at = NOW()
-         WHERE id = $3`,
-        [visits, rewards, customerId]
-      );
-
-      if (delta_applied !== 0) {
-        await insertVisitEvents(client, customerId, delta_applied, 'daily_sales');
-      }
-
-      loyaltyApplied = true;
-      rewardsEarned = rewards_earned;
-    }
+    const loyaltyResult = await applyLoyaltyForSale(client, customerId, validatedItems);
 
     await client.query('COMMIT');
 
@@ -289,8 +317,9 @@ router.post('/batch', authenticateToken, async (req, res) => {
     res.status(201).json({
       items: insertedItems,
       summary,
-      loyalty_applied: loyaltyApplied,
-      rewards_earned: rewardsEarned
+      loyalty_applied: loyaltyResult.loyaltyApplied,
+      loyalty_visits_applied: loyaltyResult.loyaltyVisitsApplied,
+      rewards_earned: loyaltyResult.rewardsEarned
     });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
@@ -370,48 +399,7 @@ router.post('/', authenticateToken, async (req, res) => {
       [dateParsed.value, product.id, customerId, qty, unitPrice]
     );
 
-    let loyaltyApplied = false;
-    let rewardsEarned = 0;
-
-    if (customerId) {
-      const settingsResult = await client.query(
-        `SELECT visits_per_reward FROM ${table('loyalty_settings')} WHERE id = 1`
-      );
-      let visitsPerReward = 10;
-      if (settingsResult.rows.length > 0) {
-        const n = Number(settingsResult.rows[0].visits_per_reward);
-        if (Number.isFinite(n) && n >= 2) visitsPerReward = n;
-      }
-
-      const customerRow = (
-        await client.query(`SELECT * FROM ${table('loyalty_customers')} WHERE id = $1`, [customerId])
-      ).rows[0];
-
-      const { visits, rewards, rewards_earned, delta_applied } = applyVisitDelta(
-        customerRow.total_visits,
-        customerRow.total_rewards,
-        1,
-        visitsPerReward
-      );
-
-      await client.query(
-        `UPDATE ${table('loyalty_customers')}
-         SET total_visits = $1,
-             total_rewards = $2,
-             updated_at = NOW(),
-             last_visit_at = NOW(),
-             last_positive_visit_at = NOW()
-         WHERE id = $3`,
-        [visits, rewards, customerId]
-      );
-
-      if (delta_applied !== 0) {
-        await insertVisitEvents(client, customerId, delta_applied, 'daily_sales');
-      }
-
-      loyaltyApplied = true;
-      rewardsEarned = rewards_earned;
-    }
+    const loyaltyResult = await applyLoyaltyForSale(client, customerId, [{ product, qty, unitPrice }]);
 
     await client.query('COMMIT');
 
@@ -427,8 +415,9 @@ router.post('/', authenticateToken, async (req, res) => {
     res.status(201).json({
       item,
       summary,
-      loyalty_applied: loyaltyApplied,
-      rewards_earned: rewardsEarned
+      loyalty_applied: loyaltyResult.loyaltyApplied,
+      loyalty_visits_applied: loyaltyResult.loyaltyVisitsApplied,
+      rewards_earned: loyaltyResult.rewardsEarned
     });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});

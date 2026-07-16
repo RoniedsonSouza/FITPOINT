@@ -106,8 +106,12 @@ async function ensureDatabase() {
       )
     `);
     await client.query(`
-      INSERT INTO ${SCHEMA}.loyalty_settings (id, visits_per_reward)
-      VALUES (1, 10)
+      ALTER TABLE ${SCHEMA}.loyalty_settings
+      ADD COLUMN IF NOT EXISTS access_value NUMERIC(10,2) NOT NULL DEFAULT 27
+    `);
+    await client.query(`
+      INSERT INTO ${SCHEMA}.loyalty_settings (id, visits_per_reward, access_value)
+      VALUES (1, 10, 27)
       ON CONFLICT (id) DO NOTHING
     `);
     await client.query(`

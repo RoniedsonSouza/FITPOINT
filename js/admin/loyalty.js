@@ -1,6 +1,7 @@
 // Módulo Fidelidade
 
 let loyaltyVisitsPerReward = 10;
+let loyaltyAccessValue = 27;
 let editingLoyaltyId = null;
 let loyaltyPage = 1;
 let loyaltySearch = '';
@@ -24,6 +25,13 @@ function updateLoyaltyRuleText() {
   const el = document.getElementById('loyalty-rule-text');
   if (el) {
     el.textContent = `A cada ${loyaltyVisitsPerReward} visitas, o cliente ganha um Shake ou Hype Drink.`;
+  }
+  const helpEl = document.getElementById('loyalty-access-help');
+  if (helpEl) {
+    const formatted = typeof formatCurrency === 'function'
+      ? formatCurrency(loyaltyAccessValue)
+      : `R$ ${loyaltyAccessValue}`;
+    helpEl.textContent = `Vendas no Diário contam visitas automaticamente: a cada ${formatted} em compras, 1 visita.`;
   }
 }
 
@@ -208,8 +216,11 @@ async function loadLoyaltySettings() {
   try {
     const settings = await DB.getLoyaltySettings();
     loyaltyVisitsPerReward = settings.visits_per_reward || 10;
+    loyaltyAccessValue = Number(settings.access_value) || 27;
     const input = document.getElementById('loyalty-visits-per-reward');
     if (input) input.value = loyaltyVisitsPerReward;
+    const accessInput = document.getElementById('loyalty-access-value');
+    if (accessInput) accessInput.value = loyaltyAccessValue;
     updateLoyaltyRuleText();
   } catch (error) {
     console.error('Erro ao carregar configurações de fidelidade:', error);
@@ -219,16 +230,26 @@ async function loadLoyaltySettings() {
 async function saveLoyaltySettings() {
   const btn = document.getElementById('btn-save-loyalty-settings');
   const input = document.getElementById('loyalty-visits-per-reward');
+  const accessInput = document.getElementById('loyalty-access-value');
   const value = parseInt(input?.value, 10);
+  const accessValue = Number(accessInput?.value);
   if (!input || Number.isNaN(value) || value < 2 || value > 100) {
     showToast('Informe um valor entre 2 e 100 visitas.', 'error');
+    return;
+  }
+  if (!accessInput || !Number.isFinite(accessValue) || accessValue < 1 || accessValue > 10000) {
+    showToast('Informe um valor de acesso entre R$ 1 e R$ 10.000.', 'error');
     return;
   }
 
   await withButtonLoading(btn, async () => {
     try {
-      await DB.updateLoyaltySettings({ visits_per_reward: value });
+      await DB.updateLoyaltySettings({
+        visits_per_reward: value,
+        access_value: Math.round(accessValue * 100) / 100
+      });
       loyaltyVisitsPerReward = value;
+      loyaltyAccessValue = Math.round(accessValue * 100) / 100;
       updateLoyaltyRuleText();
       showToast('Configuração salva!');
       await loadLoyaltyCustomers({ silent: true });

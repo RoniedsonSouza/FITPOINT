@@ -3,6 +3,7 @@
 let editingEventId = null;
 let editingLotId = null;
 let selectedEventId = null;
+let currentEventTab = 'lotes';
 let eventsCache = [];
 let savedEventLogoUrl = null;
 let savedEventCoverUrl = null;
@@ -15,6 +16,7 @@ let ticketQrLastCode = '';
 let ticketQrLastAt = 0;
 let ticketQrLifecycleBound = false;
 const TICKET_QR_COOLDOWN_MS = 2500;
+const EVENT_TABS = ['lotes', 'validar', 'ingressos'];
 
 function formatBRL(value) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value) || 0);
@@ -99,21 +101,136 @@ function formatEventDate(value) {
   return d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+function parseEventsHash() {
+  if (typeof AdminRouter !== 'undefined' && typeof AdminRouter.parseHash === 'function') {
+    const parsed = AdminRouter.parseHash();
+    if (parsed.module === 'eventos') {
+      return {
+        eventId: parsed.eventId || null,
+        tab: EVENT_TABS.includes(parsed.eventTab) ? parsed.eventTab : 'lotes'
+      };
+    }
+  }
+  const hash = window.location.hash || '#/eventos';
+  const match = hash.match(/^#\/eventos(?:\/(\d+)(?:\/(lotes|validar|ingressos))?)?\/?$/);
+  if (!match) return { eventId: null, tab: 'lotes' };
+  return {
+    eventId: match[1] ? Number(match[1]) : null,
+    tab: EVENT_TABS.includes(match[2]) ? match[2] : 'lotes'
+  };
+}
+
+function buildEventDetailHash(id, tab = 'lotes') {
+  const safeTab = EVENT_TABS.includes(tab) ? tab : 'lotes';
+  if (safeTab === 'lotes') return `#/eventos/${id}`;
+  return `#/eventos/${id}/${safeTab}`;
+}
+
+function stopEventsQrCamera() {
+  if (typeof releaseTicketQrCameraSync === 'function') releaseTicketQrCameraSync();
+  if (typeof stopTicketQrScanner === 'function') stopTicketQrScanner({ reason: 'navigate' });
+}
+
+function showEventsListView() {
+  stopEventsQrCamera();
+  selectedEventId = null;
+  currentEventTab = 'lotes';
+  document.getElementById('events-list-panel')?.classList.remove('hidden');
+  document.getElementById('event-detail-panel')?.classList.add('hidden');
+  const resultEl = document.getElementById('ticket-validate-result');
+  if (resultEl) resultEl.textContent = '';
+}
+
+function backToEventsList() {
+  if (window.location.hash !== '#/eventos') {
+    window.location.hash = '#/eventos';
+  } else {
+    showEventsListView();
+    renderEventsList();
+    refreshIcons();
+  }
+}
+
+function openEventDetail(id, tab = 'lotes') {
+  const nextHash = buildEventDetailHash(id, tab);
+  if (window.location.hash !== nextHash) {
+    window.location.hash = nextHash;
+  } else {
+    loadEventDetail(id, tab);
+  }
+}
+
+function setEventTab(tab) {
+  if (!selectedEventId) return;
+  const safeTab = EVENT_TABS.includes(tab) ? tab : 'lotes';
+  const nextHash = buildEventDetailHash(selectedEventId, safeTab);
+  if (window.location.hash !== nextHash) {
+    window.location.hash = nextHash;
+  } else {
+    applyEventTab(safeTab);
+  }
+}
+
+function applyEventTab(tab) {
+  const safeTab = EVENT_TABS.includes(tab) ? tab : 'lotes';
+  const previousTab = currentEventTab;
+  currentEventTab = safeTab;
+
+  if (previousTab === 'validar' && safeTab !== 'validar') {
+    stopEventsQrCamera();
+  }
+
+  document.querySelectorAll('[data-event-tab]').forEach((btn) => {
+    btn.classList.toggle('is-active', btn.dataset.eventTab === safeTab);
+  });
+  document.querySelectorAll('[data-event-tab-panel]').forEach((panel) => {
+    panel.classList.toggle('hidden', panel.dataset.eventTabPanel !== safeTab);
+  });
+
+  if (safeTab === 'ingressos') {
+    loadTicketsAdmin();
+  }
+  refreshIcons();
+}
+
+function editSelectedEvent() {
+  if (selectedEventId) editEvent(selectedEventId);
+}
+
 async function loadEvents() {
   const container = document.getElementById('events-list');
   if (!container || typeof DB === 'undefined') return;
-  container.innerHTML = '<p class="text-black/60">Carregando...</p>';
+
+  const { eventId, tab } = parseEventsHash();
+
+  if (!eventId) {
+    showEventsListView();
+    container.innerHTML = '<p class="text-black/60">Carregando...</p>';
+  }
 
   try {
     eventsCache = await DB.getEvents({ all: true });
-    renderEventsList();
-    if (!selectedEventId) {
-      await loadTicketsAdmin();
+
+    if (eventId) {
+      if (!eventsCache.some((e) => e.id === eventId)) {
+        showToast('Evento não encontrado', 'error');
+        window.location.hash = '#/eventos';
+        return;
+      }
+      await loadEventDetail(eventId, tab);
+      return;
     }
+
+    renderEventsList();
     refreshIcons();
   } catch (error) {
     if (handleAuthError(error)) return;
-    container.innerHTML = '<p class="text-red-600">Erro ao carregar eventos.</p>';
+    if (!eventId) {
+      container.innerHTML = '<p class="text-red-600">Erro ao carregar eventos.</p>';
+    } else {
+      showToast('Erro ao carregar eventos', 'error');
+      window.location.hash = '#/eventos';
+    }
   }
 }
 
@@ -123,50 +240,56 @@ function renderEventsList() {
 
   if (!eventsCache.length) {
     container.innerHTML = '<p class="text-black/60">Nenhum evento. Clique em "Novo evento".</p>';
-    document.getElementById('event-detail-panel')?.classList.add('hidden');
     return;
   }
 
   container.innerHTML = eventsCache.map((ev) => `
-    <div class="card ${selectedEventId === ev.id ? 'ring-2 ring-fp-green' : ''}">
-      <div class="flex items-start justify-between gap-3">
-        <button type="button" class="text-left flex-1" onclick="selectEvent(${ev.id})">
-          <h3 class="font-semibold">${escapeHtml(ev.title)}</h3>
-          <p class="text-xs text-black/50 mt-1">${formatEventDate(ev.starts_at)}${ev.venue ? ' · ' + escapeHtml(ev.venue) : ''}</p>
-          <p class="text-xs mt-1 ${ev.active === false ? 'text-red-600' : 'text-fp-green'}">${ev.active === false ? 'Inativo' : 'Ativo'}</p>
-        </button>
-        <div class="flex gap-2 shrink-0">
-          <button type="button" onclick="editEvent(${ev.id})" class="btn btn-outline btn-sm btn-icon" title="Editar">
-            <i data-lucide="edit"></i>
-          </button>
-          <button type="button" onclick="deleteEvent(${ev.id})" class="btn btn-danger btn-sm btn-icon" title="Excluir">
-            <i data-lucide="trash"></i>
-          </button>
+    <div class="card">
+      <div class="flex flex-col gap-3">
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex-1 min-w-0">
+            <h3 class="font-semibold">${escapeHtml(ev.title)}</h3>
+            <p class="text-xs text-black/50 mt-1">${formatEventDate(ev.starts_at)}${ev.venue ? ' · ' + escapeHtml(ev.venue) : ''}</p>
+            <p class="text-xs mt-1 ${ev.active === false ? 'text-red-600' : 'text-fp-green'}">${ev.active === false ? 'Inativo' : 'Ativo'}</p>
+          </div>
+          <div class="flex gap-2 shrink-0">
+            <button type="button" onclick="editEvent(${ev.id})" class="btn btn-outline btn-sm btn-icon" title="Editar">
+              <i data-lucide="edit"></i>
+            </button>
+            <button type="button" onclick="deleteEvent(${ev.id})" class="btn btn-danger btn-sm btn-icon" title="Excluir">
+              <i data-lucide="trash"></i>
+            </button>
+          </div>
         </div>
+        <button type="button" onclick="openEventDetail(${ev.id})" class="btn btn-primary btn-sm w-full sm:w-auto">
+          <i data-lucide="settings-2"></i> Gerenciar
+        </button>
       </div>
     </div>
   `).join('');
-
-  if (selectedEventId && !eventsCache.some((e) => e.id === selectedEventId)) {
-    selectedEventId = null;
-    document.getElementById('event-detail-panel')?.classList.add('hidden');
-  } else if (selectedEventId) {
-    selectEvent(selectedEventId);
-  }
 }
 
-async function selectEvent(id) {
-  selectedEventId = id;
+async function loadEventDetail(id, tab = 'lotes') {
+  const listPanel = document.getElementById('events-list-panel');
   const panel = document.getElementById('event-detail-panel');
   const titleEl = document.getElementById('event-detail-title');
+  const metaEl = document.getElementById('event-detail-meta');
   const lotsEl = document.getElementById('event-lots-list');
   if (!panel || !lotsEl) return;
 
+  selectedEventId = id;
+  listPanel?.classList.add('hidden');
   panel.classList.remove('hidden');
+
   const ev = eventsCache.find((e) => e.id === id);
   if (titleEl) titleEl.textContent = ev ? ev.title : 'Evento';
+  if (metaEl) {
+    const status = ev?.active === false ? 'Inativo' : 'Ativo';
+    const statusClass = ev?.active === false ? 'text-red-600' : 'text-fp-green';
+    metaEl.innerHTML = `${formatEventDate(ev?.starts_at)}${ev?.venue ? ' · ' + escapeHtml(ev.venue) : ''} · <span class="${statusClass}">${status}</span>`;
+  }
 
-  renderEventsListHighlight();
+  applyEventTab(tab);
 
   lotsEl.innerHTML = '<p class="text-black/60 text-sm">Carregando lotes…</p>';
   try {
@@ -201,33 +324,6 @@ async function selectEvent(id) {
     if (handleAuthError(error)) return;
     lotsEl.innerHTML = '<p class="text-red-600 text-sm">Erro ao carregar lotes.</p>';
   }
-
-  const filter = document.getElementById('tickets-event-filter');
-  if (filter) {
-    if (filter.options.length <= 1 && eventsCache.length) {
-      filter.innerHTML =
-        '<option value="">Todos os eventos</option>' +
-        eventsCache.map((e) => `<option value="${e.id}">${escapeHtml(e.title)}</option>`).join('');
-    }
-    filter.value = String(id);
-  }
-  await loadTicketsAdmin();
-}
-
-function renderEventsListHighlight() {
-  const container = document.getElementById('events-list');
-  if (!container || !eventsCache.length) return;
-  // Re-render only selection ring via selectEvent calling renderEventsList causes recursion;
-  // instead update rings after list exists:
-  container.querySelectorAll('[onclick^="selectEvent"]').forEach((btn) => {
-    const match = btn.getAttribute('onclick')?.match(/selectEvent\((\d+)\)/);
-    const id = match ? Number(match[1]) : null;
-    const card = btn.closest('.card');
-    if (card) {
-      card.classList.toggle('ring-2', id === selectedEventId);
-      card.classList.toggle('ring-fp-green', id === selectedEventId);
-    }
-  });
 }
 
 function setEventImagePreview(previewId, url) {
@@ -478,13 +574,14 @@ async function saveEvent(event) {
       if (editingEventId) {
         await DB.updateEvent(editingEventId, payload);
         showToast('Evento atualizado!');
+        closeEventModal();
+        await loadEvents();
       } else {
         const created = await DB.addEvent(payload);
-        selectedEventId = created.id;
         showToast('Evento criado!');
+        closeEventModal();
+        openEventDetail(created.id, 'lotes');
       }
-      closeEventModal();
-      await loadEvents();
     } catch (error) {
       if (!handleAuthError(error)) showToast('Erro: ' + error.message, 'error');
     }
@@ -526,9 +623,13 @@ async function deleteEvent(id) {
   if (!confirm('Excluir este evento? Lotes sem vendas também serão removidos.')) return;
   try {
     await DB.deleteEvent(id);
-    if (selectedEventId === id) selectedEventId = null;
     showToast('Evento excluído!');
-    await loadEvents();
+    if (selectedEventId === id) {
+      selectedEventId = null;
+      window.location.hash = '#/eventos';
+    } else {
+      await loadEvents();
+    }
   } catch (error) {
     if (!handleAuthError(error)) showToast('Erro: ' + error.message, 'error');
   }
@@ -536,7 +637,7 @@ async function deleteEvent(id) {
 
 function openLotModal(lotId = null) {
   if (!selectedEventId) {
-    showToast('Selecione um evento primeiro', 'error');
+    showToast('Abra um evento para gerenciar lotes', 'error');
     return;
   }
   editingLotId = lotId;
@@ -628,7 +729,7 @@ async function saveLot(event) {
         showToast('Lote criado!');
       }
       closeLotModal();
-      await selectEvent(selectedEventId);
+      await loadEventDetail(selectedEventId, 'lotes');
     } catch (error) {
       if (!handleAuthError(error)) showToast('Erro: ' + error.message, 'error');
     }
@@ -641,7 +742,7 @@ async function deleteLot(id) {
   try {
     await DB.deleteEventLot(selectedEventId, id);
     showToast('Lote excluído!');
-    await selectEvent(selectedEventId);
+    await loadEventDetail(selectedEventId, 'lotes');
   } catch (error) {
     if (!handleAuthError(error)) showToast('Erro: ' + error.message, 'error');
   }
@@ -649,22 +750,14 @@ async function deleteLot(id) {
 
 async function loadTicketsAdmin() {
   const container = document.getElementById('tickets-admin-list');
-  const filter = document.getElementById('tickets-event-filter');
   const statusFilter = document.getElementById('tickets-status-filter');
   const search = document.getElementById('tickets-search');
-  if (!container) return;
-
-  if (filter && filter.options.length <= 1 && eventsCache.length) {
-    filter.innerHTML =
-      '<option value="">Todos os eventos</option>' +
-      eventsCache.map((e) => `<option value="${e.id}">${escapeHtml(e.title)}</option>`).join('');
-    if (selectedEventId) filter.value = String(selectedEventId);
-  }
+  if (!container || !selectedEventId) return;
 
   container.innerHTML = '<p class="text-black/60 text-sm">Carregando ingressos…</p>';
   try {
     const data = await DB.getTickets({
-      event_id: filter?.value || undefined,
+      event_id: selectedEventId,
       status: statusFilter?.value || undefined,
       q: search?.value?.trim() || undefined,
       limit: 50
@@ -681,7 +774,6 @@ async function loadTicketsAdmin() {
             <tr class="text-left text-black/50 border-b border-black/10">
               <th class="py-2 pr-3">Código</th>
               <th class="py-2 pr-3">Comprador</th>
-              <th class="py-2 pr-3">Evento</th>
               <th class="py-2 pr-3">Lote</th>
               <th class="py-2">Status</th>
             </tr>
@@ -693,7 +785,6 @@ async function loadTicketsAdmin() {
               <tr class="border-b border-black/5">
                 <td class="py-2 pr-3 font-mono text-xs">${escapeHtml(t.code)}</td>
                 <td class="py-2 pr-3">${escapeHtml(t.buyer_name)}<br><span class="text-xs text-black/50">${escapeHtml(t.buyer_email)}</span></td>
-                <td class="py-2 pr-3">${escapeHtml(t.event_title)}</td>
                 <td class="py-2 pr-3">${escapeHtml(t.lot_name)}</td>
                 <td class="py-2">${t.status === 'used' ? 'Usado' : t.status === 'cancelled' ? 'Cancelado' : 'Válido'}</td>
               </tr>`

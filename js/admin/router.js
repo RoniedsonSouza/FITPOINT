@@ -68,29 +68,45 @@ const AdminRouter = {
 
   parseHash() {
     const hash = window.location.hash || '#/';
-    if (hash === '#/' || hash === '#') return 'dashboard';
-    if (hash.startsWith('#/categorias')) return 'categorias';
-    if (hash.startsWith('#/fidelidade')) return 'fidelidade';
-    if (hash.startsWith('#/produtos')) return 'produtos';
-    if (hash.startsWith('#/diario')) return 'diario';
-    if (hash.startsWith('#/vendas')) return 'vendas';
-    if (hash.startsWith('#/eventos')) return 'eventos';
-    return 'dashboard';
+    if (hash === '#/' || hash === '#') return { module: 'dashboard' };
+    if (hash.startsWith('#/categorias')) return { module: 'categorias' };
+    if (hash.startsWith('#/fidelidade')) return { module: 'fidelidade' };
+    if (hash.startsWith('#/produtos')) return { module: 'produtos' };
+    if (hash.startsWith('#/diario')) return { module: 'diario' };
+    if (hash.startsWith('#/vendas')) return { module: 'vendas' };
+    if (hash.startsWith('#/eventos')) {
+      const match = hash.match(/^#\/eventos(?:\/(\d+)(?:\/(lotes|validar|ingressos))?)?\/?$/);
+      if (match) {
+        const eventId = match[1] ? Number(match[1]) : null;
+        const eventTab = match[2] || (eventId ? 'lotes' : null);
+        return { module: 'eventos', eventId, eventTab };
+      }
+      return { module: 'eventos' };
+    }
+    return { module: 'dashboard' };
   },
 
   handleHash() {
     if (!this.isAuthenticated()) return;
-    const module = this.parseHash();
+    const { module } = this.parseHash();
     this.showModule(module, false);
   },
 
   navigate(module) {
     const route = this.routes[module];
     if (!route) return;
+    // Sidebar "Eventos" sempre abre a lista, não o último evento
     if (window.location.hash !== route.hash) {
       window.location.hash = route.hash;
     } else {
       this.showModule(module, true);
+    }
+  },
+
+  stopEventsQrIfNeeded(previousModule, module) {
+    if (previousModule === 'eventos' && module !== 'eventos') {
+      if (typeof releaseTicketQrCameraSync === 'function') releaseTicketQrCameraSync();
+      if (typeof stopTicketQrScanner === 'function') stopTicketQrScanner({ reason: 'navigate' });
     }
   },
 
@@ -101,10 +117,7 @@ const AdminRouter = {
     if (!route) return;
 
     const previousModule = this.currentModule;
-    if (previousModule === 'eventos' && module !== 'eventos') {
-      if (typeof releaseTicketQrCameraSync === 'function') releaseTicketQrCameraSync();
-      if (typeof stopTicketQrScanner === 'function') stopTicketQrScanner({ reason: 'navigate' });
-    }
+    this.stopEventsQrIfNeeded(previousModule, module);
 
     this.currentModule = module;
 
@@ -206,7 +219,8 @@ const AdminRouter = {
 
 function initAdminAfterLogin() {
   AdminRouter.reset();
-  if (window.location.hash && AdminRouter.parseHash() !== 'dashboard') {
+  const parsed = AdminRouter.parseHash();
+  if (window.location.hash && parsed.module !== 'dashboard') {
     AdminRouter.handleHash();
   } else {
     window.location.hash = '#/';

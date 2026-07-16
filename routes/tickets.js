@@ -3,7 +3,13 @@ const crypto = require('crypto');
 const router = express.Router();
 const { query, table, getClient } = require('../config/database');
 const { authenticateToken } = require('../config/auth');
-const { createTicketPreference, getPaymentById, findApprovedPaymentByOrderId } = require('../services/mercadopago');
+const {
+  createPixPayment,
+  createCardPayment,
+  getPaymentById,
+  findApprovedPaymentByOrderId,
+  getPublicKey
+} = require('../services/mercadopago');
 const { sendTicketEmail } = require('../services/email');
 const { computeOrderTotal } = require('../services/ticketPricing');
 
@@ -164,6 +170,29 @@ async function releaseOrderStock(orderId) {
   }
 }
 
+// Mensagens amigáveis para recusas de cartão (status_detail do MP)
+function friendlyCardError(statusDetail) {
+  const map = {
+    cc_rejected_insufficient_amount: 'Cartão sem limite disponível para esta compra.',
+    cc_rejected_bad_filled_card_number: 'Número do cartão incorreto. Confira e tente novamente.',
+    cc_rejected_bad_filled_date: 'Data de validade incorreta. Confira e tente novamente.',
+    cc_rejected_bad_filled_security_code: 'Código de segurança (CVV) incorreto.',
+    cc_rejected_bad_filled_other: 'Algum dado do cartão está incorreto. Revise e tente novamente.',
+    cc_rejected_call_for_authorize: 'O banco não autorizou. Ligue para o seu banco ou use outro cartão.',
+    cc_rejected_card_disabled: 'Cartão desativado. Contate o banco emissor ou use outro cartão.',
+    cc_rejected_duplicated_payment: 'Você já fez um pagamento com esse valor há pouco. Aguarde alguns minutos.',
+    cc_rejected_high_risk: 'Pagamento não autorizado. Tente outro cartão ou pague com Pix.',
+    cc_rejected_max_attempts: 'Limite de tentativas atingido. Aguarde ou use outro meio de pagamento.',
+    cc_rejected_card_expired: 'Cartão vencido. Use outro cartão.'
+  };
+  return map[statusDetail] || 'Pagamento não aprovado. Tente outro cartão ou pague com Pix.';
+}
+
+// GET /api/tickets/payment-config — público (chave pública para tokenizar cartão no navegador)
+router.get('/payment-config', (req, res) => {
+  res.json({ public_key: getPublicKey() });
+});
+
 // POST /api/tickets/checkout — público
 router.post('/checkout', async (req, res) => {
   const client = await getClient();
@@ -173,11 +202,24 @@ router.post('/checkout', async (req, res) => {
       quantity = 1,
       buyer_name,
       buyer_email,
-      buyer_phone
+      buyer_phone,
+      payment_method = 'pix',
+      card = null
     } = req.body;
 
     if (!lot_id) {
       return res.status(400).json({ error: 'Lote é obrigatório' });
+    }
+    if (payment_method !== 'pix' && payment_method !== 'card') {
+      return res.status(400).json({ error: 'Forma de pagamento inválida' });
+    }
+    if (payment_method === 'card') {
+      if (!card || !card.token) {
+        return res.status(400).json({ error: 'Dados do cartão não recebidos. Tente novamente.' });
+      }
+      if (!card.payment_method_id) {
+        return res.status(400).json({ error: 'Bandeira do cartão não identificada.' });
+      }
     }
     if (!buyer_name || !String(buyer_name).trim()) {
       return res.status(400).json({ error: 'Nome é obrigatório' });
@@ -262,40 +304,111 @@ router.post('/checkout', async (req, res) => {
     const order = orderRes.rows[0];
     await client.query('COMMIT');
 
-    let preference;
-    try {
-      preference = await createTicketPreference({
-        orderId: order.id,
-        eventId: lot.event_id,
-        title: `${lot.event_title} — ${lot.name} (${qty} ingresso${qty > 1 ? 's' : ''})`,
-        totalAmount: amount,
-        buyerEmail: email,
-        buyerName: String(buyer_name).trim()
-      });
-    } catch (mpErr) {
-      console.error('Erro Mercado Pago Preference:', mpErr);
-      await releaseOrderStock(order.id);
-      return res.status(502).json({
-        error: mpErr.message || 'Falha ao criar pagamento no Mercado Pago'
+    const description = `${lot.event_title} — ${lot.name} (${qty} ingresso${qty > 1 ? 's' : ''})`;
+
+    // ===== Pix: gera QR Code / copia-e-cola, pagamento dentro do site =====
+    if (payment_method === 'pix') {
+      let pix;
+      try {
+        pix = await createPixPayment({
+          orderId: order.id,
+          amount,
+          description,
+          buyerEmail: email,
+          buyerName: String(buyer_name).trim()
+        });
+      } catch (mpErr) {
+        console.error('Erro ao criar pagamento Pix:', mpErr);
+        await releaseOrderStock(order.id);
+        return res.status(502).json({
+          error: 'Não foi possível gerar o Pix agora. Tente novamente em instantes.'
+        });
+      }
+
+      await query(
+        `UPDATE ${table('ticket_orders')}
+         SET mp_payment_id = $1, updated_at = NOW()
+         WHERE id = $2`,
+        [String(pix.id), order.id]
+      );
+
+      return res.status(201).json({
+        order_id: order.id,
+        payment_method: 'pix',
+        status: 'pending',
+        amount,
+        savings: pricing.savings,
+        promo_applied: pricing.promoApplied,
+        pix: {
+          qr_code: pix.qr_code,
+          qr_code_base64: pix.qr_code_base64,
+          expires_at: pix.expires_at
+        }
       });
     }
 
-    await query(
-      `UPDATE ${table('ticket_orders')}
-       SET mp_preference_id = $1, updated_at = NOW()
-       WHERE id = $2`,
-      [preference.id, order.id]
-    );
+    // ===== Cartão de crédito: token gerado no navegador, cobrança direta =====
+    let payment;
+    try {
+      payment = await createCardPayment({
+        orderId: order.id,
+        amount,
+        description,
+        token: card.token,
+        installments: card.installments,
+        paymentMethodId: card.payment_method_id,
+        issuerId: card.issuer_id,
+        buyerEmail: email,
+        identificationType: card.identification_type || (card.identification_number ? 'CPF' : null),
+        identificationNumber: card.identification_number
+      });
+    } catch (mpErr) {
+      console.error('Erro ao criar pagamento com cartão:', mpErr);
+      await releaseOrderStock(order.id);
+      return res.status(502).json({
+        error: 'Não foi possível processar o cartão agora. Tente novamente ou pague com Pix.'
+      });
+    }
 
-    const initPoint = preference.init_point || preference.sandbox_init_point;
+    if (payment.status === 'approved') {
+      try {
+        await fulfillPaidOrder(order.id, payment.id);
+      } catch (fulfillErr) {
+        // Pagamento aprovado; webhook/sync completam a emissão depois
+        console.error('Pagamento aprovado, falha ao emitir ingressos agora:', fulfillErr);
+      }
+      return res.status(201).json({
+        order_id: order.id,
+        payment_method: 'card',
+        status: 'approved',
+        amount,
+        savings: pricing.savings,
+        promo_applied: pricing.promoApplied
+      });
+    }
 
-    res.status(201).json({
-      order_id: order.id,
-      preference_id: preference.id,
-      init_point: initPoint,
-      amount,
-      savings: pricing.savings,
-      promo_applied: pricing.promoApplied
+    if (payment.status === 'in_process' || payment.status === 'pending') {
+      await query(
+        `UPDATE ${table('ticket_orders')}
+         SET mp_payment_id = $1, updated_at = NOW()
+         WHERE id = $2`,
+        [String(payment.id), order.id]
+      );
+      return res.status(201).json({
+        order_id: order.id,
+        payment_method: 'card',
+        status: 'in_process',
+        amount,
+        savings: pricing.savings,
+        promo_applied: pricing.promoApplied
+      });
+    }
+
+    // Recusado
+    await releaseOrderStock(order.id);
+    return res.status(402).json({
+      error: friendlyCardError(payment.status_detail),
+      status: 'rejected'
     });
   } catch (error) {
     try {

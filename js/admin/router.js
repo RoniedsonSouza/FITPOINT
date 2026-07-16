@@ -101,8 +101,9 @@ const AdminRouter = {
     if (!route) return;
 
     const previousModule = this.currentModule;
-    if (previousModule === 'eventos' && module !== 'eventos' && typeof stopTicketQrScanner === 'function') {
-      stopTicketQrScanner();
+    if (previousModule === 'eventos' && module !== 'eventos') {
+      if (typeof releaseTicketQrCameraSync === 'function') releaseTicketQrCameraSync();
+      if (typeof stopTicketQrScanner === 'function') stopTicketQrScanner({ reason: 'navigate' });
     }
 
     this.currentModule = module;

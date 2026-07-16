@@ -8,8 +8,12 @@ let savedEventLogoUrl = null;
 let savedEventCoverUrl = null;
 let ticketQrScanner = null;
 let ticketQrScanBusy = false;
+let ticketQrStarting = false;
+let ticketQrStopPromise = null;
+let ticketQrStartSession = 0;
 let ticketQrLastCode = '';
 let ticketQrLastAt = 0;
+let ticketQrLifecycleBound = false;
 const TICKET_QR_COOLDOWN_MS = 2500;
 
 function formatBRL(value) {
@@ -256,6 +260,13 @@ function addEventSponsorRow(sponsor = null) {
   const row = document.createElement('div');
   row.className = 'event-sponsor-row';
   row.innerHTML = `
+    <div class="event-sponsor-image-wrap">
+      <img class="event-sponsor-preview hidden" alt="Logo do patrocinador">
+      <label class="event-sponsor-image-btn" title="Adicionar logo">
+        <i data-lucide="image"></i>
+        <input type="file" class="event-sponsor-file" accept="image/jpeg,image/png,image/webp,image/gif" aria-label="Logo do patrocinador">
+      </label>
+    </div>
     <input type="text" class="event-sponsor-name flex-1 min-w-0" placeholder="Nome" value="" aria-label="Nome fantasia">
     <input type="text" class="event-sponsor-instagram flex-1 min-w-0" placeholder="@instagram" value="" aria-label="Instagram">
     <button type="button" class="btn btn-danger btn-sm btn-icon" title="Remover patrocinador" aria-label="Remover">
@@ -264,15 +275,66 @@ function addEventSponsorRow(sponsor = null) {
   `;
   const nameInput = row.querySelector('.event-sponsor-name');
   const igInput = row.querySelector('.event-sponsor-instagram');
+  const fileInput = row.querySelector('.event-sponsor-file');
+  const preview = row.querySelector('.event-sponsor-preview');
+
   if (sponsor) {
     nameInput.value = sponsor.fantasy_name || '';
     igInput.value = sponsor.instagram || '';
+    if (sponsor.image_url) {
+      row.dataset.savedImageUrl = sponsor.image_url;
+      setSponsorRowPreview(row, sponsor.image_url);
+    }
   }
+
+  fileInput?.addEventListener('change', () => {
+    const f = fileInput.files && fileInput.files[0];
+    if (preview?.src && preview.src.startsWith('blob:')) {
+      URL.revokeObjectURL(preview.src);
+    }
+    if (f) {
+      setSponsorRowPreview(row, URL.createObjectURL(f));
+    } else {
+      setSponsorRowPreview(row, row.dataset.savedImageUrl || null);
+    }
+  });
+
   row.querySelector('button')?.addEventListener('click', () => {
+    if (preview?.src && preview.src.startsWith('blob:')) {
+      URL.revokeObjectURL(preview.src);
+    }
     row.remove();
   });
+
   list.appendChild(row);
   refreshIcons();
+}
+
+function setSponsorRowPreview(row, url) {
+  const preview = row.querySelector('.event-sponsor-preview');
+  const imageBtn = row.querySelector('.event-sponsor-image-btn');
+  if (!preview) return;
+  if (url) {
+    preview.src = url;
+    preview.classList.remove('hidden');
+    imageBtn?.classList.add('hidden');
+  } else {
+    if (preview.src && preview.src.startsWith('blob:')) {
+      URL.revokeObjectURL(preview.src);
+    }
+    preview.removeAttribute('src');
+    preview.classList.add('hidden');
+    imageBtn?.classList.remove('hidden');
+  }
+}
+
+function revokeSponsorRowPreviews() {
+  document.querySelectorAll('#event-sponsors-list .event-sponsor-row').forEach((row) => {
+    const preview = row.querySelector('.event-sponsor-preview');
+    if (preview?.src && preview.src.startsWith('blob:')) {
+      URL.revokeObjectURL(preview.src);
+    }
+  });
 }
 
 function renderEventSponsors(sponsors) {
@@ -293,9 +355,31 @@ function collectEventSponsors() {
   rows.forEach((row) => {
     const fantasy_name = row.querySelector('.event-sponsor-name')?.value?.trim() || '';
     const instagram = row.querySelector('.event-sponsor-instagram')?.value?.trim() || '';
-    if (!fantasy_name && !instagram) return;
-    sponsors.push({ fantasy_name, instagram });
+    const image_url = row.dataset.savedImageUrl || null;
+    if (!fantasy_name && !instagram && !image_url) return;
+    sponsors.push({ fantasy_name, instagram, image_url });
   });
+  return sponsors;
+}
+
+async function collectEventSponsorsWithUploads() {
+  const rows = document.querySelectorAll('#event-sponsors-list .event-sponsor-row');
+  const sponsors = [];
+  for (const row of rows) {
+    const fantasy_name = row.querySelector('.event-sponsor-name')?.value?.trim() || '';
+    const instagram = row.querySelector('.event-sponsor-instagram')?.value?.trim() || '';
+    let image_url = row.dataset.savedImageUrl || null;
+    const fileInput = row.querySelector('.event-sponsor-file');
+    if (fileInput?.files?.[0]) {
+      const { url } = await DB.uploadEventImage(fileInput.files[0]);
+      image_url = url;
+      row.dataset.savedImageUrl = url;
+      fileInput.value = '';
+      setSponsorRowPreview(row, url);
+    }
+    if (!fantasy_name && !instagram && !image_url) continue;
+    sponsors.push({ fantasy_name, instagram, image_url });
+  }
   return sponsors;
 }
 
@@ -342,6 +426,7 @@ function closeEventModal() {
   const coverPrev = document.getElementById('event-cover-preview');
   if (logoPrev?.src?.startsWith('blob:')) URL.revokeObjectURL(logoPrev.src);
   if (coverPrev?.src?.startsWith('blob:')) URL.revokeObjectURL(coverPrev.src);
+  revokeSponsorRowPreviews();
   document.getElementById('event-modal')?.classList.remove('active');
   editingEventId = null;
 }
@@ -363,7 +448,6 @@ async function saveEvent(event) {
     starts_at: fromDatetimeLocalValue(document.getElementById('event-starts-at').value),
     logo_url,
     cover_url,
-    sponsors: collectEventSponsors(),
     active: document.getElementById('event-active').checked
   };
 
@@ -388,6 +472,8 @@ async function saveEvent(event) {
         savedEventCoverUrl = url;
         payload.cover_url = url;
       }
+
+      payload.sponsors = await collectEventSponsorsWithUploads();
 
       if (editingEventId) {
         await DB.updateEvent(editingEventId, payload);
@@ -434,10 +520,6 @@ function wireEventImagePreviews() {
       }
     });
   });
-}
-
-if (typeof document !== 'undefined') {
-  document.addEventListener('DOMContentLoaded', wireEventImagePreviews);
 }
 
 async function deleteEvent(id) {
@@ -633,40 +715,48 @@ async function submitTicketValidation(code, options = {}) {
   const input = document.getElementById('ticket-validate-code');
   const resultEl = document.getElementById('ticket-validate-result');
   const btn = document.querySelector('#ticket-validate-form button[type="submit"]');
-  const trimmed = String(code || '').trim();
+  const trimmed = fromScanner ? normalizeTicketCodeFromQr(code) : String(code || '').trim();
   if (!trimmed) {
-    showToast('Informe o código', 'error');
+    if (fromScanner) setTicketQrOverlayResult('QR inválido ou vazio.', 'error');
+    else showToast('Informe o código', 'error');
     return false;
   }
 
-  if (input) input.value = trimmed;
+  if (input && !fromScanner) input.value = trimmed;
 
   const run = async () => {
     try {
       const data = await DB.validateTicket(trimmed);
+      const successText = `OK — ${data.ticket.buyer_name} · ${data.ticket.event_title} · ${data.ticket.lot_name}`;
       if (resultEl) {
         resultEl.className = 'mt-3 text-sm text-fp-green';
-        resultEl.textContent = `OK — ${data.ticket.buyer_name} · ${data.ticket.event_title} · ${data.ticket.lot_name}`;
+        resultEl.textContent = successText;
       }
+      setTicketQrOverlayResult(successText, 'success');
       showToast('Ingresso validado!');
       if (input) input.value = '';
       await loadTicketsAdmin();
       return true;
     } catch (error) {
       if (handleAuthError(error)) return false;
+      const extra = error.data?.ticket
+        ? ` (${error.data.ticket.buyer_name || ''} · ${error.data.ticket.status || ''})`
+        : '';
+      const errorText = error.message + extra;
       if (resultEl) {
         resultEl.className = 'mt-3 text-sm text-red-600';
-        const extra = error.data?.ticket
-          ? ` (${error.data.ticket.buyer_name || ''} · ${error.data.ticket.status || ''})`
-          : '';
-        resultEl.textContent = error.message + extra;
+        resultEl.textContent = errorText;
       }
+      setTicketQrOverlayResult(errorText, 'error');
       showToast(error.message, 'error');
       return false;
     }
   };
 
-  if (fromScanner || !btn) {
+  if (fromScanner) {
+    return run();
+  }
+  if (!btn) {
     return run();
   }
   let ok = false;
@@ -682,16 +772,168 @@ async function validateTicketCode(event) {
   await submitTicketValidation(input?.value);
 }
 
-function setTicketQrUiActive(active) {
-  document.getElementById('ticket-qr-reader-wrap')?.classList.toggle('hidden', !active);
-  document.getElementById('ticket-qr-start-btn')?.classList.toggle('hidden', active);
-  document.getElementById('ticket-qr-stop-btn')?.classList.toggle('hidden', !active);
+function isTicketQrOverlayOpen() {
+  const overlay = document.getElementById('ticket-qr-overlay');
+  return Boolean(overlay && !overlay.classList.contains('hidden'));
+}
+
+function setTicketQrOverlayOpen(open) {
+  const overlay = document.getElementById('ticket-qr-overlay');
+  if (!overlay) return;
+  overlay.classList.toggle('hidden', !open);
+  overlay.setAttribute('aria-hidden', open ? 'false' : 'true');
+  document.body.classList.toggle('ticket-qr-open', open);
   refreshIcons();
 }
 
+function setTicketQrLoading(loading) {
+  document.getElementById('ticket-qr-loading')?.classList.toggle('hidden', !loading);
+}
+
+function setTicketQrOverlayResult(message, type = '') {
+  if (!isTicketQrOverlayOpen()) return;
+  const el = document.getElementById('ticket-qr-overlay-result');
+  if (!el) return;
+  el.textContent = message || '';
+  el.className = 'ticket-qr-overlay-result';
+  if (type === 'success') el.classList.add('is-success');
+  if (type === 'error') el.classList.add('is-error');
+  if (type === 'pending') el.classList.add('is-pending');
+}
+
+function clearTicketQrReaderElement() {
+  const readerEl = document.getElementById('ticket-qr-reader');
+  if (readerEl) readerEl.innerHTML = '';
+}
+
+function releaseTicketQrCameraTracks() {
+  const readerEl = document.getElementById('ticket-qr-reader');
+  if (!readerEl) return;
+  readerEl.querySelectorAll('video').forEach((video) => {
+    const stream = video.srcObject;
+    if (stream && typeof stream.getTracks === 'function') {
+      stream.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch (_) {
+          /* ignore */
+        }
+      });
+    }
+    video.srcObject = null;
+    video.removeAttribute('src');
+  });
+}
+
+function releaseTicketQrCameraSync() {
+  const scanner = ticketQrScanner;
+  ticketQrScanner = null;
+  ticketQrStarting = false;
+  ticketQrStartSession += 1;
+  ticketQrScanBusy = false;
+
+  if (scanner) {
+    try {
+      scanner.stop().catch(() => {});
+    } catch (_) {
+      /* ignore */
+    }
+    try {
+      scanner.clear();
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  releaseTicketQrCameraTracks();
+  clearTicketQrReaderElement();
+  setTicketQrLoading(false);
+  setTicketQrOverlayOpen(false);
+}
+
+async function stopTicketQrScanner(options = {}) {
+  if (ticketQrStopPromise) return ticketQrStopPromise;
+
+  ticketQrStopPromise = (async () => {
+    const scanner = ticketQrScanner;
+    ticketQrScanner = null;
+    ticketQrStarting = false;
+    ticketQrStartSession += 1;
+
+    setTicketQrLoading(false);
+    setTicketQrOverlayOpen(false);
+
+    if (options.clearResult !== false) {
+      const overlayResult = document.getElementById('ticket-qr-overlay-result');
+      if (overlayResult) {
+        overlayResult.textContent = '';
+        overlayResult.className = 'ticket-qr-overlay-result';
+      }
+    }
+
+    if (scanner) {
+      try {
+        await scanner.stop();
+      } catch (_) {
+        /* ignore — may already be stopped */
+      }
+      try {
+        scanner.clear();
+      } catch (_) {
+        /* ignore */
+      }
+    }
+
+    releaseTicketQrCameraTracks();
+    clearTicketQrReaderElement();
+    ticketQrScanBusy = false;
+  })();
+
+  try {
+    await ticketQrStopPromise;
+  } finally {
+    ticketQrStopPromise = null;
+  }
+}
+
+function normalizeTicketCodeFromQr(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return '';
+
+  try {
+    const url = new URL(text);
+    const fromQuery = url.searchParams.get('code') || url.searchParams.get('ticket') || url.searchParams.get('ingresso');
+    if (fromQuery) return fromQuery.trim().toUpperCase().replace(/\s+/g, '');
+    const pathPart = url.pathname.split('/').filter(Boolean).pop();
+    if (pathPart && /^[A-Za-z0-9-]+$/.test(pathPart)) return pathPart.toUpperCase().replace(/-/g, '');
+  } catch (_) {
+    /* not a URL */
+  }
+
+  return text.toUpperCase().replace(/\s+/g, '');
+}
+
+async function pauseTicketQrScanner() {
+  if (!ticketQrScanner) return;
+  try {
+    await ticketQrScanner.pause(true);
+  } catch (_) {
+    /* ignore */
+  }
+}
+
+async function resumeTicketQrScanner() {
+  if (!ticketQrScanner || !isTicketQrOverlayOpen()) return;
+  try {
+    await ticketQrScanner.resume();
+  } catch (_) {
+    /* ignore */
+  }
+}
+
 async function onTicketQrDecoded(decodedText) {
-  const code = String(decodedText || '').trim();
-  if (!code || ticketQrScanBusy) return;
+  const code = normalizeTicketCodeFromQr(decodedText);
+  if (!code || ticketQrScanBusy || !ticketQrScanner || !isTicketQrOverlayOpen()) return;
 
   const now = Date.now();
   if (code === ticketQrLastCode && now - ticketQrLastAt < TICKET_QR_COOLDOWN_MS) return;
@@ -699,13 +941,38 @@ async function onTicketQrDecoded(decodedText) {
   ticketQrScanBusy = true;
   ticketQrLastCode = code;
   ticketQrLastAt = now;
+  setTicketQrOverlayResult('QR detectado — validando…', 'pending');
+
+  await pauseTicketQrScanner();
+
   try {
     await submitTicketValidation(code, { fromScanner: true });
   } finally {
-    setTimeout(() => {
+    setTimeout(async () => {
       ticketQrScanBusy = false;
+      if (isTicketQrOverlayOpen()) {
+        await resumeTicketQrScanner();
+      }
     }, TICKET_QR_COOLDOWN_MS);
   }
+}
+
+function getTicketQrScanConfig() {
+  const config = {
+    fps: 15,
+    qrbox: (viewfinderWidth, viewfinderHeight) => {
+      const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.72);
+      return { width: Math.max(size, 180), height: Math.max(size, 180) };
+    },
+    aspectRatio: 1.0,
+    disableFlip: false
+  };
+
+  if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
+    config.formatsToSupport = [Html5QrcodeSupportedFormats.QR_CODE];
+  }
+
+  return config;
 }
 
 async function startTicketQrScanner() {
@@ -713,40 +980,67 @@ async function startTicketQrScanner() {
     showToast('Biblioteca de QR não carregada. Recarregue a página.', 'error');
     return;
   }
+  if (ticketQrStarting) return;
+  if (ticketQrStopPromise) await ticketQrStopPromise;
   if (ticketQrScanner) {
-    setTicketQrUiActive(true);
+    setTicketQrOverlayOpen(true);
     return;
   }
 
   const readerEl = document.getElementById('ticket-qr-reader');
   if (!readerEl) return;
 
-  setTicketQrUiActive(true);
-  ticketQrScanner = new Html5Qrcode('ticket-qr-reader');
+  ticketQrStarting = true;
+  const session = ++ticketQrStartSession;
+  setTicketQrOverlayResult('');
+  setTicketQrOverlayOpen(true);
+  setTicketQrLoading(true);
+  clearTicketQrReaderElement();
 
-  const config = { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: 1 };
+  ticketQrScanner = new Html5Qrcode('ticket-qr-reader', { verbose: false });
+  const config = getTicketQrScanConfig();
   const onSuccess = (decodedText) => {
-    onTicketQrDecoded(decodedText);
+    void onTicketQrDecoded(decodedText);
   };
 
   const tryStart = async (cameraConfig) => {
     await ticketQrScanner.start(cameraConfig, config, onSuccess, () => {});
   };
 
+  const isStaleSession = () => session !== ticketQrStartSession || !isTicketQrOverlayOpen();
+
   try {
     await tryStart({ facingMode: 'environment' });
+    if (isStaleSession()) {
+      await stopTicketQrScanner({ clearResult: false });
+      return;
+    }
+    setTicketQrLoading(false);
   } catch (err) {
     console.warn('QR scanner rear camera error:', err);
+    if (isStaleSession()) {
+      await stopTicketQrScanner({ clearResult: false });
+      return;
+    }
     try {
       try {
         await ticketQrScanner.stop();
       } catch (_) {
         /* ignore */
       }
+      clearTicketQrReaderElement();
       await tryStart({ facingMode: 'user' });
+      if (isStaleSession()) {
+        await stopTicketQrScanner({ clearResult: false });
+        return;
+      }
+      setTicketQrLoading(false);
     } catch (err2) {
       console.warn('QR scanner fallback error:', err2);
-      await stopTicketQrScanner();
+      if (isStaleSession()) {
+        await stopTicketQrScanner({ clearResult: false });
+        return;
+      }
       const insecure = typeof window !== 'undefined' && !window.isSecureContext;
       const msg = insecure
         ? 'Câmera exige HTTPS (ou localhost). Use o código manual ou acesse via HTTPS.'
@@ -757,36 +1051,48 @@ async function startTicketQrScanner() {
         resultEl.className = 'mt-3 text-sm text-red-600';
         resultEl.textContent = msg;
       }
+      await stopTicketQrScanner();
     }
+  } finally {
+    if (session === ticketQrStartSession) ticketQrStarting = false;
   }
 }
 
-async function stopTicketQrScanner() {
-  if (ticketQrScanner) {
-    try {
-      await ticketQrScanner.stop();
-    } catch (_) {
-      /* ignore — may already be stopped */
-    }
-    try {
-      ticketQrScanner.clear();
-    } catch (_) {
-      /* ignore */
-    }
-    ticketQrScanner = null;
-  }
-  ticketQrScanBusy = false;
-  setTicketQrUiActive(false);
-}
+function wireTicketQrLifecycle() {
+  if (ticketQrLifecycleBound || typeof window === 'undefined') return;
+  ticketQrLifecycleBound = true;
 
-if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => {
+    releaseTicketQrCameraSync();
+  });
+
   window.addEventListener('beforeunload', () => {
-    if (ticketQrScanner) {
-      try {
-        ticketQrScanner.stop();
-      } catch (_) {
-        /* ignore */
-      }
+    releaseTicketQrCameraSync();
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && (ticketQrScanner || ticketQrStarting)) {
+      stopTicketQrScanner({ reason: 'hidden' });
     }
+  });
+
+  window.addEventListener('hashchange', () => {
+    if (typeof AdminRouter !== 'undefined' && AdminRouter.parseHash?.() !== 'eventos') {
+      stopTicketQrScanner({ reason: 'navigate' });
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isTicketQrOverlayOpen()) {
+      e.preventDefault();
+      stopTicketQrScanner({ reason: 'escape' });
+    }
+  });
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => {
+    wireEventImagePreviews();
+    wireTicketQrLifecycle();
   });
 }

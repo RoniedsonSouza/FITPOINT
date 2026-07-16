@@ -65,6 +65,7 @@ function mapSponsorRow(row) {
     event_id: row.event_id,
     fantasy_name: row.fantasy_name || '',
     instagram: row.instagram || '',
+    image_url: row.image_url || null,
     sort_order: Number(row.sort_order) || 0
   };
 }
@@ -129,10 +130,12 @@ function normalizeSponsorsInput(raw) {
     .map((s, index) => {
       const fantasy_name = s && s.fantasy_name != null ? String(s.fantasy_name).trim() : '';
       const instagram = s && s.instagram != null ? String(s.instagram).trim() : '';
-      if (!fantasy_name && !instagram) return null;
+      const image_url = normalizeImageUrl(s && s.image_url);
+      if (!fantasy_name && !instagram && !image_url) return null;
       return {
-        fantasy_name: fantasy_name || instagram,
-        instagram: instagram || fantasy_name,
+        fantasy_name: fantasy_name || instagram || 'Patrocinador',
+        instagram: instagram || fantasy_name || '',
+        image_url,
         sort_order: index
       };
     })
@@ -155,9 +158,9 @@ async function replaceSponsors(client, eventId, sponsors) {
   for (const sponsor of sponsors) {
     await client.query(
       `INSERT INTO ${table('event_sponsors')}
-        (event_id, fantasy_name, instagram, sort_order, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, NOW(), NOW())`,
-      [eventId, sponsor.fantasy_name, sponsor.instagram, sponsor.sort_order]
+        (event_id, fantasy_name, instagram, image_url, sort_order, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+      [eventId, sponsor.fantasy_name, sponsor.instagram, sponsor.image_url || null, sponsor.sort_order]
     );
   }
 }

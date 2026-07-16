@@ -10,8 +10,9 @@ No arquivo `.env` (copie de `.env.example` se ainda não tiver):
 
 | Variável | Obrigatória | Para quê |
 |----------|-------------|----------|
-| `APP_URL` | Sim | URL do site (retorno do pagamento e webhook) |
-| `MP_ACCESS_TOKEN` | Sim | Autenticar no Mercado Pago |
+| `APP_URL` | Sim | URL do site (webhook de pagamento) |
+| `MP_ACCESS_TOKEN` | Sim | Criar pagamentos Pix/cartão (backend) |
+| `MP_PUBLIC_KEY` | Sim (cartão) | Tokenizar o cartão no navegador — sem ela, o site oferece só Pix |
 | `MP_WEBHOOK_SECRET` | Não | Validar notificações do Mercado Pago |
 | `RESEND_API_KEY` | Sim | Enviar e-mail com o ingresso |
 | `RESEND_FROM` | Sim | Remetente do e-mail |
@@ -21,6 +22,7 @@ Exemplo mínimo:
 ```env
 APP_URL=https://seudominio.com
 MP_ACCESS_TOKEN=APP_USR-xxxxxxxx
+MP_PUBLIC_KEY=APP_USR-xxxxxxxx
 MP_WEBHOOK_SECRET=
 RESEND_API_KEY=re_xxxxxxxx
 RESEND_FROM=FitPoint <ingressos@seudominio.com>
@@ -176,11 +178,12 @@ Rota que o Mercado Pago deve chamar:
 ### 2.2 Credenciais de teste (recomendado primeiro)
 
 1. Na aplicação, abra **Credenciais de teste**
-2. Copie o **Access Token** de teste (começa em geral com `TEST-...` ou similar no painel)
+2. Copie o **Access Token** e a **Public Key** de teste
 3. Cole no `.env`:
 
 ```env
 MP_ACCESS_TOKEN=TEST-seu-token-aqui
+MP_PUBLIC_KEY=TEST-sua-public-key-aqui
 ```
 
 4. Com token de teste, use cartões/Pix de teste da documentação do Mercado Pago (não cobra de verdade)
@@ -197,15 +200,16 @@ Quando for vender de verdade:
 
 1. Na mesma aplicação → **Credenciais de produção**
 2. Complete a ativação da conta (dados da empresa, se pedido)
-3. Copie o **Access Token** de produção (geralmente `APP_USR-...`)
+3. Copie o **Access Token** e a **Public Key** de produção (geralmente `APP_USR-...`)
 4. Atualize o `.env` e reinicie o servidor
 
 ```env
 MP_ACCESS_TOKEN=APP_USR-seu-token-producao
+MP_PUBLIC_KEY=APP_USR-sua-public-key-producao
 APP_URL=https://seudominio.com
 ```
 
-**Nunca** publique o Access Token no GitHub nem no frontend. Ele fica só no `.env` do servidor.
+**Nunca** publique o Access Token no GitHub nem no frontend. Ele fica só no `.env` do servidor. A **Public Key** é a única que aparece no navegador — ela serve apenas para tokenizar cartões e não permite movimentar a conta.
 
 ### 2.4 Webhook (produção)
 
@@ -231,10 +235,12 @@ Se deixar `MP_WEBHOOK_SECRET` vazio, o webhook ainda funciona; só não valida a
 
 ### 2.5 Formas de pagamento neste projeto
 
-A Preference exclui boleto, caixa eletrônico e cartão de débito. Ficam disponíveis:
+O checkout é **transparente**: o comprador paga **dentro do site**, sem redirecionamento e sem ver a marca do processador.
 
-- **Pix**
-- **Cartão de crédito**
+- **Pix** — o site gera QR Code + copia-e-cola; a confirmação é automática (webhook/sync) e o código expira em 30 minutos, liberando o estoque reservado.
+- **Cartão de crédito** — formulário no próprio site; o número do cartão é tokenizado no navegador (via `MP_PUBLIC_KEY`) e **nunca passa pelo servidor do FitPoint**. Na fatura aparece como `FITPOINT`.
+
+Sem `MP_PUBLIC_KEY` configurada, a opção de cartão fica desabilitada e o site oferece apenas Pix.
 
 ---
 
@@ -315,16 +321,17 @@ Documentação: [https://resend.com/docs](https://resend.com/docs)
 2. Clique em **Ver detalhes** no card do evento (página `/evento.html?id=…`)
 3. Confira capa, logo, descrição, lotes e patrocinadores; clique em **Comprar** / escolha um lote
 4. Preencha nome, e-mail (use o e-mail da conta Resend se ainda estiver em `onboarding@resend.dev`) e quantidade
-5. Clique em **Pagar com Mercado Pago**
-6. Conclua o pagamento (credenciais/cartões de **teste** se estiver com token de teste)
-7. Ao voltar com sucesso para `evento.html?id=…&payment=success`, o e-mail com QR Code deve chegar
-8. No admin → **Validar ingresso**: cole o código do e-mail
+5. Escolha a forma de pagamento, **sem sair do site**:
+   - **Pix**: clique em **Gerar código Pix**, pague pelo QR Code/copia-e-cola; a tela confirma sozinha
+   - **Cartão**: preencha os dados e clique em **Pagar R$ …** (cartões de **teste** se estiver com credenciais de teste)
+6. Na confirmação em tela, o e-mail com QR Code deve chegar
+7. No admin → **Validar ingresso**: cole o código do e-mail
 
 ### Imagens e patrocinadores
 
 - **Logo** e **capa** são opcionais. Sem imagem, a página de detalhe mantém o espaço reservado (placeholder).
 - Upload pelo admin (JPG/PNG/WebP/GIF, máx. 5 MB) ou URL externa.
-- **Patrocinadores:** nome fantasia + Instagram (`@handle` ou URL). Aparecem na página de detalhe com link para o perfil.
+- **Patrocinadores:** nome fantasia + Instagram (`@handle` ou URL) e logo opcional. Aparecem na página de detalhe com link para o perfil quando houver Instagram.
 
 ### Se o e-mail não chegar
 
@@ -335,9 +342,9 @@ Documentação: [https://resend.com/docs](https://resend.com/docs)
 
 ### Se o pagamento não gerar ingresso
 
-- Confirme `MP_ACCESS_TOKEN`
+- Confirme `MP_ACCESS_TOKEN` (e `MP_PUBLIC_KEY` para cartão)
 - Em produção, confira se `APP_URL` é HTTPS e se o webhook responde
-- No retorno `?payment=success&order=ID` (em `/evento.html?id=…`), o front chama `/api/tickets/orders/:id/sync` para confirmar mesmo sem webhook
+- Enquanto o Pix está na tela, o site consulta `/api/tickets/orders/:id` e chama `/api/tickets/orders/:id/sync` periodicamente — confirma mesmo sem webhook (útil em localhost)
 - Veja logs do servidor na hora do checkout e do webhook
 
 ---
@@ -348,8 +355,9 @@ Documentação: [https://resend.com/docs](https://resend.com/docs)
 # URL pública do site (sem / no final)
 APP_URL=https://seudominio.com
 
-# Mercado Pago
+# Mercado Pago (checkout transparente)
 MP_ACCESS_TOKEN=APP_USR-xxxxxxxx
+MP_PUBLIC_KEY=APP_USR-xxxxxxxx
 # Opcional
 MP_WEBHOOK_SECRET=
 

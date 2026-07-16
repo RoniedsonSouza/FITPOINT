@@ -1,4 +1,5 @@
-const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
+const crypto = require('crypto');
+const { MercadoPagoConfig, Payment } = require('mercadopago');
 
 function getAccessToken() {
   const token = process.env.MP_ACCESS_TOKEN;
@@ -6,6 +7,10 @@ function getAccessToken() {
     throw new Error('MP_ACCESS_TOKEN não configurado');
   }
   return token;
+}
+
+function getPublicKey() {
+  return process.env.MP_PUBLIC_KEY || null;
 }
 
 function getClient() {
@@ -16,61 +21,110 @@ function getAppUrl() {
   return (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
 }
 
-/**
- * Cria Preference Checkout Pro permitindo apenas Pix e cartão de crédito.
- * Envia item único com o valor total do pedido (promoções por quantidade
- * podem gerar totais que não dividem igualmente por ingresso).
- */
-async function createTicketPreference({ orderId, eventId, title, totalAmount, buyerEmail, buyerName }) {
-  const preference = new Preference(getClient());
+// Webhook só funciona com URL pública (não localhost)
+function getNotificationUrl() {
   const appUrl = getAppUrl();
-  const returnBase = eventId
-    ? `${appUrl}/evento.html?id=${encodeURIComponent(eventId)}`
-    : `${appUrl}/eventos.html`;
-  const join = returnBase.includes('?') ? '&' : '?';
+  if (/localhost|127\.0\.0\.1/i.test(appUrl)) return undefined;
+  return `${appUrl}/api/tickets/webhooks/mercadopago`;
+}
+
+const PIX_EXPIRATION_MINUTES = 30;
+
+/**
+ * Cria pagamento Pix (checkout transparente): o comprador paga no site,
+ * via QR Code ou copia-e-cola, sem redirecionamento.
+ */
+async function createPixPayment({ orderId, amount, description, buyerEmail, buyerName }) {
+  const payment = new Payment(getClient());
+
+  const expiresAt = new Date(Date.now() + PIX_EXPIRATION_MINUTES * 60 * 1000);
+  // Formato exigido pelo MP: yyyy-MM-dd'T'HH:mm:ss.SSSXXX (com offset)
+  const dateOfExpiration = expiresAt.toISOString().replace('Z', '+00:00');
+
+  const nameParts = String(buyerName || '').trim().split(/\s+/);
+  const firstName = nameParts.shift() || undefined;
+  const lastName = nameParts.join(' ') || undefined;
 
   const body = {
-    items: [
-      {
-        id: String(orderId),
-        title: String(title).slice(0, 256),
-        quantity: 1,
-        unit_price: Number(totalAmount),
-        currency_id: 'BRL'
-      }
-    ],
-    payer: {
-      name: buyerName || undefined,
-      email: buyerEmail || undefined
-    },
+    transaction_amount: Number(amount),
+    description: String(description).slice(0, 256),
+    payment_method_id: 'pix',
     external_reference: String(orderId),
-    back_urls: {
-      success: `${returnBase}${join}payment=success&order=${orderId}`,
-      failure: `${returnBase}${join}payment=failure&order=${orderId}`,
-      pending: `${returnBase}${join}payment=pending&order=${orderId}`
-    },
-    auto_return: 'approved',
-    payment_methods: {
-      excluded_payment_types: [
-        { id: 'ticket' },
-        { id: 'atm' },
-        { id: 'debit_card' }
-      ],
-      installments: 12
-    },
-    statement_descriptor: 'FITPOINT'
+    date_of_expiration: dateOfExpiration,
+    payer: {
+      email: buyerEmail,
+      first_name: firstName,
+      last_name: lastName
+    }
   };
 
-  // Webhook só funciona com URL pública (não localhost)
-  if (!/localhost|127\.0\.0\.1/i.test(appUrl)) {
-    body.notification_url = `${appUrl}/api/tickets/webhooks/mercadopago`;
-  }
+  const notificationUrl = getNotificationUrl();
+  if (notificationUrl) body.notification_url = notificationUrl;
 
-  const result = await preference.create({ body });
+  const result = await payment.create({
+    body,
+    requestOptions: { idempotencyKey: `pix-${orderId}-${crypto.randomUUID()}` }
+  });
+
+  const tx = result.point_of_interaction?.transaction_data || {};
   return {
     id: result.id,
-    init_point: result.init_point,
-    sandbox_init_point: result.sandbox_init_point
+    status: result.status,
+    qr_code: tx.qr_code || null,
+    qr_code_base64: tx.qr_code_base64 || null,
+    expires_at: result.date_of_expiration || dateOfExpiration
+  };
+}
+
+/**
+ * Cria pagamento com cartão de crédito (checkout transparente).
+ * O número do cartão nunca chega ao nosso servidor: o navegador gera um
+ * token de uso único (SDK JS) e só o token trafega até aqui.
+ */
+async function createCardPayment({
+  orderId,
+  amount,
+  description,
+  token,
+  installments,
+  paymentMethodId,
+  issuerId,
+  buyerEmail,
+  identificationType,
+  identificationNumber
+}) {
+  const payment = new Payment(getClient());
+
+  const body = {
+    transaction_amount: Number(amount),
+    token: String(token),
+    description: String(description).slice(0, 256),
+    installments: Math.max(1, parseInt(installments, 10) || 1),
+    payment_method_id: paymentMethodId ? String(paymentMethodId) : undefined,
+    issuer_id: issuerId ? String(issuerId) : undefined,
+    external_reference: String(orderId),
+    statement_descriptor: 'FITPOINT',
+    payer: {
+      email: buyerEmail,
+      identification:
+        identificationType && identificationNumber
+          ? { type: String(identificationType), number: String(identificationNumber) }
+          : undefined
+    }
+  };
+
+  const notificationUrl = getNotificationUrl();
+  if (notificationUrl) body.notification_url = notificationUrl;
+
+  const result = await payment.create({
+    body,
+    requestOptions: { idempotencyKey: `card-${orderId}-${crypto.randomUUID()}` }
+  });
+
+  return {
+    id: result.id,
+    status: result.status,
+    status_detail: result.status_detail || null
   };
 }
 
@@ -96,8 +150,11 @@ async function findApprovedPaymentByOrderId(orderId) {
 }
 
 module.exports = {
-  createTicketPreference,
+  createPixPayment,
+  createCardPayment,
   getPaymentById,
   findApprovedPaymentByOrderId,
-  getAppUrl
+  getAppUrl,
+  getPublicKey,
+  PIX_EXPIRATION_MINUTES
 };

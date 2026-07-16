@@ -147,7 +147,8 @@
     .sponsor-chip {
       display: inline-flex;
       flex-direction: column;
-      gap: 0.15rem;
+      align-items: center;
+      gap: 0.35rem;
       padding: 0.85rem 1rem;
       border-radius: var(--field-radius);
       background: rgba(29, 107, 58, 0.06);
@@ -159,6 +160,13 @@
 
     .sponsor-chip:hover {
       background: rgba(29, 107, 58, 0.12);
+    }
+
+    .sponsor-logo {
+      width: 5rem;
+      height: 3rem;
+      object-fit: contain;
+      display: block;
     }
 
     .checkout-card {
@@ -199,6 +207,9 @@
       gap: var(--field-gap);
       margin-top: 1.5rem;
     }
+
+    /* .hidden precisa vencer o display:flex do seletor de ID acima */
+    #checkout-form.hidden { display: none; }
 
     input:not([type="checkbox"]):not([type="hidden"]),
     select,
@@ -282,9 +293,127 @@
     .payment-banner--success { background: rgba(29, 107, 58, 0.12); color: var(--fp-green); }
     .payment-banner--failure { background: rgba(220, 38, 38, 0.1); color: #b91c1c; }
     .payment-banner--pending { background: rgba(245, 124, 0, 0.12); color: #c2410c; }
+
+    /* ===== Pagamento no site (Pix / cartão) ===== */
+    .pay-methods {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+
+    .pay-method {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      padding: 0.875rem 1rem;
+      border: 1.5px solid #e5e7eb;
+      border-radius: var(--field-radius);
+      background: #fff;
+      cursor: pointer;
+      text-align: left;
+      font-family: inherit;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+
+    .pay-method strong { font-size: 0.9375rem; color: var(--fp-ink); }
+    .pay-method span { font-size: 0.75rem; color: rgba(14, 31, 22, 0.55); line-height: 1.35; }
+
+    .pay-method--active {
+      border-color: var(--fp-green);
+      box-shadow: 0 0 0 3px rgba(29, 107, 58, 0.12);
+    }
+
+    .pay-method:disabled { opacity: .5; cursor: not-allowed; }
+
+    .secure-note {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 0.4rem;
+      margin: 0;
+      font-size: 0.75rem;
+      line-height: 1.45;
+      color: rgba(14, 31, 22, 0.55);
+      text-align: center;
+    }
+
+    .secure-badges {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.4rem 1rem;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      font-size: 0.72rem;
+      color: rgba(14, 31, 22, 0.55);
+    }
+
+    .secure-badges li { display: inline-flex; align-items: center; gap: 0.3rem; }
+    .secure-badges svg, .secure-note svg { width: 0.85rem; height: 0.85rem; flex-shrink: 0; color: var(--fp-green); }
+
+    .pix-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      text-align: center;
+    }
+
+    .pix-qr {
+      width: 220px;
+      height: 220px;
+      padding: 0.75rem;
+      background: #fff;
+      border: 1.5px solid #e5e7eb;
+      border-radius: var(--field-radius);
+      image-rendering: pixelated;
+    }
+
+    .pix-copy-row {
+      display: flex;
+      gap: 0.5rem;
+      width: 100%;
+    }
+
+    .pix-copy-row input {
+      flex: 1;
+      font-size: 0.75rem;
+      color: rgba(14, 31, 22, 0.7);
+    }
+
+    .waiting-dot {
+      display: inline-block;
+      width: 0.55rem;
+      height: 0.55rem;
+      border-radius: 9999px;
+      background: var(--fp-orange);
+      margin-right: 0.45rem;
+      animation: pulse-dot 1.4s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: .35; transform: scale(.8); }
+    }
+
+    .success-check {
+      width: 4.5rem;
+      height: 4.5rem;
+      border-radius: 9999px;
+      background: rgba(29, 107, 58, 0.12);
+      color: var(--fp-green);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto;
+    }
+
+    .success-check svg { width: 2.4rem; height: 2.4rem; }
   </style>
   <link rel="stylesheet" href="/css/page-bg.css">
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://sdk.mercadopago.com/js/v2"></script>
 </head>
 
 <body class="page-bg text-fp-ink font-sans" data-page="event-detail">
@@ -358,14 +487,106 @@
             <label for="checkout-phone">Telefone <span class="font-normal text-black/40">(opcional)</span></label>
             <input type="tel" id="checkout-phone" autocomplete="tel" placeholder="(00) 00000-0000">
           </div>
+
+          <div class="field">
+            <label>Forma de pagamento</label>
+            <div class="pay-methods">
+              <button type="button" class="pay-method pay-method--active" id="pay-method-pix" data-method="pix">
+                <strong>Pix</strong>
+                <span>Aprovação em segundos, direto no app do seu banco</span>
+              </button>
+              <button type="button" class="pay-method" id="pay-method-card" data-method="card">
+                <strong>Cartão de crédito</strong>
+                <span>Parcele em até 12x</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="card-fields" class="hidden flex flex-col gap-5">
+            <div class="field">
+              <label for="card-number">Número do cartão</label>
+              <input type="text" id="card-number" inputmode="numeric" autocomplete="cc-number" placeholder="0000 0000 0000 0000" maxlength="23">
+              <p class="field-hint hidden text-fp-green font-semibold" id="card-brand"></p>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="field">
+                <label for="card-expiry">Validade</label>
+                <input type="text" id="card-expiry" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/AA" maxlength="5">
+              </div>
+              <div class="field">
+                <label for="card-cvv">CVV</label>
+                <input type="text" id="card-cvv" inputmode="numeric" autocomplete="cc-csc" placeholder="123" maxlength="4">
+              </div>
+            </div>
+            <div class="field">
+              <label for="card-holder">Nome impresso no cartão</label>
+              <input type="text" id="card-holder" autocomplete="cc-name" placeholder="Como aparece no cartão">
+            </div>
+            <div class="field">
+              <label for="card-cpf">CPF do titular</label>
+              <input type="text" id="card-cpf" inputmode="numeric" placeholder="000.000.000-00" maxlength="14">
+            </div>
+            <div class="field">
+              <label for="card-installments">Parcelas</label>
+              <select id="card-installments"></select>
+            </div>
+            <p class="secure-note m-0">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Seus dados são criptografados. O número do cartão não fica salvo em nossos servidores.
+            </p>
+          </div>
+
           <p class="text-sm font-semibold text-fp-green hidden" id="checkout-savings"></p>
           <p class="checkout-total" id="checkout-total">Total: R$&nbsp;0,00</p>
           <button type="submit" id="checkout-submit" class="btn w-full">
-            Pagar com Mercado Pago
+            Gerar código Pix
           </button>
-          <p class="checkout-note">Pix e cartão de crédito · pagamento seguro via Mercado Pago</p>
+          <ul class="secure-badges">
+            <li><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Pagamento seguro</li>
+            <li><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Confirmação oficial imediata</li>
+            <li><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg> Ingresso oficial por e-mail</li>
+          </ul>
           <p id="checkout-error" class="text-sm text-red-600 hidden m-0"></p>
         </form>
+
+        <!-- Painel Pix: QR Code + copia e cola -->
+        <div id="pix-panel" class="hidden mt-2">
+          <div class="pix-box">
+            <h3 class="font-display text-xl font-bold m-0">Pague com Pix para garantir seu ingresso</h3>
+            <p class="checkout-total w-full" id="pix-amount">Total: R$ 0,00</p>
+            <img id="pix-qr" class="pix-qr" alt="QR Code Pix" src="">
+            <p class="text-sm text-black/60 m-0">Abra o app do seu banco, escolha <strong>Pix</strong> e escaneie o código — ou use o copia e cola:</p>
+            <div class="pix-copy-row">
+              <input type="text" id="pix-code" readonly>
+              <button type="button" class="btn btn-outline" id="pix-copy-btn">Copiar</button>
+            </div>
+            <p class="text-sm font-semibold m-0" id="pix-status"><span class="waiting-dot"></span>Aguardando pagamento — a confirmação é automática</p>
+            <p class="field-hint m-0" id="pix-expiry"></p>
+            <p class="secure-note m-0">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Pagamento oficial e seguro. Assim que o banco confirmar, seu ingresso é emitido e enviado por e-mail.
+            </p>
+            <button type="button" class="text-sm text-black/50 hover:text-fp-green underline bg-transparent border-0 cursor-pointer" id="pix-cancel">Cancelar e voltar</button>
+          </div>
+        </div>
+
+        <!-- Painel aguardando análise (cartão em processamento) -->
+        <div id="processing-panel" class="hidden mt-2 text-center">
+          <p class="text-sm font-semibold m-0"><span class="waiting-dot"></span>Pagamento em processamento…</p>
+          <p class="text-sm text-black/60 mt-3">Estamos confirmando com a operadora do cartão. Isso costuma levar poucos instantes — não feche esta página.</p>
+        </div>
+
+        <!-- Painel de sucesso -->
+        <div id="success-panel" class="hidden mt-2 text-center">
+          <div class="success-check">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
+          <h3 class="font-display text-2xl font-bold mt-4">Pagamento confirmado!</h3>
+          <p class="text-sm text-black/70 mt-2 leading-relaxed" id="success-message">Sua compra está garantida.</p>
+          <p class="text-sm text-black/50 mt-3">Não encontrou? Confira a caixa de spam ou lixo eletrônico.</p>
+          <p class="field-hint mt-2" id="success-order"></p>
+          <a href="/eventos.html" class="btn mt-5">Ver outros eventos</a>
+        </div>
       </div>
     </div>
   </main>

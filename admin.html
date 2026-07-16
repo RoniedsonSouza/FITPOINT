@@ -440,7 +440,7 @@
               <div class="events-filters events-filters--detail">
                 <div class="field">
                   <label for="tickets-status-filter">Status</label>
-                  <select id="tickets-status-filter" onchange="loadTicketsAdmin()">
+                  <select class="px-4" id="tickets-status-filter" onchange="loadTicketsAdmin()">
                     <option value="">Todos</option>
                     <option value="valid">Válido</option>
                     <option value="used">Usado</option>
@@ -501,7 +501,7 @@
         </div>
         <div class="form-group">
           <label>Descrição</label>
-          <textarea id="product-description" rows="3" placeholder="Detalhes do produto para a página de detalhes…"></textarea>
+          <textarea class="p-4" id="product-description" rows="3" placeholder="Detalhes do produto para a página de detalhes…"></textarea>
         </div>
         <div class="form-group">
           <label>Informações nutricionais (opcional)</label>
@@ -615,7 +615,7 @@
         </div>
         <div class="form-group">
           <label>Descrição</label>
-          <textarea id="event-description" rows="3" placeholder="Detalhes do evento…"></textarea>
+          <textarea class="p-4" id="event-description" rows="3" placeholder="Detalhes do evento…"></textarea>
         </div>
         <div class="form-group">
           <label>Local</label>
@@ -715,7 +715,7 @@
             </div>
             <div class="field mt-2">
               <label for="lot-promo-mode">Para quantidades maiores</label>
-              <select id="lot-promo-mode" onchange="updateLotPromoPreview()">
+              <select class="px-4" id="lot-promo-mode" onchange="updateLotPromoPreview()">
                 <option value="repeat">Repetir pacote — cada pacote completo sai pelo preço promocional (3 = pacote + 1 cheio)</option>
                 <option value="once">Aplicar uma vez — só o primeiro pacote tem desconto, o resto paga preço cheio</option>
                 <option value="proportional">Preço unitário cai — a partir do pacote, todos pagam o unitário promocional</option>

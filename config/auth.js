@@ -152,6 +152,16 @@ const requirePermission = (module, action) => (req, res, next) => {
   return res.status(403).json({ error: 'Sem permissão para este recurso' });
 };
 
+/** Aceita se o usuário tiver qualquer um dos módulos informados. */
+const requireAnyPermission = (...modules) => (req, res, next) => {
+  for (const module of modules) {
+    if (userHasPermission(req.user, module)) {
+      return next();
+    }
+  }
+  return res.status(403).json({ error: 'Sem permissão para este recurso' });
+};
+
 // Gerar hash de senha
 const hashPassword = async (password) => {
   const salt = await bcrypt.genSalt(10);
@@ -185,6 +195,7 @@ module.exports = {
   authenticateToken,
   requireSuperAdmin,
   requirePermission,
+  requireAnyPermission,
   hashPassword,
   comparePassword,
   generateToken,

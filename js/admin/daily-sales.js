@@ -9,6 +9,9 @@ let diarioSelectedCustomer = null;
 let diarioAccessValue = 27;
 let diarioComboboxesBound = false;
 let diarioSearchTimers = { product: null, customer: null };
+let diarioOptionProduct = null;
+let diarioPendingOptionId = null;
+let diarioCustomerSearchSeq = 0;
 
 function getLocalDateString(date = new Date()) {
   const y = date.getFullYear();
@@ -52,6 +55,46 @@ function getProductBasePrice(product) {
   return Number(product.price) || 0;
 }
 
+function getProductOptions(product) {
+  return Array.isArray(product?.options) ? product.options.filter(o => o && String(o.name || '').trim()) : [];
+}
+
+function findProductOption(product, optionId) {
+  if (!optionId) return null;
+  return getProductOptions(product).find(o => String(o.id) === String(optionId)) || null;
+}
+
+function getDefaultProductOption(product) {
+  const opts = getProductOptions(product);
+  if (!opts.length) return null;
+  return opts.find(o => o.default) || opts[0];
+}
+
+function getDiarioUnitPrice(product, option) {
+  const base = getProductBasePrice(product);
+  if (!option) return base;
+  return Math.round((base + (Number(option.price_adjustment) || 0)) * 100) / 100;
+}
+
+function diarioLineKey(productId, optionId = '') {
+  return `${productId}::${optionId || ''}`;
+}
+
+function formatDiarioPhoneDisplay(phone) {
+  if (typeof formatPhoneDisplay === 'function') return formatPhoneDisplay(phone);
+  const d = String(phone || '').replace(/\D/g, '');
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return phone || '';
+}
+
+function upsertDiarioCustomerCache(customer) {
+  if (!customer?.id) return;
+  const idx = dailySalesCustomersCache.findIndex(c => String(c.id) === String(customer.id));
+  if (idx >= 0) dailySalesCustomersCache[idx] = { ...dailySalesCustomersCache[idx], ...customer };
+  else dailySalesCustomersCache.unshift(customer);
+}
+
 function computeDiarioFinalPrice(basePrice, discount) {
   const base = Number(basePrice) || 0;
   const disc = Math.max(0, Number(discount) || 0);
@@ -75,10 +118,10 @@ function getDiarioLinePreview(line, rawQty, rawDiscount) {
   return preview;
 }
 
-function updateDiarioCartRowTotal(productId) {
-  const row = Array.from(document.querySelectorAll('[data-cart-product]'))
-    .find(el => el.dataset.cartProduct === productId);
-  const line = diarioCart.find(l => l.productId === productId);
+function updateDiarioCartRowTotal(lineKey) {
+  const row = Array.from(document.querySelectorAll('[data-cart-line]'))
+    .find(el => el.dataset.cartLine === lineKey);
+  const line = diarioCart.find(l => diarioLineKey(l.productId, l.optionId) === lineKey);
   if (!row || !line) return;
 
   const qtyInput = row.querySelector('[data-cart-qty]');
@@ -109,10 +152,24 @@ function updateDailySalesSummary(summary) {
 async function fetchDailySalesCatalog() {
   const [products, loyaltyData] = await Promise.all([
     DB.getProducts().catch(() => []),
-    DB.getLoyaltyCustomers({ page: 1, limit: 200 }).catch(() => ({ items: [] }))
+    DB.getLoyaltyCustomers({ page: 1, limit: 50, active: true }).catch(() => ({ items: [] }))
   ]);
   dailySalesProductsCache = (products || []).filter(p => p.active !== false);
   dailySalesCustomersCache = loyaltyData.items || loyaltyData || [];
+}
+
+async function searchDiarioCustomersRemote(query) {
+  const q = String(query || '').trim();
+  if (!q) return dailySalesCustomersCache.slice(0, 12);
+  try {
+    const data = await DB.getLoyaltyCustomers({ q, page: 1, limit: 20, active: true });
+    const items = data.items || [];
+    items.forEach(upsertDiarioCustomerCache);
+    return items;
+  } catch (error) {
+    if (handleAuthError(error)) return [];
+    return filterDiarioCustomersLocal(q);
+  }
 }
 
 function filterDiarioProducts(query) {
@@ -125,7 +182,7 @@ function filterDiarioProducts(query) {
   }).slice(0, 12);
 }
 
-function filterDiarioCustomers(query) {
+function filterDiarioCustomersLocal(query) {
   const q = normalizeSearchText(query);
   const digits = q.replace(/\D/g, '');
   if (!q) return dailySalesCustomersCache.slice(0, 12);
@@ -152,36 +209,55 @@ function showDiarioProductResults(query) {
     container.innerHTML = '<p class="diario-combobox-empty">Nenhum produto encontrado.</p>';
   } else {
     container.innerHTML = matches.map(p => {
+      const opts = getProductOptions(p);
       const base = getProductBasePrice(p);
+      const meta = opts.length
+        ? `${opts.length} adicional${opts.length > 1 ? 'is' : ''} · a partir de ${formatCurrency(base)}`
+        : formatCurrency(base);
       return `<button type="button" class="diario-combobox-result-item" data-product-id="${escapeAttr(p.id)}">
         <span class="diario-combobox-result-name">${escapeHtml(p.name)}</span>
-        <span class="diario-combobox-result-meta">${formatCurrency(base)}</span>
+        <span class="diario-combobox-result-meta">${escapeHtml(meta)}</span>
       </button>`;
     }).join('');
   }
   container.classList.remove('hidden');
 }
 
-function showDiarioCustomerResults(query) {
+async function showDiarioCustomerResults(query) {
   const container = document.getElementById('daily-diario-customer-results');
   if (!container) return;
-  const matches = filterDiarioCustomers(query);
+  const q = String(query || '').trim();
+  const seq = ++diarioCustomerSearchSeq;
+  container.innerHTML = '<p class="diario-combobox-empty">Buscando…</p>';
+  container.classList.remove('hidden');
+
+  const matches = await searchDiarioCustomersRemote(q);
+  if (seq !== diarioCustomerSearchSeq) return;
+
+  const createBtn = `<button type="button" class="diario-combobox-result-item diario-combobox-result-item--create" data-create-customer>
+      <span class="diario-combobox-result-name">Cadastrar novo cliente</span>
+      <span class="diario-combobox-result-meta">+</span>
+    </button>`;
+
   if (matches.length === 0) {
-    container.innerHTML = '<p class="diario-combobox-empty">Nenhum cliente encontrado.</p>';
+    container.innerHTML = `<p class="diario-combobox-empty">Nenhum cliente encontrado.</p>${createBtn}`;
   } else {
     container.innerHTML = matches.map(c =>
       `<button type="button" class="diario-combobox-result-item" data-customer-id="${c.id}">
         <span class="diario-combobox-result-name">${escapeHtml(c.name)}</span>
+        <span class="diario-combobox-result-meta">${escapeHtml(formatDiarioPhoneDisplay(c.phone))}</span>
       </button>`
-    ).join('');
+    ).join('') + createBtn;
   }
   container.classList.remove('hidden');
 }
 
 function selectDiarioCustomer(customer) {
   diarioSelectedCustomer = { id: customer.id, name: customer.name };
+  upsertDiarioCustomerCache(customer);
   const search = document.getElementById('daily-diario-customer-search');
   const selected = document.getElementById('daily-diario-customer-selected');
+  const createBtn = document.getElementById('daily-diario-customer-create-btn');
   if (search) {
     search.value = '';
     search.classList.add('hidden');
@@ -193,6 +269,7 @@ function selectDiarioCustomer(customer) {
       <button type="button" class="diario-combobox-clear" data-clear-customer aria-label="Remover cliente">&times;</button>
     `;
   }
+  if (createBtn) createBtn.classList.add('hidden');
   hideDiarioResults('customer');
   updateDiarioLoyaltyUI();
 }
@@ -201,6 +278,7 @@ function clearDiarioCustomer() {
   diarioSelectedCustomer = null;
   const search = document.getElementById('daily-diario-customer-search');
   const selected = document.getElementById('daily-diario-customer-selected');
+  const createBtn = document.getElementById('daily-diario-customer-create-btn');
   if (search) {
     search.classList.remove('hidden');
     search.value = '';
@@ -210,21 +288,95 @@ function clearDiarioCustomer() {
     selected.classList.add('hidden');
     selected.innerHTML = '';
   }
+  if (createBtn) createBtn.classList.remove('hidden');
   updateDiarioLoyaltyUI();
 }
 
-function addProductToDiarioCart(productId) {
+function openDiarioOptionModal(product) {
+  const opts = getProductOptions(product);
+  if (!opts.length) {
+    addProductToDiarioCart(product.id, null);
+    return;
+  }
+
+  diarioOptionProduct = product;
+  const defaultOpt = getDefaultProductOption(product);
+  diarioPendingOptionId = defaultOpt ? String(defaultOpt.id) : String(opts[0].id);
+
+  const modal = document.getElementById('diario-option-modal');
+  const title = document.getElementById('diario-option-modal-title');
+  const subtitle = document.getElementById('diario-option-modal-subtitle');
+  const list = document.getElementById('diario-option-modal-list');
+  if (title) title.textContent = product.name;
+  if (subtitle) subtitle.textContent = 'Selecione o adicional / variação:';
+  if (list) {
+    const base = getProductBasePrice(product);
+    list.innerHTML = opts.map(opt => {
+      const adj = Number(opt.price_adjustment) || 0;
+      const price = Math.round((base + adj) * 100) / 100;
+      const adjLabel = adj > 0 ? `+${formatCurrency(adj)}` : 'Incluso';
+      const checked = String(opt.id) === String(diarioPendingOptionId) ? 'checked' : '';
+      return `
+        <label class="diario-option-item">
+          <input type="radio" name="diario-option" value="${escapeAttr(opt.id)}" ${checked}>
+          <span class="diario-option-item-body">
+            <span class="diario-option-item-name">${escapeHtml(opt.name)}</span>
+            <span class="diario-option-item-meta">
+              <span>${escapeHtml(adjLabel)}</span>
+              <strong>${formatCurrency(price)}</strong>
+            </span>
+          </span>
+        </label>`;
+    }).join('');
+    list.querySelectorAll('input[name="diario-option"]').forEach(input => {
+      input.addEventListener('change', () => {
+        diarioPendingOptionId = input.value;
+      });
+    });
+  }
+  modal?.classList.add('active');
+}
+
+function closeDiarioOptionModal() {
+  document.getElementById('diario-option-modal')?.classList.remove('active');
+  diarioOptionProduct = null;
+  diarioPendingOptionId = null;
+}
+
+function confirmDiarioOptionSelection() {
+  if (!diarioOptionProduct) return;
+  const selected = document.querySelector('#diario-option-modal-list input[name="diario-option"]:checked');
+  const optionId = selected?.value || diarioPendingOptionId;
+  const productId = diarioOptionProduct.id;
+  closeDiarioOptionModal();
+  addProductToDiarioCart(productId, optionId);
+}
+
+function addProductToDiarioCart(productId, optionId) {
   const product = dailySalesProductsCache.find(p => p.id === productId);
   if (!product) return;
 
-  const existing = diarioCart.find(line => line.productId === productId);
+  const opts = getProductOptions(product);
+  let option = null;
+  if (opts.length) {
+    option = findProductOption(product, optionId) || getDefaultProductOption(product);
+    if (!option) {
+      showToast('Selecione um adicional do produto.', 'error');
+      return;
+    }
+  }
+
+  const key = diarioLineKey(product.id, option?.id || '');
+  const existing = diarioCart.find(line => diarioLineKey(line.productId, line.optionId) === key);
   if (existing) {
     existing.quantity += 1;
   } else {
     diarioCart.push({
       productId: product.id,
+      optionId: option ? String(option.id) : '',
+      optionName: option ? option.name : '',
       name: product.name,
-      basePrice: getProductBasePrice(product),
+      basePrice: getDiarioUnitPrice(product, option),
       quantity: 1,
       discount: 0
     });
@@ -237,8 +389,8 @@ function addProductToDiarioCart(productId) {
   updateDiarioLoyaltyUI();
 }
 
-function removeFromDiarioCart(productId) {
-  diarioCart = diarioCart.filter(line => line.productId !== productId);
+function removeFromDiarioCart(lineKey) {
+  diarioCart = diarioCart.filter(line => diarioLineKey(line.productId, line.optionId) !== lineKey);
   renderDiarioCart();
   updateDiarioLoyaltyUI();
 }
@@ -267,6 +419,7 @@ function computeDiarioLoyaltyVisits() {
 function buildDiarioPayloadItems() {
   const lines = diarioCart.map(line => ({
     productId: line.productId,
+    optionId: line.optionId || null,
     quantity: Math.max(1, Number(line.quantity) || 1),
     unitPrice: computeDiarioFinalPrice(line.basePrice, line.discount),
     lineTotal: computeDiarioLineTotal(line)
@@ -278,6 +431,7 @@ function buildDiarioPayloadItems() {
   if (cartDisc <= 0 || subtotal <= 0) {
     return lines.map(line => ({
       product_id: line.productId,
+      option_id: line.optionId || undefined,
       quantity: line.quantity,
       unit_price: line.unitPrice
     }));
@@ -294,6 +448,7 @@ function buildDiarioPayloadItems() {
     const unitPrice = Math.round((discountedTotal / line.quantity) * 100) / 100;
     return {
       product_id: line.productId,
+      option_id: line.optionId || undefined,
       quantity: line.quantity,
       unit_price: unitPrice
     };
@@ -363,11 +518,16 @@ function renderDiarioCart() {
 
   container.innerHTML = diarioCart.map(line => {
     const lineTotal = computeDiarioLineTotal(line);
+    const key = diarioLineKey(line.productId, line.optionId);
+    const optionHint = line.optionName
+      ? `<span class="daily-diario-cart-option">${escapeHtml(line.optionName)}</span>`
+      : '';
     return `
-      <div class="daily-diario-cart-row" data-cart-product="${escapeAttr(line.productId)}">
+      <div class="daily-diario-cart-row" data-cart-line="${escapeAttr(key)}">
         <div class="daily-diario-cart-row-name">
           <span class="daily-diario-cart-title">${escapeHtml(line.name)}</span>
-          <span class="daily-diario-cart-base">Base: ${formatCurrency(line.basePrice)}</span>
+          ${optionHint}
+          <span class="daily-diario-cart-base">Unit.: ${formatCurrency(line.basePrice)}</span>
         </div>
         <div class="daily-diario-cart-row-fields">
           <label class="daily-diario-cart-field">
@@ -382,7 +542,7 @@ function renderDiarioCart() {
             <span>Total</span>
             <strong>${formatCurrency(lineTotal)}</strong>
           </div>
-          <button type="button" class="btn btn-danger btn-sm btn-icon daily-diario-cart-remove" data-remove-product="${escapeAttr(line.productId)}" title="Remover" aria-label="Remover produto">
+          <button type="button" class="btn btn-danger btn-sm btn-icon daily-diario-cart-remove" data-remove-line="${escapeAttr(key)}" title="Remover" aria-label="Remover produto">
             <i data-lucide="x"></i>
           </button>
         </div>
@@ -394,9 +554,9 @@ function renderDiarioCart() {
 }
 
 function onDiarioCartClick(e) {
-  const removeBtn = e.target.closest('[data-remove-product]');
+  const removeBtn = e.target.closest('[data-remove-line]');
   if (removeBtn) {
-    removeFromDiarioCart(removeBtn.dataset.removeProduct);
+    removeFromDiarioCart(removeBtn.dataset.removeLine);
     return;
   }
   const clearCustomer = e.target.closest('[data-clear-customer]');
@@ -406,16 +566,16 @@ function onDiarioCartClick(e) {
 }
 
 function onDiarioCartInput(e) {
-  const row = e.target.closest('[data-cart-product]');
+  const row = e.target.closest('[data-cart-line]');
   if (!row) return;
-  const productId = row.dataset.cartProduct;
-  const line = diarioCart.find(l => l.productId === productId);
+  const lineKey = row.dataset.cartLine;
+  const line = diarioCart.find(l => diarioLineKey(l.productId, l.optionId) === lineKey);
   if (!line) return;
 
   if (e.target.matches('[data-cart-qty]')) {
     const parsed = parseLooseInt(e.target.value);
     if (parsed != null && parsed >= 1) line.quantity = parsed;
-    updateDiarioCartRowTotal(productId);
+    updateDiarioCartRowTotal(lineKey);
     updateDiarioLoyaltyUI();
     return;
   }
@@ -427,22 +587,22 @@ function onDiarioCartInput(e) {
     if (parsed != null && parsed >= 0) {
       line.discount = Math.min(parsed, line.basePrice);
     }
-    updateDiarioCartRowTotal(productId);
+    updateDiarioCartRowTotal(lineKey);
     updateDiarioLoyaltyUI();
   }
 }
 
 function onDiarioCartBlur(e) {
-  const row = e.target.closest('[data-cart-product]');
+  const row = e.target.closest('[data-cart-line]');
   if (!row) return;
-  const productId = row.dataset.cartProduct;
-  const line = diarioCart.find(l => l.productId === productId);
+  const lineKey = row.dataset.cartLine;
+  const line = diarioCart.find(l => diarioLineKey(l.productId, l.optionId) === lineKey);
   if (!line) return;
 
   if (e.target.matches('[data-cart-qty]')) {
     line.quantity = clampInt(parseLooseInt(e.target.value), 1, 1);
     e.target.value = String(line.quantity);
-    updateDiarioCartRowTotal(productId);
+    updateDiarioCartRowTotal(lineKey);
     updateDiarioLoyaltyUI();
     return;
   }
@@ -456,7 +616,7 @@ function onDiarioCartBlur(e) {
       MONEY_DECIMALS
     );
     e.target.value = formatDecimalInput(line.discount, MONEY_DECIMALS);
-    updateDiarioCartRowTotal(productId);
+    updateDiarioCartRowTotal(lineKey);
     updateDiarioLoyaltyUI();
   }
 }
@@ -464,14 +624,81 @@ function onDiarioCartBlur(e) {
 function onDiarioProductResultsClick(e) {
   const btn = e.target.closest('[data-product-id]');
   if (!btn) return;
-  addProductToDiarioCart(btn.dataset.productId);
+  const product = dailySalesProductsCache.find(p => String(p.id) === String(btn.dataset.productId));
+  if (!product) return;
+  hideDiarioResults('product');
+  if (getProductOptions(product).length) {
+    openDiarioOptionModal(product);
+  } else {
+    addProductToDiarioCart(product.id, null);
+  }
 }
 
 function onDiarioCustomerResultsClick(e) {
+  const createBtn = e.target.closest('[data-create-customer]');
+  if (createBtn) {
+    openDiarioQuickCustomerModal();
+    return;
+  }
   const btn = e.target.closest('[data-customer-id]');
   if (!btn) return;
   const customer = dailySalesCustomersCache.find(c => String(c.id) === String(btn.dataset.customerId));
   if (customer) selectDiarioCustomer(customer);
+}
+
+function openDiarioQuickCustomerModal() {
+  hideDiarioResults('customer');
+  const modal = document.getElementById('diario-quick-customer-modal');
+  const form = document.getElementById('diario-quick-customer-form');
+  const nameInput = document.getElementById('diario-quick-customer-name');
+  const phoneInput = document.getElementById('diario-quick-customer-phone');
+  const search = document.getElementById('daily-diario-customer-search');
+  form?.reset();
+  if (search?.value) {
+    const raw = search.value.trim();
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length >= 8 && nameInput && phoneInput) {
+      phoneInput.value = formatDiarioPhoneDisplay(digits);
+    } else if (nameInput) {
+      nameInput.value = raw;
+    }
+  }
+  modal?.classList.add('active');
+  setTimeout(() => nameInput?.focus(), 50);
+}
+
+function closeDiarioQuickCustomerModal() {
+  document.getElementById('diario-quick-customer-modal')?.classList.remove('active');
+}
+
+async function saveDiarioQuickCustomer(event) {
+  event.preventDefault();
+  const btn = event.submitter || document.querySelector('#diario-quick-customer-form button[type="submit"]');
+  const name = document.getElementById('diario-quick-customer-name')?.value.trim() || '';
+  const phone = document.getElementById('diario-quick-customer-phone')?.value.trim() || '';
+
+  if (!name) {
+    showToast('Informe o nome do cliente.', 'error');
+    return;
+  }
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 10) {
+    showToast('Telefone inválido (mínimo 10 dígitos).', 'error');
+    return;
+  }
+
+  await withButtonLoading(btn, async () => {
+    try {
+      const customer = await DB.addLoyaltyCustomer({ name, phone });
+      upsertDiarioCustomerCache(customer);
+      selectDiarioCustomer(customer);
+      closeDiarioQuickCustomerModal();
+      showToast('Cliente cadastrado!', 'success');
+    } catch (error) {
+      if (handleAuthError(error)) return;
+      showToast(error.message || 'Erro ao cadastrar cliente.', 'error');
+    }
+  }, 'Cadastrando…');
 }
 
 function onDiarioCartDiscountInput(e) {
@@ -544,7 +771,7 @@ function initDiarioComboboxes() {
           return;
         }
         showDiarioCustomerResults(q);
-      }, 200);
+      }, 250);
     });
     customerSearch.addEventListener('focus', () => {
       const q = customerSearch.value.trim();
@@ -567,7 +794,9 @@ function initDiarioComboboxes() {
 
   document.addEventListener('click', (e) => {
     if (!e.target.closest('#diario-product-combobox')) hideDiarioResults('product');
-    if (!e.target.closest('#diario-customer-combobox')) hideDiarioResults('customer');
+    if (!e.target.closest('#diario-customer-combobox') && !e.target.closest('#daily-diario-customer-create-btn')) {
+      hideDiarioResults('customer');
+    }
   });
 }
 
@@ -655,6 +884,7 @@ async function loadDailyDiario() {
   const productSearch = document.getElementById('daily-diario-product-search');
   const customerSearch = document.getElementById('daily-diario-customer-search');
   const customerSelected = document.getElementById('daily-diario-customer-selected');
+  const customerCreateBtn = document.getElementById('daily-diario-customer-create-btn');
   const cartDiscount = document.getElementById('daily-diario-cart-discount');
 
   if (productSearch) productSearch.value = '';
@@ -666,6 +896,7 @@ async function loadDailyDiario() {
     customerSelected.classList.add('hidden');
     customerSelected.innerHTML = '';
   }
+  if (customerCreateBtn) customerCreateBtn.classList.remove('hidden');
   if (cartDiscount) cartDiscount.value = formatDecimalInput(0, MONEY_DECIMALS);
 
   hideDiarioResults('product');

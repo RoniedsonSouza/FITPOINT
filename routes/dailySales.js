@@ -3,6 +3,7 @@ const router = express.Router();
 const { query, getClient, table } = require('../config/database');
 const { authenticateToken, requirePermission } = require('../config/auth');
 const { applyVisitDelta, insertVisitEvents, computeLoyaltyVisitsFromAmount, DEFAULT_ACCESS_VALUE, DEFAULT_VISITS_PER_REWARD } = require('./loyaltyHelpers');
+const { normalizeOptions } = require('./productHelpers');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -31,14 +32,39 @@ function resolveUnitPrice(productRow) {
   return Number(productRow.price);
 }
 
+function resolveProductOption(productRow, optionId) {
+  const options = normalizeOptions(productRow.options);
+  if (!options.length) {
+    if (optionId) return { error: 'Produto sem opções disponíveis' };
+    return { option: null, adjustment: 0 };
+  }
+  if (optionId === undefined || optionId === null || optionId === '') {
+    return { error: 'Selecione um adicional/opção do produto' };
+  }
+  const option = options.find(o => String(o.id) === String(optionId));
+  if (!option) return { error: 'Opção inválida para este produto' };
+  return {
+    option,
+    adjustment: Math.max(0, Number(option.price_adjustment) || 0)
+  };
+}
+
+function displayProductName(productName, optionName) {
+  if (!optionName) return productName;
+  return `${productName} (${optionName})`;
+}
+
 function mapSaleRow(row) {
   const quantity = Number(row.quantity) || 1;
   const unitPrice = Number(row.unit_price);
+  const optionName = row.option_name || null;
   return {
     id: row.id,
     sale_date: row.sale_date,
     product_id: row.product_id,
-    product_name: row.product_name,
+    product_name: displayProductName(row.product_name, optionName),
+    option_id: row.option_id || null,
+    option_name: optionName,
     quantity,
     unit_price: unitPrice,
     line_total: Math.round(quantity * unitPrice * 100) / 100,
@@ -108,6 +134,8 @@ async function fetchDayItems(saleDate) {
        ds.quantity,
        ds.unit_price,
        ds.loyalty_customer_id,
+       ds.option_id,
+       ds.option_name,
        ds.created_at,
        p.name AS product_name,
        lc.name AS customer_name
@@ -297,7 +325,7 @@ router.post('/batch', authenticateToken, requirePermission('vendas'), async (req
       }
 
       const productResult = await client.query(
-        `SELECT id, name, price, promo_price, active FROM ${table('products')} WHERE id = $1`,
+        `SELECT id, name, price, promo_price, active, options FROM ${table('products')} WHERE id = $1`,
         [productId]
       );
       if (productResult.rows.length === 0) {
@@ -308,32 +336,45 @@ router.post('/batch', authenticateToken, requirePermission('vendas'), async (req
         return res.status(400).json({ error: `Produto inativo: ${product.name}` });
       }
 
-      const basePrice = resolveUnitPrice(product);
+      const optionResolved = resolveProductOption(product, raw.option_id);
+      if (optionResolved.error) {
+        return res.status(400).json({ error: `Item ${i + 1}: ${optionResolved.error}` });
+      }
+      const optionAdj = optionResolved.adjustment;
+      const option = optionResolved.option;
+      const maxPrice = resolveUnitPrice(product) + optionAdj;
+
       let unitPrice = raw.unit_price !== undefined && raw.unit_price !== null && raw.unit_price !== ''
         ? Number(raw.unit_price)
-        : basePrice;
+        : maxPrice;
 
       if (!Number.isFinite(unitPrice) || unitPrice < 0) {
         return res.status(400).json({ error: `Item ${i + 1}: preço inválido` });
       }
-      if (unitPrice > basePrice + 0.001) {
-        return res.status(400).json({ error: `Item ${i + 1}: preço não pode exceder o preço base` });
+      if (unitPrice > maxPrice + 0.001) {
+        return res.status(400).json({ error: `Item ${i + 1}: preço não pode exceder o preço do item` });
       }
 
       unitPrice = Math.round(unitPrice * 100) / 100;
-      validatedItems.push({ product, qty, unitPrice });
+      validatedItems.push({
+        product,
+        qty,
+        unitPrice,
+        optionId: option ? option.id : null,
+        optionName: option ? option.name : null
+      });
     }
 
     await client.query('BEGIN');
 
     const insertedItems = [];
-    for (const { product, qty, unitPrice } of validatedItems) {
+    for (const { product, qty, unitPrice, optionId, optionName } of validatedItems) {
       const insertResult = await client.query(
         `INSERT INTO ${table('daily_sales')}
-           (sale_date, product_id, loyalty_customer_id, quantity, unit_price, created_at)
-         VALUES ($1::date, $2, $3, $4, $5, NOW())
+           (sale_date, product_id, loyalty_customer_id, quantity, unit_price, option_id, option_name, created_at)
+         VALUES ($1::date, $2, $3, $4, $5, $6, $7, NOW())
          RETURNING *`,
-        [dateParsed.value, product.id, customerId, qty, unitPrice]
+        [dateParsed.value, product.id, customerId, qty, unitPrice, optionId, optionName]
       );
       insertedItems.push(mapSaleRow({
         ...insertResult.rows[0],

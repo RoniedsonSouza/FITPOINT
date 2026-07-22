@@ -2076,6 +2076,90 @@ body.ticket-qr-open {
   flex-shrink: 0;
 }
 
+.diario-combobox-result-item--create {
+  border-top: 1px solid rgba(14, 31, 22, 0.08);
+  color: var(--fp-green);
+  font-weight: 600;
+}
+
+.diario-combobox-result-item--create .diario-combobox-result-meta {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.daily-diario-customer-create-btn {
+  margin-top: 0.5rem;
+  align-self: flex-start;
+}
+
+.daily-diario-customer-create-btn.hidden {
+  display: none;
+}
+
+.daily-diario-cart-option {
+  display: block;
+  font-size: 0.8125rem;
+  color: rgba(14, 31, 22, 0.65);
+  margin-top: 0.125rem;
+}
+
+.diario-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  max-height: min(50vh, 22rem);
+  overflow-y: auto;
+}
+
+.diario-option-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 0.875rem;
+  border: 1.5px solid rgba(14, 31, 22, 0.12);
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.diario-option-item:has(input:checked) {
+  border-color: rgba(29, 107, 58, 0.55);
+  background: rgba(29, 107, 58, 0.06);
+}
+
+.diario-option-item input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+.diario-option-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.diario-option-item-name {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.diario-option-item-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+  color: rgba(14, 31, 22, 0.6);
+}
+
+.diario-option-item-meta strong {
+  color: var(--fp-green);
+  font-weight: 700;
+}
+
 .diario-combobox-empty {
   margin: 0;
   padding: 0.75rem 1rem;

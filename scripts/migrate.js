@@ -224,6 +224,16 @@ async function migrate() {
     `);
 
     await client.query(`
+      ALTER TABLE ${SCHEMA}.daily_sales
+      ADD COLUMN IF NOT EXISTS option_id VARCHAR(255)
+    `);
+
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.daily_sales
+      ADD COLUMN IF NOT EXISTS option_name VARCHAR(255)
+    `);
+
+    await client.query(`
       CREATE INDEX IF NOT EXISTS idx_daily_sales_date ON ${SCHEMA}.daily_sales(sale_date)
     `);
 

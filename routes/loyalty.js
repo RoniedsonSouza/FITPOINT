@@ -4,7 +4,7 @@ const fs = require('fs');
 const multer = require('multer');
 const router = express.Router();
 const { query, table, getClient } = require('../config/database');
-const { authenticateToken, requirePermission } = require('../config/auth');
+const { authenticateToken, requirePermission, requireAnyPermission } = require('../config/auth');
 const {
   DEFAULT_VISITS_PER_REWARD,
   DEFAULT_ACCESS_VALUE,
@@ -219,14 +219,16 @@ router.get('/rankings', async (req, res) => {
   }
 });
 
-// GET /api/loyalty/customers — admin
-router.get('/customers', authenticateToken, requirePermission('fidelidade'), async (req, res) => {
+// GET /api/loyalty/customers — admin (fidelidade ou vendas/diário)
+router.get('/customers', authenticateToken, requireAnyPermission('fidelidade', 'vendas'), async (req, res) => {
   try {
     const visitsPerReward = await getVisitsPerReward();
     const { page, limit, offset } = parsePaginationQuery(req.query);
     const search = parseSearchQuery(req.query);
     const searchPart = buildNamePhoneSearchClause(search, 1);
-    const baseWhere = `WHERE 1=1${searchPart.clause}`;
+    const activeOnly = ['1', 'true', 'yes'].includes(String(req.query.active || '').toLowerCase());
+    const activeClause = activeOnly ? ' AND active IS DISTINCT FROM false' : '';
+    const baseWhere = `WHERE 1=1${searchPart.clause}${activeClause}`;
 
     const countResult = await query(
       `SELECT COUNT(*)::int AS cnt FROM ${table('loyalty_customers')} ${baseWhere}`,
@@ -280,8 +282,8 @@ router.get('/customers/:id', authenticateToken, requirePermission('fidelidade'),
   }
 });
 
-// POST /api/loyalty/customers — admin
-router.post('/customers', authenticateToken, requirePermission('fidelidade'), async (req, res) => {
+// POST /api/loyalty/customers — admin (fidelidade ou cadastro rápido no diário)
+router.post('/customers', authenticateToken, requireAnyPermission('fidelidade', 'vendas'), async (req, res) => {
   try {
     const visitsPerReward = await getVisitsPerReward();
     const { name, phone, avatar, total_visits, total_rewards } = req.body;

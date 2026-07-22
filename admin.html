@@ -362,10 +362,13 @@
             <div class="daily-diario-field">
               <label for="daily-diario-customer-search">Cliente (opcional)</label>
               <div class="diario-combobox" id="diario-customer-combobox">
-                <input type="search" id="daily-diario-customer-search" placeholder="Buscar cliente…" autocomplete="off">
+                <input type="search" id="daily-diario-customer-search" placeholder="Buscar por nome ou telefone…" autocomplete="off">
                 <div id="daily-diario-customer-results" class="diario-combobox-results hidden"></div>
                 <div id="daily-diario-customer-selected" class="diario-combobox-selected hidden"></div>
               </div>
+              <button type="button" id="daily-diario-customer-create-btn" class="btn btn-outline btn-sm daily-diario-customer-create-btn" onclick="openDiarioQuickCustomerModal()">
+                <i data-lucide="user-plus"></i> Cadastrar cliente
+              </button>
             </div>
             <div id="daily-diario-loyalty-wrap" class="daily-diario-loyalty-info-wrap hidden">
               <p id="daily-diario-loyalty-info" class="daily-diario-loyalty-info"></p>
@@ -937,6 +940,46 @@
           <button type="submit" class="btn btn-primary btn-lg">Salvar</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Cadastro rápido de cliente (Diário) -->
+  <div id="diario-quick-customer-modal" class="modal">
+    <div class="modal-content modal-content--sm">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-display text-xl font-bold">Cadastrar cliente</h3>
+        <button type="button" onclick="closeDiarioQuickCustomerModal()" class="modal-close" aria-label="Fechar">&times;</button>
+      </div>
+      <form id="diario-quick-customer-form" onsubmit="saveDiarioQuickCustomer(event)">
+        <div class="form-group">
+          <label for="diario-quick-customer-name">Nome</label>
+          <input type="text" id="diario-quick-customer-name" required placeholder="Ex.: Maria Silva" autocomplete="name">
+        </div>
+        <div class="form-group">
+          <label for="diario-quick-customer-phone">Telefone</label>
+          <input type="tel" id="diario-quick-customer-phone" required placeholder="Ex.: (27) 99999-9999" autocomplete="tel">
+        </div>
+        <div class="modal-footer">
+          <button type="button" onclick="closeDiarioQuickCustomerModal()" class="btn btn-secondary btn-md">Cancelar</button>
+          <button type="submit" class="btn btn-primary btn-lg">Cadastrar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Seleção de adicional/opção (Diário) -->
+  <div id="diario-option-modal" class="modal">
+    <div class="modal-content modal-content--sm">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-display text-xl font-bold" id="diario-option-modal-title">Adicionais</h3>
+        <button type="button" onclick="closeDiarioOptionModal()" class="modal-close" aria-label="Fechar">&times;</button>
+      </div>
+      <p id="diario-option-modal-subtitle" class="text-sm text-black/60 mb-3"></p>
+      <div id="diario-option-modal-list" class="diario-option-list"></div>
+      <div class="modal-footer">
+        <button type="button" onclick="closeDiarioOptionModal()" class="btn btn-secondary btn-md">Cancelar</button>
+        <button type="button" id="diario-option-confirm-btn" onclick="confirmDiarioOptionSelection()" class="btn btn-primary btn-lg">Adicionar</button>
+      </div>
     </div>
   </div>
 

@@ -263,6 +263,9 @@ const DB = {
     if (params.q) qs.set('q', params.q);
     if (params.page) qs.set('page', String(params.page));
     if (params.limit) qs.set('limit', String(params.limit));
+    if (params.active != null) {
+      qs.set('active', params.active === true || params.active === 'true' ? 'true' : String(params.active));
+    }
     const query = qs.toString();
     const url = `${getApiBaseUrl()}/loyalty/customers${query ? `?${query}` : ''}`;
     const response = await fetch(url, {

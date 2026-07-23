@@ -603,7 +603,7 @@
         </div>
         <div class="form-group">
           <label>Opções / variações (opcional)</label>
-          <p class="text-xs text-black/50 mb-2">Ex.: Pizza comum (+R$0) e Pizza com frango (+R$8). Marque uma como padrão.</p>
+          <p class="text-xs text-black/50 mb-2">No Diário dá para marcar várias. Marque <strong>Única</strong> se não permitir quantidade (sempre 1×). Desmarque para permitir qty. Uma opção como padrão é pré-marcada no Diário.</p>
           <div id="product-options-list" class="space-y-2"></div>
           <button type="button" onclick="addProductOptionRow()" class="btn btn-outline btn-sm mt-2">
             <i data-lucide="plus"></i> Adicionar opção
@@ -969,13 +969,17 @@
 
   <!-- Seleção de adicional/opção (Diário) -->
   <div id="diario-option-modal" class="modal">
-    <div class="modal-content modal-content--sm">
+    <div class="modal-content modal-content--sm diario-option-modal-content">
       <div class="flex justify-between items-center mb-4">
         <h3 class="font-display text-xl font-bold" id="diario-option-modal-title">Adicionais</h3>
         <button type="button" onclick="closeDiarioOptionModal()" class="modal-close" aria-label="Fechar">&times;</button>
       </div>
-      <p id="diario-option-modal-subtitle" class="text-sm text-black/60 mb-3"></p>
+      <p id="diario-option-modal-subtitle" class="text-sm text-black/60 mb-3">Selecione uma ou mais variações:</p>
       <div id="diario-option-modal-list" class="diario-option-list"></div>
+      <div class="diario-option-modal-footer-total">
+        <span>Preço unitário</span>
+        <strong id="diario-option-modal-unit-price">R$&nbsp;0,00</strong>
+      </div>
       <div class="modal-footer">
         <button type="button" onclick="closeDiarioOptionModal()" class="btn btn-secondary btn-md">Cancelar</button>
         <button type="button" id="diario-option-confirm-btn" onclick="confirmDiarioOptionSelection()" class="btn btn-primary btn-lg">Adicionar</button>

@@ -74,6 +74,7 @@ function addProductOptionRow(option = null) {
   const list = document.getElementById('product-options-list');
   if (!list) return;
   const rowId = option?.id || generateOptionId();
+  const isUnique = option?.unique !== false;
   const row = document.createElement('div');
   row.className = 'product-option-row flex flex-wrap gap-2 items-end p-2 rounded-lg border border-black/10 bg-black/[0.02]';
   row.dataset.optionId = rowId;
@@ -86,6 +87,10 @@ function addProductOptionRow(option = null) {
       <label class="text-xs text-black/60">+ R$</label>
       <input type="number" class="option-price" step="0.01" min="0" value="${option ? formatDecimalInput(option.price_adjustment || 0, MONEY_DECIMALS) : formatDecimalInput(0, MONEY_DECIMALS)}">
     </div>
+    <label class="flex items-center gap-1 text-sm pb-2 cursor-pointer shrink-0" title="Se marcada, no Diário não permite quantidade (sempre 1)">
+      <input type="checkbox" class="option-unique" ${isUnique ? 'checked' : ''}>
+      Única
+    </label>
     <label class="flex items-center gap-1 text-sm pb-2 cursor-pointer shrink-0">
       <input type="radio" name="product-option-default" class="option-default" value="${rowId}" ${option?.default ? 'checked' : ''}>
       Padrão
@@ -136,11 +141,13 @@ function readProductOptionsFromForm() {
     );
     const id = row.dataset.optionId || generateOptionId();
     const isDefault = row.querySelector('.option-default')?.checked === true;
+    const isUnique = row.querySelector('.option-unique')?.checked !== false;
     options.push({
       id,
       name,
       price_adjustment: priceAdj,
-      default: isDefault
+      default: isDefault,
+      unique: isUnique
     });
   });
   if (options.length > 0 && !options.some(o => o.default)) {

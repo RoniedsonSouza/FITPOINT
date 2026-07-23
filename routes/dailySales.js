@@ -38,11 +38,15 @@ function resolveProductOption(productRow, optionId) {
     if (optionId) return { error: 'Produto sem opções disponíveis' };
     return { option: null, adjustment: 0 };
   }
-  if (optionId === undefined || optionId === null || optionId === '') {
-    return { error: 'Selecione um adicional/opção do produto' };
+
+  let option = null;
+  if (optionId !== undefined && optionId !== null && optionId !== '') {
+    option = options.find(o => String(o.id) === String(optionId)) || null;
+    if (!option) return { error: 'Opção inválida para este produto' };
+  } else {
+    option = options.find(o => o.default) || options[0];
   }
-  const option = options.find(o => String(o.id) === String(optionId));
-  if (!option) return { error: 'Opção inválida para este produto' };
+
   return {
     option,
     adjustment: Math.max(0, Number(option.price_adjustment) || 0)

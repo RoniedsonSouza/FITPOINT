@@ -154,8 +154,11 @@ async function fetchDailySalesCatalog() {
     DB.getProducts().catch(() => []),
     DB.getLoyaltyCustomers({ page: 1, limit: 50, active: true }).catch(() => ({ items: [] }))
   ]);
-  dailySalesProductsCache = (products || []).filter(p => p.active !== false);
-  dailySalesCustomersCache = loyaltyData.items || loyaltyData || [];
+  const list = Array.isArray(products) ? products : [];
+  dailySalesProductsCache = list.filter(p => p && p.active !== false);
+  dailySalesCustomersCache = Array.isArray(loyaltyData?.items)
+    ? loyaltyData.items
+    : (Array.isArray(loyaltyData) ? loyaltyData : []);
 }
 
 async function searchDiarioCustomersRemote(query) {

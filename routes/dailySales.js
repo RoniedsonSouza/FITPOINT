@@ -277,6 +277,58 @@ async function applyLoyaltyForSale(client, customerId, validatedItems) {
   };
 }
 
+// GET /api/daily-sales/day-status?date=
+router.get('/day-status', authenticateToken, requirePermission('vendas'), async (req, res) => {
+  try {
+    const parsed = parseSaleDate(req.query.date);
+    if (parsed.error) return res.status(400).json({ error: parsed.error });
+
+    const result = await query(
+      `SELECT sale_date, registered
+       FROM ${table('daily_diary_days')}
+       WHERE sale_date = $1::date`,
+      [parsed.value]
+    );
+
+    const row = result.rows[0];
+    res.json({
+      sale_date: parsed.value,
+      registered: row ? Boolean(row.registered) : false
+    });
+  } catch (error) {
+    console.error('Erro ao buscar status do diário:', error);
+    res.status(500).json({ error: 'Erro ao buscar status do diário' });
+  }
+});
+
+// PUT /api/daily-sales/day-status
+router.put('/day-status', authenticateToken, requirePermission('vendas'), async (req, res) => {
+  try {
+    const parsed = parseSaleDate(req.body?.sale_date);
+    if (parsed.error) return res.status(400).json({ error: parsed.error });
+
+    const registered = Boolean(req.body?.registered);
+
+    const result = await query(
+      `INSERT INTO ${table('daily_diary_days')} (sale_date, registered, updated_at)
+       VALUES ($1::date, $2, NOW())
+       ON CONFLICT (sale_date) DO UPDATE
+       SET registered = EXCLUDED.registered, updated_at = NOW()
+       RETURNING sale_date, registered`,
+      [parsed.value, registered]
+    );
+
+    const row = result.rows[0];
+    res.json({
+      sale_date: parsed.value,
+      registered: Boolean(row?.registered)
+    });
+  } catch (error) {
+    console.error('Erro ao atualizar status do diário:', error);
+    res.status(500).json({ error: 'Erro ao atualizar status do diário' });
+  }
+});
+
 // GET /api/daily-sales/bestsellers?limit= — público (home)
 router.get('/bestsellers', async (req, res) => {
   try {

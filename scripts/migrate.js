@@ -243,6 +243,14 @@ async function migrate() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA}.daily_diary_days (
+        sale_date DATE PRIMARY KEY,
+        registered BOOLEAN NOT NULL DEFAULT FALSE,
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS ${SCHEMA}.events (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,

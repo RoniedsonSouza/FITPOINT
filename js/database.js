@@ -406,6 +406,35 @@ const DB = {
     return response.json();
   },
 
+  async getDailyDiaryDayStatus(date) {
+    const qs = date ? `?date=${encodeURIComponent(date)}` : '';
+    const response = await fetch(`${getApiBaseUrl()}/daily-sales/day-status${qs}`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao buscar status do diário';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async setDailyDiaryDayStatus(sale_date, registered) {
+    const response = await fetch(`${getApiBaseUrl()}/daily-sales/day-status`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ sale_date, registered: Boolean(registered) })
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao atualizar status do diário';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
   async getDailySalesSummary(date) {
     const qs = date ? `?date=${encodeURIComponent(date)}` : '';
     const response = await fetch(`${getApiBaseUrl()}/daily-sales/summary${qs}`, {

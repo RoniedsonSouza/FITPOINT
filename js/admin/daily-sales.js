@@ -30,7 +30,40 @@ function shiftDailySalesDate(days) {
   dailySalesSelectedDate = getLocalDateString(current);
   const input = document.getElementById('daily-sales-date');
   if (input) input.value = dailySalesSelectedDate;
+  const diarioInput = document.getElementById('daily-diario-date');
+  if (diarioInput) diarioInput.value = dailySalesSelectedDate;
   loadDailySales();
+}
+
+function ensureDailySalesSelectedDate() {
+  if (!dailySalesSelectedDate) {
+    dailySalesSelectedDate = getLocalDateString();
+  }
+  return dailySalesSelectedDate;
+}
+
+function syncSharedDateInputs() {
+  const date = ensureDailySalesSelectedDate();
+  const salesInput = document.getElementById('daily-sales-date');
+  const diarioInput = document.getElementById('daily-diario-date');
+  if (salesInput && salesInput.value !== date) salesInput.value = date;
+  if (diarioInput && diarioInput.value !== date) diarioInput.value = date;
+}
+
+function shiftDiarioDate(days) {
+  const current = parseLocalDate(ensureDailySalesSelectedDate());
+  current.setDate(current.getDate() + days);
+  dailySalesSelectedDate = getLocalDateString(current);
+  syncSharedDateInputs();
+  reloadDiarioForSelectedDate();
+}
+
+function onDiarioDateChange() {
+  const input = document.getElementById('daily-diario-date');
+  if (!input?.value) return;
+  dailySalesSelectedDate = input.value;
+  syncSharedDateInputs();
+  reloadDiarioForSelectedDate();
 }
 
 function formatCurrency(value) {
@@ -230,8 +263,13 @@ function showDiarioProductResults(query) {
   const container = document.getElementById('daily-diario-product-results');
   if (!container) return;
   const matches = filterDiarioProducts(query);
+  const createBtn = `<button type="button" class="diario-combobox-result-item diario-combobox-result-item--create" data-create-product>
+      <span class="diario-combobox-result-name">Cadastrar novo produto</span>
+      <span class="diario-combobox-result-meta">+</span>
+    </button>`;
+
   if (matches.length === 0) {
-    container.innerHTML = '<p class="diario-combobox-empty">Nenhum produto encontrado.</p>';
+    container.innerHTML = `<p class="diario-combobox-empty">Nenhum produto encontrado.</p>${createBtn}`;
   } else {
     container.innerHTML = matches.map(p => {
       const opts = getProductOptions(p);
@@ -243,7 +281,7 @@ function showDiarioProductResults(query) {
         <span class="diario-combobox-result-name">${escapeHtml(p.name)}</span>
         <span class="diario-combobox-result-meta">${escapeHtml(meta)}</span>
       </button>`;
-    }).join('');
+    }).join('') + createBtn;
   }
   container.classList.remove('hidden');
 }
@@ -282,7 +320,6 @@ function selectDiarioCustomer(customer) {
   upsertDiarioCustomerCache(customer);
   const search = document.getElementById('daily-diario-customer-search');
   const selected = document.getElementById('daily-diario-customer-selected');
-  const createBtn = document.getElementById('daily-diario-customer-create-btn');
   if (search) {
     search.value = '';
     search.classList.add('hidden');
@@ -294,7 +331,6 @@ function selectDiarioCustomer(customer) {
       <button type="button" class="diario-combobox-clear" data-clear-customer aria-label="Remover cliente">&times;</button>
     `;
   }
-  if (createBtn) createBtn.classList.add('hidden');
   hideDiarioResults('customer');
   updateDiarioLoyaltyUI();
 }
@@ -303,7 +339,6 @@ function clearDiarioCustomer() {
   diarioSelectedCustomer = null;
   const search = document.getElementById('daily-diario-customer-search');
   const selected = document.getElementById('daily-diario-customer-selected');
-  const createBtn = document.getElementById('daily-diario-customer-create-btn');
   if (search) {
     search.classList.remove('hidden');
     search.value = '';
@@ -313,7 +348,6 @@ function clearDiarioCustomer() {
     selected.classList.add('hidden');
     selected.innerHTML = '';
   }
-  if (createBtn) createBtn.classList.remove('hidden');
   updateDiarioLoyaltyUI();
 }
 
@@ -703,6 +737,11 @@ function onDiarioCartBlur(e) {
 }
 
 function onDiarioProductResultsClick(e) {
+  const createBtn = e.target.closest('[data-create-product]');
+  if (createBtn) {
+    openDiarioQuickProductModal();
+    return;
+  }
   const btn = e.target.closest('[data-product-id]');
   if (!btn) return;
   const product = dailySalesProductsCache.find(p => String(p.id) === String(btn.dataset.productId));
@@ -778,6 +817,109 @@ async function saveDiarioQuickCustomer(event) {
     } catch (error) {
       if (handleAuthError(error)) return;
       showToast(error.message || 'Erro ao cadastrar cliente.', 'error');
+    }
+  }, 'Cadastrando…');
+}
+
+async function populateDiarioQuickProductCategories(selectedName) {
+  const sel = document.getElementById('diario-quick-product-category');
+  if (!sel) return;
+  try {
+    const categories = await DB.getCategories();
+    const active = (categories || []).filter(c => c.active !== false);
+    sel.innerHTML = '<option value="">Selecione…</option>' +
+      active.map(c => `<option value="${escapeAttr(c.name)}">${escapeHtml(c.name)}</option>`).join('');
+    if (selectedName) sel.value = selectedName;
+  } catch (e) {
+    console.error(e);
+    sel.innerHTML = '<option value="">Selecione…</option>';
+  }
+}
+
+async function openDiarioQuickProductModal() {
+  hideDiarioResults('product');
+  const modal = document.getElementById('diario-quick-product-modal');
+  const form = document.getElementById('diario-quick-product-form');
+  const nameInput = document.getElementById('diario-quick-product-name');
+  const priceInput = document.getElementById('diario-quick-product-price');
+  const search = document.getElementById('daily-diario-product-search');
+  form?.reset();
+  await populateDiarioQuickProductCategories();
+  if (search?.value && nameInput) {
+    nameInput.value = search.value.trim();
+  }
+  if (priceInput) priceInput.value = '';
+  modal?.classList.add('active');
+  setTimeout(() => nameInput?.focus(), 50);
+}
+
+function closeDiarioQuickProductModal() {
+  document.getElementById('diario-quick-product-modal')?.classList.remove('active');
+}
+
+async function saveDiarioQuickProduct(event) {
+  event.preventDefault();
+  const btn = event.submitter || document.querySelector('#diario-quick-product-form button[type="submit"]');
+  const name = document.getElementById('diario-quick-product-name')?.value.trim() || '';
+  const price = clampDecimal(
+    parseLooseDecimal(document.getElementById('diario-quick-product-price')?.value, MONEY_DECIMALS),
+    0,
+    null,
+    0,
+    MONEY_DECIMALS
+  );
+  const category = document.getElementById('diario-quick-product-category')?.value || '';
+
+  if (!name) {
+    showToast('Informe o nome do produto.', 'error');
+    return;
+  }
+  if (price == null || price < 0) {
+    showToast('Informe um preço válido.', 'error');
+    return;
+  }
+  if (!category) {
+    showToast('Selecione uma categoria.', 'error');
+    return;
+  }
+
+  await withButtonLoading(btn, async () => {
+    try {
+      const id = generateProductId();
+      const productData = {
+        id,
+        name,
+        price,
+        promo_price: null,
+        is_kit: false,
+        category,
+        tags: [],
+        active: true,
+        description: null,
+        nutrition: null,
+        options: []
+      };
+      await DB.addProduct(productData);
+      const product = { ...productData, options: [] };
+      const idx = dailySalesProductsCache.findIndex(p => String(p.id) === String(id));
+      if (idx >= 0) dailySalesProductsCache[idx] = product;
+      else dailySalesProductsCache.push(product);
+      dailySalesProductsCache.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR'));
+
+      closeDiarioQuickProductModal();
+      const search = document.getElementById('daily-diario-product-search');
+      if (search) search.value = '';
+      hideDiarioResults('product');
+
+      if (getProductOptions(product).length) {
+        openDiarioOptionModal(product);
+      } else {
+        addProductToDiarioCart(product.id, []);
+      }
+      showToast('Produto cadastrado!', 'success');
+    } catch (error) {
+      if (handleAuthError(error)) return;
+      showToast(error.message || 'Erro ao cadastrar produto.', 'error');
     }
   }, 'Cadastrando…');
 }
@@ -875,9 +1017,7 @@ function initDiarioComboboxes() {
 
   document.addEventListener('click', (e) => {
     if (!e.target.closest('#diario-product-combobox')) hideDiarioResults('product');
-    if (!e.target.closest('#diario-customer-combobox') && !e.target.closest('#daily-diario-customer-create-btn')) {
-      hideDiarioResults('customer');
-    }
+    if (!e.target.closest('#diario-customer-combobox')) hideDiarioResults('customer');
   });
 }
 
@@ -885,7 +1025,7 @@ function renderDailyDiarioDayStats(summary) {
   const statsEl = document.getElementById('daily-diario-day-stats');
   if (!statsEl) return;
 
-  const dateLabel = formatDisplayDate(getLocalDateString());
+  const dateLabel = formatDisplayDate(ensureDailySalesSelectedDate());
   const totalItems = summary?.total_items ?? 0;
   const totalRevenue = summary?.total_revenue ?? 0;
   const itemsLabel = totalItems === 1 ? '1 item' : `${totalItems} itens`;
@@ -899,7 +1039,7 @@ function renderDailyDiarioList(items, summary) {
   renderDailyDiarioDayStats(summary);
 
   if (!items || items.length === 0) {
-    listEl.innerHTML = '<p class="daily-diario-list-empty">Nenhuma venda hoje.</p>';
+    listEl.innerHTML = '<p class="daily-diario-list-empty">Nenhuma venda neste dia.</p>';
     return;
   }
 
@@ -924,7 +1064,12 @@ function renderDailyDiarioList(items, summary) {
         <div class="daily-diario-sale-main">
           <div class="daily-diario-sale-head">
             <p class="daily-diario-sale-title">${escapeHtml(item.product_name)}</p>
-            <span class="daily-diario-sale-price">${formatCurrency(item.line_total)}</span>
+            <div class="daily-diario-sale-head-actions">
+              <span class="daily-diario-sale-price">${formatCurrency(item.line_total)}</span>
+              <button type="button" onclick="deleteDailySaleEntry(${item.id})" class="btn btn-danger btn-sm btn-icon" title="Excluir" aria-label="Excluir venda">
+                <i data-lucide="trash"></i>
+              </button>
+            </div>
           </div>
           <p class="daily-diario-sale-unit">${unitLine}</p>
           <div class="daily-diario-sale-meta">
@@ -945,7 +1090,7 @@ function renderDailyDiarioList(items, summary) {
 
 async function loadDailyDiarioList() {
   try {
-    const data = await DB.getDailySales(getLocalDateString());
+    const data = await DB.getDailySales(ensureDailySalesSelectedDate());
     renderDailyDiarioList(data.items || [], data.summary);
   } catch (error) {
     if (handleAuthError(error)) return;
@@ -955,9 +1100,33 @@ async function loadDailyDiarioList() {
   }
 }
 
-async function loadDailyDiario() {
-  if (typeof DB === 'undefined') return;
+async function loadDiarioRegisteredStatus() {
+  const checkbox = document.getElementById('daily-diario-registered');
+  if (!checkbox) return;
+  try {
+    const data = await DB.getDailyDiaryDayStatus(ensureDailySalesSelectedDate());
+    checkbox.checked = Boolean(data?.registered);
+  } catch (error) {
+    if (handleAuthError(error)) return;
+    checkbox.checked = false;
+  }
+}
 
+async function onDiarioRegisteredChange() {
+  const checkbox = document.getElementById('daily-diario-registered');
+  if (!checkbox) return;
+  const registered = checkbox.checked;
+  try {
+    const data = await DB.setDailyDiaryDayStatus(ensureDailySalesSelectedDate(), registered);
+    checkbox.checked = Boolean(data?.registered);
+  } catch (error) {
+    checkbox.checked = !registered;
+    if (handleAuthError(error)) return;
+    showToast(error.message || 'Erro ao atualizar status.', 'error');
+  }
+}
+
+function clearDiarioFormState() {
   diarioCart = [];
   diarioCartDiscount = 0;
   diarioSelectedCustomer = null;
@@ -965,7 +1134,6 @@ async function loadDailyDiario() {
   const productSearch = document.getElementById('daily-diario-product-search');
   const customerSearch = document.getElementById('daily-diario-customer-search');
   const customerSelected = document.getElementById('daily-diario-customer-selected');
-  const customerCreateBtn = document.getElementById('daily-diario-customer-create-btn');
   const cartDiscount = document.getElementById('daily-diario-cart-discount');
 
   if (productSearch) productSearch.value = '';
@@ -977,22 +1145,35 @@ async function loadDailyDiario() {
     customerSelected.classList.add('hidden');
     customerSelected.innerHTML = '';
   }
-  if (customerCreateBtn) customerCreateBtn.classList.remove('hidden');
   if (cartDiscount) cartDiscount.value = formatDecimalInput(0, MONEY_DECIMALS);
 
   hideDiarioResults('product');
   hideDiarioResults('customer');
   renderDiarioCart();
   updateDiarioLoyaltyUI();
+}
+
+async function reloadDiarioForSelectedDate() {
+  clearDiarioFormState();
+  await Promise.all([loadDailyDiarioList(), loadDiarioRegisteredStatus()]);
+  refreshIcons();
+}
+
+async function loadDailyDiario() {
+  if (typeof DB === 'undefined') return;
+
+  ensureDailySalesSelectedDate();
+  syncSharedDateInputs();
+  clearDiarioFormState();
   initDiarioComboboxes();
 
   try {
     const settings = await DB.getLoyaltySettings().catch(() => ({}));
     diarioAccessValue = Number(settings.access_value) || 27;
     await fetchDailySalesCatalog();
-    await loadDailyDiarioList();
+    await Promise.all([loadDailyDiarioList(), loadDiarioRegisteredStatus()]);
     updateDiarioLoyaltyUI();
-    productSearch?.focus();
+    document.getElementById('daily-diario-product-search')?.focus();
     refreshIcons();
   } catch (error) {
     if (handleAuthError(error)) return;
@@ -1009,10 +1190,7 @@ async function loadDailySales() {
     dailySalesSelectedDate = getLocalDateString();
   }
 
-  const dateInput = document.getElementById('daily-sales-date');
-  if (dateInput && dateInput.value !== dailySalesSelectedDate) {
-    dateInput.value = dailySalesSelectedDate;
-  }
+  syncSharedDateInputs();
   if (dateLabel) {
     dateLabel.textContent = formatDisplayDate(dailySalesSelectedDate);
   }
@@ -1058,6 +1236,7 @@ function onDailySalesDateChange() {
   const input = document.getElementById('daily-sales-date');
   if (!input?.value) return;
   dailySalesSelectedDate = input.value;
+  syncSharedDateInputs();
   loadDailySales();
 }
 
@@ -1085,7 +1264,7 @@ async function submitDailyDiario(event) {
   await withButtonLoading(btn, async () => {
     try {
       const payload = {
-        sale_date: getLocalDateString(),
+        sale_date: ensureDailySalesSelectedDate(),
         items: buildDiarioPayloadItems()
       };
       if (diarioSelectedCustomer) {
@@ -1129,7 +1308,10 @@ async function deleteDailySaleEntry(id) {
   try {
     await DB.deleteDailySale(id);
     showToast('Lançamento excluído.', 'success');
-    await loadDailySales();
+    await Promise.all([
+      loadDailySales(),
+      loadDailyDiarioList()
+    ]);
     AdminRouter.loadDashboardStats();
   } catch (error) {
     if (handleAuthError(error)) return;
@@ -1142,6 +1324,11 @@ function bindDailySalesEvents() {
   if (dateInput && !dateInput.dataset.bound) {
     dateInput.dataset.bound = '1';
     dateInput.addEventListener('change', onDailySalesDateChange);
+  }
+  const diarioDateInput = document.getElementById('daily-diario-date');
+  if (diarioDateInput && !diarioDateInput.dataset.bound) {
+    diarioDateInput.dataset.bound = '1';
+    diarioDateInput.addEventListener('change', onDiarioDateChange);
   }
 }
 

@@ -141,6 +141,13 @@ async function ensureDatabase() {
       CREATE INDEX IF NOT EXISTS idx_daily_sales_date ON ${SCHEMA}.daily_sales(sale_date)
     `);
     await client.query(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA}.daily_diary_days (
+        sale_date DATE PRIMARY KEY,
+        registered BOOLEAN NOT NULL DEFAULT FALSE,
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await client.query(`
       CREATE TABLE IF NOT EXISTS ${SCHEMA}.events (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,

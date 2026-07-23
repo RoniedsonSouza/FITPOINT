@@ -330,7 +330,21 @@
         <div class="daily-diario">
           <div class="daily-diario-header">
             <h1>Diário</h1>
-            <p>Registrar venda de hoje</p>
+            <div class="daily-diario-header-tools">
+              <div class="daily-diario-date-nav">
+                <button type="button" onclick="shiftDiarioDate(-1)" class="btn btn-outline btn-sm btn-icon" title="Dia anterior" aria-label="Dia anterior">
+                  <i data-lucide="chevron-left"></i>
+                </button>
+                <input type="date" id="daily-diario-date" class="daily-diario-date-input" aria-label="Data do diário">
+                <button type="button" onclick="shiftDiarioDate(1)" class="btn btn-outline btn-sm btn-icon" title="Próximo dia" aria-label="Próximo dia">
+                  <i data-lucide="chevron-right"></i>
+                </button>
+              </div>
+              <label class="daily-diario-registered">
+                <input type="checkbox" id="daily-diario-registered" onchange="onDiarioRegisteredChange()">
+                <span>Registrado</span>
+              </label>
+            </div>
           </div>
           <form id="daily-diario-form" class="daily-diario-form" onsubmit="submitDailyDiario(event)">
             <div class="daily-diario-field">
@@ -366,9 +380,6 @@
                 <div id="daily-diario-customer-results" class="diario-combobox-results hidden"></div>
                 <div id="daily-diario-customer-selected" class="diario-combobox-selected hidden"></div>
               </div>
-              <button type="button" id="daily-diario-customer-create-btn" class="btn btn-outline btn-sm daily-diario-customer-create-btn" onclick="openDiarioQuickCustomerModal()">
-                <i data-lucide="user-plus"></i> Cadastrar cliente
-              </button>
             </div>
             <div id="daily-diario-loyalty-wrap" class="daily-diario-loyalty-info-wrap hidden">
               <p id="daily-diario-loyalty-info" class="daily-diario-loyalty-info"></p>
@@ -379,11 +390,11 @@
           </form>
           <div class="daily-diario-day-section">
             <div class="daily-diario-day-header">
-              <h2 class="daily-diario-day-title">Vendas de hoje</h2>
+              <h2 class="daily-diario-day-title">Vendas do dia</h2>
               <p id="daily-diario-day-stats" class="daily-diario-day-stats"></p>
             </div>
             <div id="daily-diario-list" class="daily-diario-list">
-              <p class="daily-diario-list-empty">Nenhuma venda hoje.</p>
+              <p class="daily-diario-list-empty">Nenhuma venda neste dia.</p>
             </div>
           </div>
         </div>
@@ -961,6 +972,36 @@
         </div>
         <div class="modal-footer">
           <button type="button" onclick="closeDiarioQuickCustomerModal()" class="btn btn-secondary btn-md">Cancelar</button>
+          <button type="submit" class="btn btn-primary btn-lg">Cadastrar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Cadastro rápido de produto (Diário) -->
+  <div id="diario-quick-product-modal" class="modal">
+    <div class="modal-content modal-content--sm">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-display text-xl font-bold">Cadastrar produto</h3>
+        <button type="button" onclick="closeDiarioQuickProductModal()" class="modal-close" aria-label="Fechar">&times;</button>
+      </div>
+      <form id="diario-quick-product-form" onsubmit="saveDiarioQuickProduct(event)">
+        <div class="form-group">
+          <label for="diario-quick-product-name">Nome</label>
+          <input type="text" id="diario-quick-product-name" required placeholder="Ex.: Shake Baunilha" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="diario-quick-product-price">Preço (R$)</label>
+          <input type="number" id="diario-quick-product-price" required min="0" step="0.01" inputmode="decimal" placeholder="0,00">
+        </div>
+        <div class="form-group">
+          <label for="diario-quick-product-category">Categoria</label>
+          <select id="diario-quick-product-category" required>
+            <option value="">Selecione…</option>
+          </select>
+        </div>
+        <div class="modal-footer">
+          <button type="button" onclick="closeDiarioQuickProductModal()" class="btn btn-secondary btn-md">Cancelar</button>
           <button type="submit" class="btn btn-primary btn-lg">Cadastrar</button>
         </div>
       </form>

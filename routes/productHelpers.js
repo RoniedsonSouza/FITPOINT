@@ -19,7 +19,9 @@ function normalizeOptions(options) {
       id: String(o.id || `opt-${i}-${Date.now().toString(36)}`),
       name: String(o.name).trim(),
       price_adjustment: Math.max(0, Number(o.price_adjustment) || 0),
-      default: o.default === true
+      default: o.default === true,
+      // Opções antigas sem o campo são tratadas como únicas (sem quantidade).
+      unique: o.unique !== false
     }));
 
   if (normalized.length === 0) return [];

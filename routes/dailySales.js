@@ -32,25 +32,75 @@ function resolveUnitPrice(productRow) {
   return Number(productRow.price);
 }
 
-function resolveProductOption(productRow, optionId) {
+function formatSelectedOptionLabel(selected) {
+  if (!Array.isArray(selected) || selected.length === 0) return null;
+  return selected
+    .map((s) => {
+      const qty = Math.max(1, Number(s.quantity) || 1);
+      return qty > 1 ? `${s.name} ×${qty}` : s.name;
+    })
+    .join(' · ');
+}
+
+/**
+ * Resolve selected_options (multi) ou legado option_id (single).
+ * Seleção vazia = só preço base (permitido).
+ */
+function resolveSelectedOptions(productRow, rawSelected, legacyOptionId) {
   const options = normalizeOptions(productRow.options);
+  let raw = Array.isArray(rawSelected) ? rawSelected : null;
+
+  if ((!raw || raw.length === 0) && legacyOptionId !== undefined && legacyOptionId !== null && legacyOptionId !== '') {
+    raw = [{ id: legacyOptionId, quantity: 1 }];
+  }
+
   if (!options.length) {
-    if (optionId) return { error: 'Produto sem opções disponíveis' };
-    return { option: null, adjustment: 0 };
+    if (raw && raw.length) return { error: 'Produto sem opções disponíveis' };
+    return { selected: [], adjustment: 0, optionId: null, optionName: null };
   }
 
-  let option = null;
-  if (optionId !== undefined && optionId !== null && optionId !== '') {
-    option = options.find(o => String(o.id) === String(optionId)) || null;
-    if (!option) return { error: 'Opção inválida para este produto' };
-  } else {
-    option = options.find(o => o.default) || options[0];
+  if (!raw || raw.length === 0) {
+    return { selected: [], adjustment: 0, optionId: null, optionName: null };
   }
 
-  return {
-    option,
-    adjustment: Math.max(0, Number(option.price_adjustment) || 0)
-  };
+  const selected = [];
+  let adjustment = 0;
+  const seen = new Set();
+
+  for (const item of raw) {
+    const id = String(item?.id || item?.option_id || '').trim();
+    if (!id) continue;
+    if (seen.has(id)) return { error: 'Opção duplicada na seleção' };
+    seen.add(id);
+
+    const opt = options.find((o) => String(o.id) === id);
+    if (!opt) return { error: 'Opção inválida para este produto' };
+
+    const isUnique = opt.unique !== false;
+    let qty = 1;
+    if (!isUnique) {
+      qty = parseInt(String(item.quantity ?? 1), 10);
+      if (!Number.isInteger(qty) || qty < 1) {
+        return { error: `Quantidade inválida para "${opt.name}"` };
+      }
+    }
+
+    const adj = Math.max(0, Number(opt.price_adjustment) || 0);
+    adjustment += adj * qty;
+    selected.push({
+      id: opt.id,
+      name: opt.name,
+      price_adjustment: adj,
+      quantity: qty,
+      unique: isUnique
+    });
+  }
+
+  adjustment = Math.round(adjustment * 100) / 100;
+  const optionName = formatSelectedOptionLabel(selected);
+  const optionId = selected[0]?.id || null;
+
+  return { selected, adjustment, optionId, optionName };
 }
 
 function displayProductName(productName, optionName) {
@@ -61,7 +111,8 @@ function displayProductName(productName, optionName) {
 function mapSaleRow(row) {
   const quantity = Number(row.quantity) || 1;
   const unitPrice = Number(row.unit_price);
-  const optionName = row.option_name || null;
+  const selectedOptions = Array.isArray(row.selected_options) ? row.selected_options : [];
+  const optionName = row.option_name || formatSelectedOptionLabel(selectedOptions) || null;
   return {
     id: row.id,
     sale_date: row.sale_date,
@@ -69,6 +120,7 @@ function mapSaleRow(row) {
     product_name: displayProductName(row.product_name, optionName),
     option_id: row.option_id || null,
     option_name: optionName,
+    selected_options: selectedOptions,
     quantity,
     unit_price: unitPrice,
     line_total: Math.round(quantity * unitPrice * 100) / 100,
@@ -140,6 +192,7 @@ async function fetchDayItems(saleDate) {
        ds.loyalty_customer_id,
        ds.option_id,
        ds.option_name,
+       ds.selected_options,
        ds.created_at,
        p.name AS product_name,
        lc.name AS customer_name
@@ -340,12 +393,11 @@ router.post('/batch', authenticateToken, requirePermission('vendas'), async (req
         return res.status(400).json({ error: `Produto inativo: ${product.name}` });
       }
 
-      const optionResolved = resolveProductOption(product, raw.option_id);
+      const optionResolved = resolveSelectedOptions(product, raw.selected_options, raw.option_id);
       if (optionResolved.error) {
         return res.status(400).json({ error: `Item ${i + 1}: ${optionResolved.error}` });
       }
       const optionAdj = optionResolved.adjustment;
-      const option = optionResolved.option;
       const maxPrice = resolveUnitPrice(product) + optionAdj;
 
       let unitPrice = raw.unit_price !== undefined && raw.unit_price !== null && raw.unit_price !== ''
@@ -364,21 +416,31 @@ router.post('/batch', authenticateToken, requirePermission('vendas'), async (req
         product,
         qty,
         unitPrice,
-        optionId: option ? option.id : null,
-        optionName: option ? option.name : null
+        optionId: optionResolved.optionId,
+        optionName: optionResolved.optionName,
+        selectedOptions: optionResolved.selected
       });
     }
 
     await client.query('BEGIN');
 
     const insertedItems = [];
-    for (const { product, qty, unitPrice, optionId, optionName } of validatedItems) {
+    for (const { product, qty, unitPrice, optionId, optionName, selectedOptions } of validatedItems) {
       const insertResult = await client.query(
         `INSERT INTO ${table('daily_sales')}
-           (sale_date, product_id, loyalty_customer_id, quantity, unit_price, option_id, option_name, created_at)
-         VALUES ($1::date, $2, $3, $4, $5, $6, $7, NOW())
+           (sale_date, product_id, loyalty_customer_id, quantity, unit_price, option_id, option_name, selected_options, created_at)
+         VALUES ($1::date, $2, $3, $4, $5, $6, $7, $8::jsonb, NOW())
          RETURNING *`,
-        [dateParsed.value, product.id, customerId, qty, unitPrice, optionId, optionName]
+        [
+          dateParsed.value,
+          product.id,
+          customerId,
+          qty,
+          unitPrice,
+          optionId,
+          optionName,
+          JSON.stringify(selectedOptions || [])
+        ]
       );
       insertedItems.push(mapSaleRow({
         ...insertResult.rows[0],

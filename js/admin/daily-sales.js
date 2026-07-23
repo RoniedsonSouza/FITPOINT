@@ -10,7 +10,6 @@ let diarioAccessValue = 27;
 let diarioComboboxesBound = false;
 let diarioSearchTimers = { product: null, customer: null };
 let diarioOptionProduct = null;
-let diarioPendingOptionId = null;
 let diarioCustomerSearchSeq = 0;
 
 function getLocalDateString(date = new Date()) {
@@ -64,20 +63,43 @@ function findProductOption(product, optionId) {
   return getProductOptions(product).find(o => String(o.id) === String(optionId)) || null;
 }
 
-function getDefaultProductOption(product) {
-  const opts = getProductOptions(product);
-  if (!opts.length) return null;
-  return opts.find(o => o.default) || opts[0];
+function isOptionUnique(opt) {
+  return opt?.unique !== false;
 }
 
-function getDiarioUnitPrice(product, option) {
-  const base = getProductBasePrice(product);
-  if (!option) return base;
-  return Math.round((base + (Number(option.price_adjustment) || 0)) * 100) / 100;
+function formatSelectedOptionsHint(selected) {
+  if (!Array.isArray(selected) || selected.length === 0) return '';
+  return selected.map(s => {
+    const qty = Math.max(1, Number(s.quantity) || 1);
+    return qty > 1 ? `${s.name} ×${qty}` : s.name;
+  }).join(' · ');
 }
 
-function diarioLineKey(productId, optionId = '') {
-  return `${productId}::${optionId || ''}`;
+function getDiarioOptionsAdjustment(selected) {
+  if (!Array.isArray(selected) || selected.length === 0) return 0;
+  const sum = selected.reduce((acc, s) => {
+    const qty = Math.max(1, Number(s.quantity) || 1);
+    return acc + (Number(s.price_adjustment) || 0) * qty;
+  }, 0);
+  return Math.round(sum * 100) / 100;
+}
+
+function getDiarioUnitPriceFromSelected(product, selected) {
+  return Math.round((getProductBasePrice(product) + getDiarioOptionsAdjustment(selected)) * 100) / 100;
+}
+
+function diarioLineKey(productId, selectedOptions = []) {
+  const sel = Array.isArray(selectedOptions) ? selectedOptions : [];
+  if (!sel.length) return `${productId}::`;
+  const part = [...sel]
+    .map(s => `${s.id}:${Math.max(1, Number(s.quantity) || 1)}`)
+    .sort()
+    .join('|');
+  return `${productId}::${part}`;
+}
+
+function getDiarioCartLineKey(line) {
+  return diarioLineKey(line.productId, line.selectedOptions || []);
 }
 
 function formatDiarioPhoneDisplay(phone) {
@@ -121,7 +143,7 @@ function getDiarioLinePreview(line, rawQty, rawDiscount) {
 function updateDiarioCartRowTotal(lineKey) {
   const row = Array.from(document.querySelectorAll('[data-cart-line]'))
     .find(el => el.dataset.cartLine === lineKey);
-  const line = diarioCart.find(l => diarioLineKey(l.productId, l.optionId) === lineKey);
+  const line = diarioCart.find(l => getDiarioCartLineKey(l) === lineKey);
   if (!row || !line) return;
 
   const qtyInput = row.querySelector('[data-cart-qty]');
@@ -298,88 +320,147 @@ function clearDiarioCustomer() {
 function openDiarioOptionModal(product) {
   const opts = getProductOptions(product);
   if (!opts.length) {
-    addProductToDiarioCart(product.id, null);
+    addProductToDiarioCart(product.id, []);
     return;
   }
 
   diarioOptionProduct = product;
-  const defaultOpt = getDefaultProductOption(product);
-  diarioPendingOptionId = defaultOpt ? String(defaultOpt.id) : String(opts[0].id);
 
   const modal = document.getElementById('diario-option-modal');
   const title = document.getElementById('diario-option-modal-title');
   const subtitle = document.getElementById('diario-option-modal-subtitle');
   const list = document.getElementById('diario-option-modal-list');
   if (title) title.textContent = product.name;
-  if (subtitle) subtitle.textContent = 'Selecione o adicional / variação:';
+  if (subtitle) subtitle.textContent = 'Selecione uma ou mais variações (opcional):';
   if (list) {
-    const base = getProductBasePrice(product);
     list.innerHTML = opts.map(opt => {
       const adj = Number(opt.price_adjustment) || 0;
-      const price = Math.round((base + adj) * 100) / 100;
       const adjLabel = adj > 0 ? `+${formatCurrency(adj)}` : 'Incluso';
-      const checked = String(opt.id) === String(diarioPendingOptionId) ? 'checked' : '';
+      const isUnique = isOptionUnique(opt);
+      const checked = opt.default === true;
+      const qtyVisible = checked && !isUnique;
       return `
-        <label class="diario-option-item">
-          <input type="radio" name="diario-option" value="${escapeAttr(opt.id)}" ${checked}>
-          <span class="diario-option-item-body">
+        <div class="diario-option-item${checked ? ' is-selected' : ''}" data-option-id="${escapeAttr(opt.id)}">
+          <input type="checkbox" class="diario-option-check" value="${escapeAttr(opt.id)}" ${checked ? 'checked' : ''} aria-label="${escapeAttr(opt.name)}">
+          <div class="diario-option-item-body">
             <span class="diario-option-item-name">${escapeHtml(opt.name)}</span>
             <span class="diario-option-item-meta">
               <span>${escapeHtml(adjLabel)}</span>
-              <strong>${formatCurrency(price)}</strong>
+              ${isUnique ? '<span class="diario-option-badge">Única</span>' : '<span class="diario-option-badge">Qtd livre</span>'}
             </span>
-          </span>
-        </label>`;
+          </div>
+          ${isUnique ? '' : `
+            <div class="diario-option-qty-wrap${qtyVisible ? '' : ' hidden'}">
+              <span class="diario-option-qty-label">Qtd</span>
+              <input type="number" class="diario-option-qty" min="1" step="1" value="1" inputmode="numeric" aria-label="Quantidade de ${escapeAttr(opt.name)}">
+            </div>
+          `}
+        </div>`;
     }).join('');
-    list.querySelectorAll('input[name="diario-option"]').forEach(input => {
-      input.addEventListener('change', () => {
-        diarioPendingOptionId = input.value;
+
+    list.querySelectorAll('.diario-option-item').forEach(row => {
+      const check = row.querySelector('.diario-option-check');
+      const qtyWrap = row.querySelector('.diario-option-qty-wrap');
+      const qtyInput = row.querySelector('.diario-option-qty');
+
+      check?.addEventListener('change', () => {
+        row.classList.toggle('is-selected', check.checked);
+        if (qtyWrap) qtyWrap.classList.toggle('hidden', !check.checked);
+        updateDiarioOptionModalUnitPrice();
+      });
+
+      if (qtyInput) {
+        qtyInput.addEventListener('click', (e) => e.stopPropagation());
+        qtyInput.addEventListener('pointerdown', (e) => e.stopPropagation());
+        qtyInput.addEventListener('input', () => {
+          const parsed = parseLooseInt(qtyInput.value);
+          if (parsed != null && parsed >= 1) {
+            // keep raw while typing
+          }
+          updateDiarioOptionModalUnitPrice();
+        });
+        qtyInput.addEventListener('blur', () => {
+          qtyInput.value = String(clampInt(parseLooseInt(qtyInput.value), 1, 1));
+          updateDiarioOptionModalUnitPrice();
+        });
+      }
+
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.diario-option-qty-wrap') || e.target === check) return;
+        if (!check) return;
+        check.checked = !check.checked;
+        check.dispatchEvent(new Event('change', { bubbles: true }));
       });
     });
   }
+  updateDiarioOptionModalUnitPrice();
   modal?.classList.add('active');
+}
+
+function readDiarioOptionModalSelection() {
+  if (!diarioOptionProduct) return [];
+  const list = document.getElementById('diario-option-modal-list');
+  if (!list) return [];
+  const selected = [];
+  list.querySelectorAll('.diario-option-item').forEach(row => {
+    const check = row.querySelector('.diario-option-check');
+    if (!check?.checked) return;
+    const opt = findProductOption(diarioOptionProduct, check.value);
+    if (!opt) return;
+    const isUnique = isOptionUnique(opt);
+    let qty = 1;
+    if (!isUnique) {
+      const qtyInput = row.querySelector('.diario-option-qty');
+      qty = clampInt(parseLooseInt(qtyInput?.value), 1, 1);
+      if (qtyInput) qtyInput.value = String(qty);
+    }
+    selected.push({
+      id: String(opt.id),
+      name: opt.name,
+      price_adjustment: Math.max(0, Number(opt.price_adjustment) || 0),
+      quantity: qty,
+      unique: isUnique
+    });
+  });
+  return selected;
+}
+
+function updateDiarioOptionModalUnitPrice() {
+  const el = document.getElementById('diario-option-modal-unit-price');
+  if (!el || !diarioOptionProduct) return;
+  const selected = readDiarioOptionModalSelection();
+  el.textContent = formatCurrency(getDiarioUnitPriceFromSelected(diarioOptionProduct, selected));
 }
 
 function closeDiarioOptionModal() {
   document.getElementById('diario-option-modal')?.classList.remove('active');
   diarioOptionProduct = null;
-  diarioPendingOptionId = null;
 }
 
 function confirmDiarioOptionSelection() {
   if (!diarioOptionProduct) return;
-  const selected = document.querySelector('#diario-option-modal-list input[name="diario-option"]:checked');
-  const optionId = selected?.value || diarioPendingOptionId;
+  const selected = readDiarioOptionModalSelection();
   const productId = diarioOptionProduct.id;
   closeDiarioOptionModal();
-  addProductToDiarioCart(productId, optionId);
+  addProductToDiarioCart(productId, selected);
 }
 
-function addProductToDiarioCart(productId, optionId) {
+function addProductToDiarioCart(productId, selectedOptions) {
   const product = dailySalesProductsCache.find(p => p.id === productId);
   if (!product) return;
 
-  const opts = getProductOptions(product);
-  let option = null;
-  if (opts.length) {
-    option = findProductOption(product, optionId) || getDefaultProductOption(product);
-    if (!option) {
-      showToast('Selecione um adicional do produto.', 'error');
-      return;
-    }
-  }
-
-  const key = diarioLineKey(product.id, option?.id || '');
-  const existing = diarioCart.find(line => diarioLineKey(line.productId, line.optionId) === key);
+  const selected = Array.isArray(selectedOptions) ? selectedOptions : [];
+  const key = diarioLineKey(product.id, selected);
+  const existing = diarioCart.find(line => getDiarioCartLineKey(line) === key);
   if (existing) {
     existing.quantity += 1;
   } else {
     diarioCart.push({
       productId: product.id,
-      optionId: option ? String(option.id) : '',
-      optionName: option ? option.name : '',
+      selectedOptions: selected,
+      optionName: formatSelectedOptionsHint(selected),
       name: product.name,
-      basePrice: getDiarioUnitPrice(product, option),
+      basePrice: getDiarioUnitPriceFromSelected(product, selected),
       quantity: 1,
       discount: 0
     });
@@ -393,7 +474,7 @@ function addProductToDiarioCart(productId, optionId) {
 }
 
 function removeFromDiarioCart(lineKey) {
-  diarioCart = diarioCart.filter(line => diarioLineKey(line.productId, line.optionId) !== lineKey);
+  diarioCart = diarioCart.filter(line => getDiarioCartLineKey(line) !== lineKey);
   renderDiarioCart();
   updateDiarioLoyaltyUI();
 }
@@ -422,7 +503,7 @@ function computeDiarioLoyaltyVisits() {
 function buildDiarioPayloadItems() {
   const lines = diarioCart.map(line => ({
     productId: line.productId,
-    optionId: line.optionId || null,
+    selectedOptions: Array.isArray(line.selectedOptions) ? line.selectedOptions : [],
     quantity: Math.max(1, Number(line.quantity) || 1),
     unitPrice: computeDiarioFinalPrice(line.basePrice, line.discount),
     lineTotal: computeDiarioLineTotal(line)
@@ -431,13 +512,15 @@ function buildDiarioPayloadItems() {
   const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
   const cartDisc = getDiarioCartDiscountApplied(subtotal);
 
+  const toPayload = (line, unitPrice) => ({
+    product_id: line.productId,
+    selected_options: line.selectedOptions,
+    quantity: line.quantity,
+    unit_price: unitPrice
+  });
+
   if (cartDisc <= 0 || subtotal <= 0) {
-    return lines.map(line => ({
-      product_id: line.productId,
-      option_id: line.optionId || undefined,
-      quantity: line.quantity,
-      unit_price: line.unitPrice
-    }));
+    return lines.map(line => toPayload(line, line.unitPrice));
   }
 
   let remaining = cartDisc;
@@ -449,12 +532,7 @@ function buildDiarioPayloadItems() {
     remaining = Math.round((remaining - share) * 100) / 100;
     const discountedTotal = Math.max(0, Math.round((line.lineTotal - share) * 100) / 100);
     const unitPrice = Math.round((discountedTotal / line.quantity) * 100) / 100;
-    return {
-      product_id: line.productId,
-      option_id: line.optionId || undefined,
-      quantity: line.quantity,
-      unit_price: unitPrice
-    };
+    return toPayload(line, unitPrice);
   });
 }
 
@@ -521,7 +599,7 @@ function renderDiarioCart() {
 
   container.innerHTML = diarioCart.map(line => {
     const lineTotal = computeDiarioLineTotal(line);
-    const key = diarioLineKey(line.productId, line.optionId);
+    const key = getDiarioCartLineKey(line);
     const optionHint = line.optionName
       ? `<span class="daily-diario-cart-option">${escapeHtml(line.optionName)}</span>`
       : '';
@@ -572,7 +650,7 @@ function onDiarioCartInput(e) {
   const row = e.target.closest('[data-cart-line]');
   if (!row) return;
   const lineKey = row.dataset.cartLine;
-  const line = diarioCart.find(l => diarioLineKey(l.productId, l.optionId) === lineKey);
+  const line = diarioCart.find(l => getDiarioCartLineKey(l) === lineKey);
   if (!line) return;
 
   if (e.target.matches('[data-cart-qty]')) {
@@ -599,7 +677,7 @@ function onDiarioCartBlur(e) {
   const row = e.target.closest('[data-cart-line]');
   if (!row) return;
   const lineKey = row.dataset.cartLine;
-  const line = diarioCart.find(l => diarioLineKey(l.productId, l.optionId) === lineKey);
+  const line = diarioCart.find(l => getDiarioCartLineKey(l) === lineKey);
   if (!line) return;
 
   if (e.target.matches('[data-cart-qty]')) {
@@ -633,7 +711,7 @@ function onDiarioProductResultsClick(e) {
   if (getProductOptions(product).length) {
     openDiarioOptionModal(product);
   } else {
-    addProductToDiarioCart(product.id, null);
+    addProductToDiarioCart(product.id, []);
   }
 }
 

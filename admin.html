@@ -44,7 +44,8 @@
         </button>
         <a href="/" class="flex items-center gap-3 no-underline text-inherit">
           <img src="/assets/logo.png" alt="FitPoint Fitness" class="h-9 w-auto rounded-full" />
-          <span class="font-display text-lg font-bold tracking-tight hidden sm:inline">FitPoint <span class="text-fp-green">Admin</span></span>
+          <span class="font-display text-lg font-bold tracking-tight hidden sm:inline">FitPoint <span
+              class="text-fp-green">Admin</span></span>
         </a>
       </div>
       <nav class="flex items-center gap-3">
@@ -65,7 +66,8 @@
       <form id="login-form" onsubmit="handleLogin(event)">
         <div class="form-group text-left">
           <label>E-mail</label>
-          <input type="text" id="login-username" required autocomplete="username" placeholder="seu@email.com" inputmode="email">
+          <input type="text" id="login-username" required autocomplete="username" placeholder="seu@email.com"
+            inputmode="email">
         </div>
         <div class="form-group text-left">
           <label>Senha</label>
@@ -93,7 +95,8 @@
           <input type="password" id="change-password-confirm" required minlength="6" autocomplete="new-password">
         </div>
         <div id="change-password-error" class="text-red-600 text-sm mb-4" style="display: none;"></div>
-        <button type="submit" id="change-password-submit-btn" class="btn btn-primary btn-lg w-full">Salvar e continuar</button>
+        <button type="submit" id="change-password-submit-btn" class="btn btn-primary btn-lg w-full">Salvar e
+          continuar</button>
       </form>
     </div>
   </div>
@@ -223,7 +226,8 @@
       <section id="view-loyalty" class="admin-view">
         <div class="admin-view-header">
           <h1>Fidelidade</h1>
-          <p class="text-sm text-black/60 mt-1" id="loyalty-rule-text">A cada 10 visitas, o cliente ganha um Shake ou Hype Drink.</p>
+          <p class="text-sm text-black/60 mt-1" id="loyalty-rule-text">A cada 10 visitas, o cliente ganha um Shake ou
+            Hype Drink.</p>
         </div>
         <div class="module-toolbar">
           <span></span>
@@ -241,20 +245,25 @@
           <div class="flex flex-wrap items-end gap-3">
             <div>
               <label class="text-xs text-black/60 block mb-1">Visitas para ganhar prêmio</label>
-              <input type="number" id="loyalty-visits-per-reward" min="2" max="100" step="1" value="10" class="input-compact !w-24 !min-h-0 !py-2 !px-2">
+              <input type="number" id="loyalty-visits-per-reward" min="2" max="100" step="1" value="10"
+                class="input-compact !w-24 !min-h-0 !py-2 !px-2">
             </div>
             <div>
               <label class="text-xs text-black/60 block mb-1">Valor do acesso (R$)</label>
-              <input type="number" id="loyalty-access-value" min="1" max="10000" step="0.01" value="27" class="input-compact !w-28 !min-h-0 !py-2 !px-2">
+              <input type="number" id="loyalty-access-value" min="1" max="10000" step="0.01" value="27"
+                class="input-compact !w-28 !min-h-0 !py-2 !px-2">
             </div>
-            <button type="button" id="btn-save-loyalty-settings" onclick="saveLoyaltySettings()" class="btn btn-outline btn-md">
+            <button type="button" id="btn-save-loyalty-settings" onclick="saveLoyaltySettings()"
+              class="btn btn-outline btn-md">
               <i data-lucide="save"></i> Salvar configuração
             </button>
           </div>
-          <p class="text-xs text-black/50 mt-2" id="loyalty-access-help">Vendas no Diário contam visitas automaticamente: a cada R$ 27 em compras, 1 visita.</p>
+          <p class="text-xs text-black/50 mt-2" id="loyalty-access-help">Vendas no Diário contam visitas
+            automaticamente: a cada R$ 27 em compras, 1 visita.</p>
         </div>
         <div class="mb-3">
-          <input type="search" id="loyalty-search" class="max-w-md" placeholder="Buscar por nome ou telefone…" autocomplete="off" aria-label="Buscar clientes de fidelidade">
+          <input type="search" id="loyalty-search" class="max-w-md" placeholder="Buscar por nome ou telefone…"
+            autocomplete="off" aria-label="Buscar clientes de fidelidade">
         </div>
         <div id="loyalty-pagination" class="mb-3 hidden"></div>
         <div id="loyalty-list" class="loyalty-list grid gap-3">
@@ -290,17 +299,19 @@
 
         <div class="module-toolbar">
           <div class="daily-sales-date-nav">
-            <button type="button" onclick="shiftDailySalesDate(-1)" class="btn btn-outline btn-sm btn-icon" title="Dia anterior" aria-label="Dia anterior">
+            <button type="button" onclick="shiftDailySalesDate(-1)" class="btn btn-outline btn-sm btn-icon"
+              title="Dia anterior" aria-label="Dia anterior">
               <i data-lucide="chevron-left"></i>
             </button>
             <input type="date" id="daily-sales-date" class="daily-sales-date-input" aria-label="Data">
-            <button type="button" onclick="shiftDailySalesDate(1)" class="btn btn-outline btn-sm btn-icon" title="Próximo dia" aria-label="Próximo dia">
+            <button type="button" onclick="shiftDailySalesDate(1)" class="btn btn-outline btn-sm btn-icon"
+              title="Próximo dia" aria-label="Próximo dia">
               <i data-lucide="chevron-right"></i>
             </button>
           </div>
           <div class="module-toolbar-actions">
             <button type="button" onclick="AdminRouter.navigate('diario')" class="btn btn-primary btn-md">
-              <i data-lucide="pen-line"></i> Diário
+              <i data-lucide="pen-line"></i> Registrar Acesso
             </button>
           </div>
         </div>
@@ -310,14 +321,12 @@
             <p class="daily-sales-stat-label">Vendas</p>
             <p class="daily-sales-stat-value" id="daily-sales-stat-items">—</p>
           </div>
+
           <div class="card daily-sales-stat-card">
             <p class="daily-sales-stat-label">Faturamento</p>
             <p class="daily-sales-stat-value daily-sales-stat-value--revenue" id="daily-sales-stat-revenue">—</p>
           </div>
-          <div class="card daily-sales-stat-card">
-            <p class="daily-sales-stat-label">Mais vendido</p>
-            <p class="daily-sales-stat-value daily-sales-stat-value--top" id="daily-sales-stat-top">—</p>
-          </div>
+          
         </div>
 
         <div id="daily-sales-list" class="daily-sales-list">
@@ -329,20 +338,22 @@
       <section id="view-daily-diario" class="admin-view">
         <div class="daily-diario">
           <div class="daily-diario-header">
-            <h1>Diário</h1>
+            <h1>Acessos do dia</h1>
             <div class="daily-diario-header-tools">
               <div class="daily-diario-date-nav">
-                <button type="button" onclick="shiftDiarioDate(-1)" class="btn btn-outline btn-sm btn-icon" title="Dia anterior" aria-label="Dia anterior">
+                <button type="button" onclick="shiftDiarioDate(-1)" class="btn btn-outline btn-sm btn-icon"
+                  title="Dia anterior" aria-label="Dia anterior">
                   <i data-lucide="chevron-left"></i>
                 </button>
                 <input type="date" id="daily-diario-date" class="daily-diario-date-input" aria-label="Data do diário">
-                <button type="button" onclick="shiftDiarioDate(1)" class="btn btn-outline btn-sm btn-icon" title="Próximo dia" aria-label="Próximo dia">
+                <button type="button" onclick="shiftDiarioDate(1)" class="btn btn-outline btn-sm btn-icon"
+                  title="Próximo dia" aria-label="Próximo dia">
                   <i data-lucide="chevron-right"></i>
                 </button>
               </div>
               <label class="daily-diario-registered">
                 <input type="checkbox" id="daily-diario-registered" onchange="onDiarioRegisteredChange()">
-                <span>Registrado</span>
+                <span>Vinculado ao HN Control</span>
               </label>
             </div>
           </div>
@@ -350,9 +361,23 @@
             <div class="daily-diario-field">
               <label for="daily-diario-product-search">Produtos</label>
               <div class="diario-combobox" id="diario-product-combobox">
-                <input type="search" id="daily-diario-product-search" placeholder="Buscar produto para adicionar…" autocomplete="off">
+                <input type="search" id="daily-diario-product-search" placeholder="Ex: Hype Drink, Shake, etc."
+                  autocomplete="off">
                 <div id="daily-diario-product-results" class="diario-combobox-results hidden"></div>
               </div>
+            </div>
+
+            <div class="daily-diario-field">
+              <label for="daily-diario-customer-search">Cliente (opcional)</label>
+              <div class="diario-combobox" id="diario-customer-combobox">
+                <input type="search" id="daily-diario-customer-search" placeholder="Buscar por nome ou telefone…"
+                  autocomplete="off">
+                <div id="daily-diario-customer-results" class="diario-combobox-results hidden"></div>
+                <div id="daily-diario-customer-selected" class="diario-combobox-selected hidden"></div>
+              </div>
+            </div>
+            <div id="daily-diario-loyalty-wrap" class="daily-diario-loyalty-info-wrap hidden">
+              <p id="daily-diario-loyalty-info" class="daily-diario-loyalty-info"></p>
             </div>
             <div id="daily-diario-cart" class="daily-diario-cart">
               <p class="daily-diario-cart-empty">Nenhum produto adicionado.</p>
@@ -360,7 +385,8 @@
             <div id="daily-diario-cart-summary" class="daily-diario-cart-summary hidden">
               <label class="daily-diario-cart-field daily-diario-cart-discount-field">
                 <span>Desc. compra R$</span>
-                <input type="number" id="daily-diario-cart-discount" min="0" step="0.01" value="0" inputmode="decimal" aria-label="Desconto na compra">
+                <input type="number" id="daily-diario-cart-discount" min="0" step="0.01" value="0" inputmode="decimal"
+                  aria-label="Desconto na compra">
               </label>
               <div class="daily-diario-cart-summary-totals">
                 <p class="daily-diario-cart-summary-line">
@@ -372,17 +398,6 @@
                   <strong id="daily-diario-total">R$&nbsp;0,00</strong>
                 </p>
               </div>
-            </div>
-            <div class="daily-diario-field">
-              <label for="daily-diario-customer-search">Cliente (opcional)</label>
-              <div class="diario-combobox" id="diario-customer-combobox">
-                <input type="search" id="daily-diario-customer-search" placeholder="Buscar por nome ou telefone…" autocomplete="off">
-                <div id="daily-diario-customer-results" class="diario-combobox-results hidden"></div>
-                <div id="daily-diario-customer-selected" class="diario-combobox-selected hidden"></div>
-              </div>
-            </div>
-            <div id="daily-diario-loyalty-wrap" class="daily-diario-loyalty-info-wrap hidden">
-              <p id="daily-diario-loyalty-info" class="daily-diario-loyalty-info"></p>
             </div>
             <button type="submit" id="daily-diario-submit-btn" class="btn btn-primary btn-lg daily-diario-submit-btn">
               <i data-lucide="plus"></i> Registrar
@@ -434,20 +449,23 @@
                 <h1 id="event-detail-title">Evento</h1>
                 <p id="event-detail-meta" class="mt-1"></p>
               </div>
-              <button type="button" id="event-detail-edit-btn" onclick="editSelectedEvent()" class="btn btn-outline btn-md" data-requires-event-lotes>
+              <button type="button" id="event-detail-edit-btn" onclick="editSelectedEvent()"
+                class="btn btn-outline btn-md" data-requires-event-lotes>
                 <i data-lucide="edit"></i> Editar evento
               </button>
             </div>
           </div>
 
           <nav class="event-detail-tabs" aria-label="Seções do evento">
-            <button type="button" class="event-detail-tab is-active" data-event-tab="lotes" onclick="setEventTab('lotes')">
+            <button type="button" class="event-detail-tab is-active" data-event-tab="lotes"
+              onclick="setEventTab('lotes')">
               <i data-lucide="layers"></i> Lotes
             </button>
             <button type="button" class="event-detail-tab" data-event-tab="validar" onclick="setEventTab('validar')">
               <i data-lucide="scan-line"></i> Validar
             </button>
-            <button type="button" class="event-detail-tab" data-event-tab="ingressos" onclick="setEventTab('ingressos')">
+            <button type="button" class="event-detail-tab" data-event-tab="ingressos"
+              onclick="setEventTab('ingressos')">
               <i data-lucide="ticket"></i> Ingressos
             </button>
           </nav>
@@ -466,13 +484,15 @@
             <div class="card">
               <h2 class="font-semibold text-sm mb-4">Validar ingresso</h2>
               <div class="ticket-qr-scanner-actions mb-3">
-                <button type="button" id="ticket-qr-start-btn" class="btn btn-outline btn-md" onclick="startTicketQrScanner()">
+                <button type="button" id="ticket-qr-start-btn" class="btn btn-outline btn-md"
+                  onclick="startTicketQrScanner()">
                   <i data-lucide="camera"></i> Escanear QR
                 </button>
               </div>
               <form id="ticket-validate-form" class="events-validate-form" onsubmit="validateTicketCode(event)">
                 <p class="text-xs text-black/50 w-full sm:w-auto sm:mb-0 mb-1">Ou informe o código manualmente:</p>
-                <input type="text" id="ticket-validate-code" placeholder="Cole ou digite o código" autocomplete="off" required>
+                <input type="text" id="ticket-validate-code" placeholder="Cole ou digite o código" autocomplete="off"
+                  required>
                 <button type="submit" class="btn btn-primary btn-md">
                   <i data-lucide="check-circle"></i> Validar
                 </button>
@@ -495,7 +515,8 @@
                 </div>
                 <div class="field">
                   <label for="tickets-search">Buscar</label>
-                  <input type="search" id="tickets-search" placeholder="Código, nome ou e-mail" onkeydown="if(event.key==='Enter'){event.preventDefault();loadTicketsAdmin();}">
+                  <input type="search" id="tickets-search" placeholder="Código, nome ou e-mail"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();loadTicketsAdmin();}">
                 </div>
                 <button type="button" onclick="loadTicketsAdmin()" class="btn btn-outline btn-md">
                   <i data-lucide="search"></i> Filtrar
@@ -570,7 +591,8 @@
         <div class="form-group">
           <label>Preço promocional (opcional)</label>
           <input type="number" id="product-promo-price" step="0.01" min="0" placeholder="Ex.: 5,90">
-          <p class="text-xs text-black/50 mt-1">Se preenchido e menor que o preço normal, o produto entra em promoção no site e no carrinho usa este valor.</p>
+          <p class="text-xs text-black/50 mt-1">Se preenchido e menor que o preço normal, o produto entra em promoção no
+            site e no carrinho usa este valor.</p>
         </div>
         <div class="form-group">
           <label>Categoria</label>
@@ -585,7 +607,8 @@
         </div>
         <div class="form-group">
           <label>Descrição</label>
-          <textarea class="p-4" id="product-description" rows="3" placeholder="Detalhes do produto para a página de detalhes…"></textarea>
+          <textarea class="p-4" id="product-description" rows="3"
+            placeholder="Detalhes do produto para a página de detalhes…"></textarea>
         </div>
         <div class="form-group">
           <label>Informações nutricionais (opcional)</label>
@@ -614,7 +637,9 @@
         </div>
         <div class="form-group">
           <label>Opções / variações (opcional)</label>
-          <p class="text-xs text-black/50 mb-2">No Diário dá para marcar várias. Marque <strong>Única</strong> se não permitir quantidade (sempre 1×). Desmarque para permitir qty. Uma opção como padrão é pré-marcada no Diário.</p>
+          <p class="text-xs text-black/50 mb-2">No Diário dá para marcar várias. Marque <strong>Única</strong> se não
+            permitir quantidade (sempre 1×). Desmarque para permitir qty. Uma opção como padrão é pré-marcada no Diário.
+          </p>
           <div id="product-options-list" class="space-y-2"></div>
           <button type="button" onclick="addProductOptionRow()" class="btn btn-outline btn-sm mt-2">
             <i data-lucide="plus"></i> Adicionar opção
@@ -636,7 +661,8 @@
           <input type="file" id="product-image-file" accept="image/jpeg,image/png,image/webp,image/gif">
           <p class="text-xs text-black/50 mt-1">JPG, PNG, WebP ou GIF · máx. 5 MB</p>
           <div class="mt-3">
-            <img id="product-image-preview" alt="Pré-visualização" class="hidden max-h-48 w-full max-w-xs rounded-lg object-cover border border-black/10 bg-black/5">
+            <img id="product-image-preview" alt="Pré-visualização"
+              class="hidden max-h-48 w-full max-w-xs rounded-lg object-cover border border-black/10 bg-black/5">
           </div>
           <label class="block mt-3 text-sm text-black/60">URL da imagem (opcional, se preferir link externo)</label>
           <input type="text" id="product-image" placeholder="/uploads/products/… ou https://…">
@@ -717,13 +743,15 @@
             <input type="number" id="distributor-lng" step="any" required placeholder="-40.38">
           </div>
         </div>
-        <p class="text-xs text-black/50 -mt-2 mb-3">Use localização aproximada da área de atendimento (não precisa ser endereço residencial).</p>
+        <p class="text-xs text-black/50 -mt-2 mb-3">Use localização aproximada da área de atendimento (não precisa ser
+          endereço residencial).</p>
         <div class="form-group">
           <label>Foto do contato</label>
           <input type="file" id="distributor-photo-file" accept="image/jpeg,image/png,image/webp,image/gif">
           <p class="text-xs text-black/50 mt-1">JPG, PNG, WebP ou GIF · máx. 5 MB</p>
           <div class="mt-3 flex items-center gap-3">
-            <img id="distributor-photo-preview" alt="Pré-visualização" class="hidden h-16 w-16 rounded-full object-cover border border-black/10 bg-black/5">
+            <img id="distributor-photo-preview" alt="Pré-visualização"
+              class="hidden h-16 w-16 rounded-full object-cover border border-black/10 bg-black/5">
             <input type="hidden" id="distributor-photo">
           </div>
         </div>
@@ -743,7 +771,8 @@
         </div>
         <div class="form-group">
           <label for="distributor-description">Observação (opcional)</label>
-          <textarea class="p-4" id="distributor-description" rows="2" placeholder="Horários, bairros atendidos…"></textarea>
+          <textarea class="p-4" id="distributor-description" rows="2"
+            placeholder="Horários, bairros atendidos…"></textarea>
         </div>
         <div class="form-group field-row">
           <div class="field">
@@ -795,7 +824,8 @@
             <input type="file" id="event-logo-file" accept="image/jpeg,image/png,image/webp,image/gif">
             <p class="text-xs text-black/50 mt-1">JPG, PNG, WebP ou GIF · máx. 5 MB</p>
             <div class="mt-3">
-              <img id="event-logo-preview" alt="Pré-visualização do logo" class="hidden h-24 w-24 rounded-lg object-cover border border-black/10 bg-black/5">
+              <img id="event-logo-preview" alt="Pré-visualização do logo"
+                class="hidden h-24 w-24 rounded-lg object-cover border border-black/10 bg-black/5">
             </div>
           </div>
           <div class="form-group">
@@ -803,13 +833,15 @@
             <input type="file" id="event-cover-file" accept="image/jpeg,image/png,image/webp,image/gif">
             <p class="text-xs text-black/50 mt-1">JPG, PNG, WebP ou GIF · máx. 5 MB</p>
             <div class="mt-3">
-              <img id="event-cover-preview" alt="Pré-visualização da capa" class="hidden max-h-28 w-full rounded-lg object-cover border border-black/10 bg-black/5">
+              <img id="event-cover-preview" alt="Pré-visualização da capa"
+                class="hidden max-h-28 w-full rounded-lg object-cover border border-black/10 bg-black/5">
             </div>
           </div>
         </div>
         <div class="form-group">
           <label>Patrocinadores</label>
-          <p class="text-xs text-black/50 mb-2">Nome, Instagram (@marca ou URL) e logo opcional (JPG/PNG/WebP/GIF, máx. 5 MB).</p>
+          <p class="text-xs text-black/50 mb-2">Nome, Instagram (@marca ou URL) e logo opcional (JPG/PNG/WebP/GIF, máx.
+            5 MB).</p>
           <div id="event-sponsors-list" class="event-sponsors-list space-y-1.5"></div>
           <button type="button" onclick="addEventSponsorRow()" class="btn btn-outline btn-sm mt-2">
             <i data-lucide="plus"></i> Adicionar patrocinador
@@ -870,19 +902,24 @@
             <div class="field-row">
               <div class="field">
                 <label for="lot-promo-qty">Quantidade do pacote</label>
-                <input type="number" id="lot-promo-qty" min="2" step="1" placeholder="Ex.: 2" oninput="updateLotPromoPreview()">
+                <input type="number" id="lot-promo-qty" min="2" step="1" placeholder="Ex.: 2"
+                  oninput="updateLotPromoPreview()">
               </div>
               <div class="field">
                 <label for="lot-promo-price">Preço do pacote (R$)</label>
-                <input type="number" id="lot-promo-price" step="0.01" min="0.01" placeholder="Ex.: 75,00" oninput="updateLotPromoPreview()">
+                <input type="number" id="lot-promo-price" step="0.01" min="0.01" placeholder="Ex.: 75,00"
+                  oninput="updateLotPromoPreview()">
               </div>
             </div>
             <div class="field mt-2">
               <label for="lot-promo-mode">Para quantidades maiores</label>
               <select class="px-4" id="lot-promo-mode" onchange="updateLotPromoPreview()">
-                <option value="repeat">Repetir pacote — cada pacote completo sai pelo preço promocional (3 = pacote + 1 cheio)</option>
-                <option value="once">Aplicar uma vez — só o primeiro pacote tem desconto, o resto paga preço cheio</option>
-                <option value="proportional">Preço unitário cai — a partir do pacote, todos pagam o unitário promocional</option>
+                <option value="repeat">Repetir pacote — cada pacote completo sai pelo preço promocional (3 = pacote + 1
+                  cheio)</option>
+                <option value="once">Aplicar uma vez — só o primeiro pacote tem desconto, o resto paga preço cheio
+                </option>
+                <option value="proportional">Preço unitário cai — a partir do pacote, todos pagam o unitário promocional
+                </option>
               </select>
               <p class="text-xs text-black/50 mt-1" id="lot-promo-preview"></p>
             </div>
@@ -923,7 +960,8 @@
           <input type="file" id="loyalty-avatar-file" accept="image/jpeg,image/png,image/webp,image/gif">
           <p class="text-xs text-black/50 mt-1">JPG, PNG, WebP ou GIF · máx. 5 MB</p>
           <div class="mt-3 flex items-center gap-3">
-            <img id="loyalty-avatar-preview" alt="Pré-visualização" class="hidden h-16 w-16 rounded-full object-cover border border-black/10 bg-black/5">
+            <img id="loyalty-avatar-preview" alt="Pré-visualização"
+              class="hidden h-16 w-16 rounded-full object-cover border border-black/10 bg-black/5">
             <input type="hidden" id="loyalty-avatar">
           </div>
         </div>
@@ -959,19 +997,23 @@
     <div class="modal-content modal-content--sm">
       <div class="flex justify-between items-center mb-4">
         <h3 class="font-display text-xl font-bold">Cadastrar cliente</h3>
-        <button type="button" onclick="closeDiarioQuickCustomerModal()" class="modal-close" aria-label="Fechar">&times;</button>
+        <button type="button" onclick="closeDiarioQuickCustomerModal()" class="modal-close"
+          aria-label="Fechar">&times;</button>
       </div>
       <form id="diario-quick-customer-form" onsubmit="saveDiarioQuickCustomer(event)">
         <div class="form-group">
           <label for="diario-quick-customer-name">Nome</label>
-          <input type="text" id="diario-quick-customer-name" required placeholder="Ex.: Maria Silva" autocomplete="name">
+          <input type="text" id="diario-quick-customer-name" required placeholder="Ex.: Maria Silva"
+            autocomplete="name">
         </div>
         <div class="form-group">
           <label for="diario-quick-customer-phone">Telefone</label>
-          <input type="tel" id="diario-quick-customer-phone" required placeholder="Ex.: (27) 99999-9999" autocomplete="tel">
+          <input type="tel" id="diario-quick-customer-phone" required placeholder="Ex.: (27) 99999-9999"
+            autocomplete="tel">
         </div>
         <div class="modal-footer">
-          <button type="button" onclick="closeDiarioQuickCustomerModal()" class="btn btn-secondary btn-md">Cancelar</button>
+          <button type="button" onclick="closeDiarioQuickCustomerModal()"
+            class="btn btn-secondary btn-md">Cancelar</button>
           <button type="submit" class="btn btn-primary btn-lg">Cadastrar</button>
         </div>
       </form>
@@ -983,16 +1025,19 @@
     <div class="modal-content modal-content--sm">
       <div class="flex justify-between items-center mb-4">
         <h3 class="font-display text-xl font-bold">Cadastrar produto</h3>
-        <button type="button" onclick="closeDiarioQuickProductModal()" class="modal-close" aria-label="Fechar">&times;</button>
+        <button type="button" onclick="closeDiarioQuickProductModal()" class="modal-close"
+          aria-label="Fechar">&times;</button>
       </div>
       <form id="diario-quick-product-form" onsubmit="saveDiarioQuickProduct(event)">
         <div class="form-group">
           <label for="diario-quick-product-name">Nome</label>
-          <input type="text" id="diario-quick-product-name" required placeholder="Ex.: Shake Baunilha" autocomplete="off">
+          <input type="text" id="diario-quick-product-name" required placeholder="Ex.: Shake Baunilha"
+            autocomplete="off">
         </div>
         <div class="form-group">
           <label for="diario-quick-product-price">Preço (R$)</label>
-          <input type="number" id="diario-quick-product-price" required min="0" step="0.01" inputmode="decimal" placeholder="0,00">
+          <input type="number" id="diario-quick-product-price" required min="0" step="0.01" inputmode="decimal"
+            placeholder="0,00">
         </div>
         <div class="form-group">
           <label for="diario-quick-product-category">Categoria</label>
@@ -1001,7 +1046,8 @@
           </select>
         </div>
         <div class="modal-footer">
-          <button type="button" onclick="closeDiarioQuickProductModal()" class="btn btn-secondary btn-md">Cancelar</button>
+          <button type="button" onclick="closeDiarioQuickProductModal()"
+            class="btn btn-secondary btn-md">Cancelar</button>
           <button type="submit" class="btn btn-primary btn-lg">Cadastrar</button>
         </div>
       </form>
@@ -1013,7 +1059,8 @@
     <div class="modal-content modal-content--sm diario-option-modal-content">
       <div class="flex justify-between items-center mb-4">
         <h3 class="font-display text-xl font-bold" id="diario-option-modal-title">Adicionais</h3>
-        <button type="button" onclick="closeDiarioOptionModal()" class="modal-close" aria-label="Fechar">&times;</button>
+        <button type="button" onclick="closeDiarioOptionModal()" class="modal-close"
+          aria-label="Fechar">&times;</button>
       </div>
       <p id="diario-option-modal-subtitle" class="text-sm text-black/60 mb-3">Selecione uma ou mais variações:</p>
       <div id="diario-option-modal-list" class="diario-option-list"></div>
@@ -1023,7 +1070,8 @@
       </div>
       <div class="modal-footer">
         <button type="button" onclick="closeDiarioOptionModal()" class="btn btn-secondary btn-md">Cancelar</button>
-        <button type="button" id="diario-option-confirm-btn" onclick="confirmDiarioOptionSelection()" class="btn btn-primary btn-lg">Adicionar</button>
+        <button type="button" id="diario-option-confirm-btn" onclick="confirmDiarioOptionSelection()"
+          class="btn btn-primary btn-lg">Adicionar</button>
       </div>
     </div>
   </div>
@@ -1081,7 +1129,8 @@
           </div>
           <div class="form-group" id="user-custom-password-wrap" style="display: none;">
             <label for="user-custom-password">Senha inicial personalizada</label>
-            <input type="password" id="user-custom-password" minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres">
+            <input type="password" id="user-custom-password" minlength="6" autocomplete="new-password"
+              placeholder="Mínimo 6 caracteres">
           </div>
           <p class="text-xs text-black/50 mb-3">No primeiro login, a pessoa deverá definir uma nova senha.</p>
         </div>
@@ -1105,7 +1154,8 @@
     <div class="modal-content modal-content--sm">
       <div class="flex justify-between items-center mb-4">
         <h3 class="font-display text-xl font-bold" id="loyalty-history-title">Histórico de visitas</h3>
-        <button type="button" onclick="closeLoyaltyHistoryModal()" class="modal-close" aria-label="Fechar">&times;</button>
+        <button type="button" onclick="closeLoyaltyHistoryModal()" class="modal-close"
+          aria-label="Fechar">&times;</button>
       </div>
       <div id="loyalty-history-summary" class="loyalty-history-summary"></div>
       <div id="loyalty-history-body" class="loyalty-history-body">
@@ -1117,10 +1167,12 @@
     </div>
   </div>
 
-  <div id="ticket-qr-overlay" class="ticket-qr-overlay hidden" role="dialog" aria-modal="true" aria-label="Escanear QR do ingresso" aria-hidden="true">
+  <div id="ticket-qr-overlay" class="ticket-qr-overlay hidden" role="dialog" aria-modal="true"
+    aria-label="Escanear QR do ingresso" aria-hidden="true">
     <div class="ticket-qr-overlay-top">
       <p class="ticket-qr-overlay-title">Validar ingresso</p>
-      <button type="button" id="ticket-qr-close-btn" class="ticket-qr-close-btn" onclick="stopTicketQrScanner()" aria-label="Fechar câmera">
+      <button type="button" id="ticket-qr-close-btn" class="ticket-qr-close-btn" onclick="stopTicketQrScanner()"
+        aria-label="Fechar câmera">
         <i data-lucide="x"></i>
       </button>
     </div>

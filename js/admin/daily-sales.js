@@ -617,7 +617,8 @@ function updateDiarioLoyaltyUI() {
     const visitLabel = visits === 1 ? 'visita será contada' : 'visitas serão contadas';
     info.textContent = `${visits} ${visitLabel} automaticamente (${formatCurrency(total)} ÷ ${formatCurrency(access)})`;
   } else {
-    info.textContent = `Ainda sem visita — falta atingir ${formatCurrency(access)} (total atual: ${formatCurrency(total)})`;
+    wrap.classList.add('hidden');
+    info.textContent = '';
   }
 }
 
@@ -639,27 +640,32 @@ function renderDiarioCart() {
       : '';
     return `
       <div class="daily-diario-cart-row" data-cart-line="${escapeAttr(key)}">
-        <div class="daily-diario-cart-row-name">
-          <span class="daily-diario-cart-title">${escapeHtml(line.name)}</span>
-          ${optionHint}
-          <span class="daily-diario-cart-base">Unit.: ${formatCurrency(line.basePrice)}</span>
+        
+        <div class="daily-diario-cart-row-name-header">
+          <div class="daily-diario-cart-row-name">
+            <span class="daily-diario-cart-title">${escapeHtml(line.name)}</span>
+            ${optionHint}
+            <span class="daily-diario-cart-base">Unit.: ${formatCurrency(line.basePrice)}</span>
+          </div>
+          <div>
+            <button type="button" class="btn btn-danger btn-sm btn-icon daily-diario-cart-remove" data-remove-line="${escapeAttr(key)}" title="Remover" aria-label="Remover produto">
+              <i data-lucide="x"></i>
+            </button>
+          </div>
         </div>
         <div class="daily-diario-cart-row-fields">
-          <label class="daily-diario-cart-field">
+          <label class="daily-diario-cart-field daily-diario-cart-field--qty">
             <span>Qtd</span>
             <input type="number" min="1" step="1" value="${line.quantity}" data-cart-qty inputmode="numeric">
           </label>
-          <label class="daily-diario-cart-field">
-            <span>Desc. item</span>
+          <label class="daily-diario-cart-field daily-diario-cart-field--discount">
+            <span>Desc.</span>
             <input type="number" min="0" step="0.01" value="${formatDecimalInput(line.discount, MONEY_DECIMALS)}" data-cart-discount inputmode="decimal" title="Desconto por unidade (R$)">
           </label>
-          <div class="daily-diario-cart-total">
-            <span>Total</span>
-            <strong>${formatCurrency(lineTotal)}</strong>
-          </div>
-          <button type="button" class="btn btn-danger btn-sm btn-icon daily-diario-cart-remove" data-remove-line="${escapeAttr(key)}" title="Remover" aria-label="Remover produto">
-            <i data-lucide="x"></i>
-          </button>
+        </div>
+        <div class="daily-diario-cart-total">
+          <span>Total &nbsp;</span>
+          <strong>${formatCurrency(lineTotal)}</strong>
         </div>
       </div>
     `;
@@ -1063,19 +1069,23 @@ function renderDailyDiarioList(items, summary) {
       <div class="card daily-diario-sale-card">
         <div class="daily-diario-sale-main">
           <div class="daily-diario-sale-head">
-            <p class="daily-diario-sale-title">${escapeHtml(item.product_name)}</p>
+            <div>
+              <span class="daily-diario-sale-title">${escapeHtml(item.product_name)}</span>
+              <p class="daily-diario-sale-unit">${unitLine}</p>
+            </div>
             <div class="daily-diario-sale-head-actions">
-              <span class="daily-diario-sale-price">${formatCurrency(item.line_total)}</span>
               <button type="button" onclick="deleteDailySaleEntry(${item.id})" class="btn btn-danger btn-sm btn-icon" title="Excluir" aria-label="Excluir venda">
                 <i data-lucide="trash"></i>
               </button>
             </div>
           </div>
-          <p class="daily-diario-sale-unit">${unitLine}</p>
           <div class="daily-diario-sale-meta">
-            <span class="daily-diario-sale-meta-item">
-              <i data-lucide="clock" aria-hidden="true"></i>
-              ${formatSaleTime(item.created_at)}
+            <span class="daily-diario-sale-meta-item-header">
+              <div class="daily-diario-sale-meta-item">
+                <i data-lucide="clock" aria-hidden="true"></i>
+                ${formatSaleTime(item.created_at)}
+              </div>
+              <span class="daily-diario-sale-price">${formatCurrency(item.line_total)}</span>
             </span>
             ${customerBadge}
             ${loyaltyBadge}

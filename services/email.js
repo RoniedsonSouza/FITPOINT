@@ -33,8 +33,10 @@ function escapeHtml(str) {
 
 /**
  * Envia e-mail com os ingressos e QR Codes (HTML + anexos PNG).
+ * @param {object} opts
+ * @param {boolean} [opts.complimentary=false] — copy VIP/cortesia (sem menção a pagamento)
  */
-async function sendTicketEmail({ to, buyerName, event, lot, tickets }) {
+async function sendTicketEmail({ to, buyerName, event, lot, tickets, complimentary = false }) {
   const resend = getResendClient();
   const attachments = [];
   const ticketBlocks = [];
@@ -58,11 +60,18 @@ async function sendTicketEmail({ to, buyerName, event, lot, tickets }) {
     `);
   }
 
+  const introLine = complimentary
+    ? 'Seu ingresso VIP/cortesia para o evento:'
+    : 'Pagamento confirmado. Segue o ingresso para o evento:';
+  const subject = complimentary
+    ? `Ingresso VIP — ${event.title}`
+    : `Ingresso confirmado — ${event.title}`;
+
   const html = `
     <div style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:0 auto;color:#0E1F16;">
       <h1 style="color:#1D6B3A;font-size:22px;">Seu ingresso FitPoint</h1>
       <p>Olá, <strong>${escapeHtml(buyerName)}</strong>!</p>
-      <p>Pagamento confirmado. Segue o ingresso para o evento:</p>
+      <p>${introLine}</p>
       <div style="background:#F5F3EE;padding:16px;border-radius:12px;margin:16px 0;">
         <p style="margin:0 0 6px;"><strong>${escapeHtml(event.title)}</strong></p>
         <p style="margin:0 0 6px;">${formatDatePt(event.starts_at)}</p>
@@ -78,7 +87,7 @@ async function sendTicketEmail({ to, buyerName, event, lot, tickets }) {
   const result = await resend.emails.send({
     from: getFromAddress(),
     to: [to],
-    subject: `Ingresso confirmado — ${event.title}`,
+    subject,
     html,
     attachments
   });

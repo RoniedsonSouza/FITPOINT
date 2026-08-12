@@ -12,6 +12,7 @@ const {
 } = require('../services/mercadopago');
 const { sendTicketEmail } = require('../services/email');
 const { computeOrderTotal } = require('../services/ticketPricing');
+const { resolveHolders } = require('../services/ticketAssignees');
 
 function generateTicketCode() {
   return crypto.randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase();
@@ -24,18 +25,33 @@ function isLotOnSale(lot, now = new Date()) {
   return Number(lot.quantity_sold) + 1 <= Number(lot.quantity_total);
 }
 
+function parseOrderAssignees(assignees) {
+  if (assignees == null) return [];
+  if (typeof assignees === 'string') {
+    try {
+      const parsed = JSON.parse(assignees);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      return [];
+    }
+  }
+  return Array.isArray(assignees) ? assignees : [];
+}
+
 /**
- * Gera tickets, marca pedido como pago e envia e-mail.
- * Idempotente se o pedido já estiver paid.
+ * Gera tickets por titular, marca pedido como pago e envia e-mails agrupados.
+ * Idempotente se o pedido já estiver paid e já tiver tickets.
+ * VIP: permite emitir quando order já paid sem tickets (source=vip ou options.allowAlreadyPaid).
  */
-async function fulfillPaidOrder(orderId, mpPaymentId) {
+async function fulfillPaidOrder(orderId, mpPaymentId, options = {}) {
   const client = await getClient();
   try {
     await client.query('BEGIN');
 
     const orderRes = await client.query(
       `SELECT o.*, e.title AS event_title, e.starts_at AS event_starts_at,
-              e.venue AS event_venue, l.name AS lot_name, l.price AS lot_price
+              e.venue AS event_venue, l.name AS lot_name, l.price AS lot_price,
+              l.is_vip AS lot_is_vip
        FROM ${table('ticket_orders')} o
        JOIN ${table('events')} e ON e.id = o.event_id
        JOIN ${table('ticket_lots')} l ON l.id = o.lot_id
@@ -50,36 +66,57 @@ async function fulfillPaidOrder(orderId, mpPaymentId) {
     }
 
     const order = orderRes.rows[0];
+    order.assignees = parseOrderAssignees(order.assignees);
+
+    const ticketCountRes = await client.query(
+      `SELECT COUNT(*)::int AS count FROM ${table('tickets')} WHERE order_id = $1`,
+      [orderId]
+    );
+    const existingTicketCount = ticketCountRes.rows[0].count;
+
+    const allowAlreadyPaid =
+      options.allowAlreadyPaid === true || order.source === 'vip';
 
     if (order.status === 'paid') {
-      await client.query('COMMIT');
-      return { ok: true, already: true };
-    }
-
-    if (order.status !== 'pending') {
+      // Idempotente se já há tickets; VIP (ou allowAlreadyPaid) emite se paid sem tickets
+      if (existingTicketCount > 0 || !allowAlreadyPaid) {
+        await client.query('COMMIT');
+        return { ok: true, already: true };
+      }
+    } else if (order.status === 'pending') {
+      await client.query(
+        `UPDATE ${table('ticket_orders')}
+         SET status = 'paid', mp_payment_id = $1, updated_at = NOW()
+         WHERE id = $2`,
+        [mpPaymentId ? String(mpPaymentId) : order.mp_payment_id, orderId]
+      );
+    } else {
       await client.query('ROLLBACK');
       return { ok: false, reason: `order_status_${order.status}` };
     }
 
-    await client.query(
-      `UPDATE ${table('ticket_orders')}
-       SET status = 'paid', mp_payment_id = $1, updated_at = NOW()
-       WHERE id = $2`,
-      [mpPaymentId ? String(mpPaymentId) : order.mp_payment_id, orderId]
-    );
-
+    const holders = resolveHolders(order);
     const tickets = [];
-    for (let i = 0; i < Number(order.quantity); i++) {
+    for (let i = 0; i < holders.length; i++) {
+      const holder = holders[i];
       let code = generateTicketCode();
       let inserted = false;
       for (let attempt = 0; attempt < 5 && !inserted; attempt++) {
         try {
           const tRes = await client.query(
             `INSERT INTO ${table('tickets')}
-              (order_id, event_id, lot_id, code, status, buyer_name, buyer_email, created_at)
-             VALUES ($1, $2, $3, $4, 'valid', $5, $6, NOW())
+              (order_id, event_id, lot_id, code, status, buyer_name, buyer_email, buyer_phone, created_at)
+             VALUES ($1, $2, $3, $4, 'valid', $5, $6, $7, NOW())
              RETURNING *`,
-            [order.id, order.event_id, order.lot_id, code, order.buyer_name, order.buyer_email]
+            [
+              order.id,
+              order.event_id,
+              order.lot_id,
+              code,
+              holder.name,
+              holder.email,
+              holder.phone
+            ]
           );
           tickets.push(tRes.rows[0]);
           inserted = true;
@@ -98,20 +135,36 @@ async function fulfillPaidOrder(orderId, mpPaymentId) {
 
     await client.query('COMMIT');
 
-    try {
-      await sendTicketEmail({
-        to: order.buyer_email,
-        buyerName: order.buyer_name,
-        event: {
-          title: order.event_title,
-          starts_at: order.event_starts_at,
-          venue: order.event_venue
-        },
-        lot: { name: order.lot_name },
-        tickets: tickets.map((t) => ({ code: t.code }))
-      });
-    } catch (emailErr) {
-      console.error('Pedido pago, mas falha no e-mail:', emailErr.message);
+    const byEmail = new Map();
+    for (const t of tickets) {
+      const key = String(t.buyer_email).trim().toLowerCase();
+      if (!byEmail.has(key)) {
+        byEmail.set(key, { name: t.buyer_name, tickets: [] });
+      }
+      byEmail.get(key).tickets.push({ code: t.code });
+    }
+
+    const complimentary = order.source === 'vip';
+    const eventPayload = {
+      title: order.event_title,
+      starts_at: order.event_starts_at,
+      venue: order.event_venue
+    };
+    const lotPayload = { name: order.lot_name };
+
+    for (const [to, group] of byEmail) {
+      try {
+        await sendTicketEmail({
+          to,
+          buyerName: group.name,
+          event: eventPayload,
+          lot: lotPayload,
+          tickets: group.tickets,
+          complimentary
+        });
+      } catch (emailErr) {
+        console.error('Pedido pago, mas falha no e-mail:', emailErr.message);
+      }
     }
 
     return { ok: true, tickets };

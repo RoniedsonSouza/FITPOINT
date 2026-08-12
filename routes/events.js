@@ -107,6 +107,7 @@ function mapLotRow(row) {
     promo_qty: row.promo_qty != null ? Number(row.promo_qty) : null,
     promo_price: row.promo_price != null ? Number(row.promo_price) : null,
     promo_mode: row.promo_mode || 'repeat',
+    is_vip: row.is_vip === true,
     created_at: row.created_at,
     updated_at: row.updated_at
   };
@@ -194,7 +195,7 @@ async function getLotsForEvent(eventId, { onlyAvailable = false } = {}) {
   let lots = result.rows.map(mapLotRow);
   if (onlyAvailable) {
     const now = new Date();
-    lots = lots.filter((lot) => isLotOnSale(lot, now));
+    lots = lots.filter((lot) => !lot.is_vip && isLotOnSale(lot, now));
   }
   return lots;
 }
@@ -466,27 +467,46 @@ router.post('/:id/lots', authenticateToken, requirePermission('eventos', 'lotes'
       return res.status(404).json({ error: 'Evento não encontrado' });
     }
 
+    const isVip = req.body.is_vip === true;
     const {
-      name,
-      price,
       quantity_total,
       sales_start = null,
       sales_end = null,
-      active = true,
-      promo_enabled = false,
-      promo_qty = null,
-      promo_price = null,
-      promo_mode = 'repeat'
+      active = true
     } = req.body;
 
-    if (!name || !String(name).trim()) {
-      return res.status(400).json({ error: 'Nome do lote é obrigatório' });
+    let name = req.body.name;
+    let priceNum = Number(req.body.price);
+    let promo_enabled = req.body.promo_enabled === true;
+    let promo_qty = req.body.promo_qty ?? null;
+    let promo_price = req.body.promo_price ?? null;
+    let promo_mode = req.body.promo_mode || 'repeat';
+
+    if (isVip) {
+      name = 'Ingresso VIP';
+      priceNum = 0;
+      promo_enabled = false;
+      promo_qty = null;
+      promo_price = null;
+      promo_mode = 'repeat';
+
+      const vipExists = await query(
+        `SELECT id FROM ${table('ticket_lots')} WHERE event_id = $1 AND is_vip = true LIMIT 1`,
+        [req.params.id]
+      );
+      if (vipExists.rows.length) {
+        return res.status(400).json({ error: 'Este evento já possui um lote VIP' });
+      }
+    } else {
+      if (!name || !String(name).trim()) {
+        return res.status(400).json({ error: 'Nome do lote é obrigatório' });
+      }
+      if (Number.isNaN(priceNum) || priceNum < 0) {
+        return res.status(400).json({ error: 'Preço inválido' });
+      }
     }
-    const priceNum = Number(price);
+
     const qty = parseInt(quantity_total, 10);
-    if (Number.isNaN(priceNum) || priceNum < 0) {
-      return res.status(400).json({ error: 'Preço inválido' });
-    }
     if (!qty || qty < 1) {
       return res.status(400).json({ error: 'Quantidade deve ser pelo menos 1' });
     }
@@ -502,8 +522,8 @@ router.post('/:id/lots', authenticateToken, requirePermission('eventos', 'lotes'
     const result = await query(
       `INSERT INTO ${table('ticket_lots')}
         (event_id, name, price, quantity_total, quantity_sold, sales_start, sales_end, active,
-         promo_enabled, promo_qty, promo_price, promo_mode, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, 0, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+         promo_enabled, promo_qty, promo_price, promo_mode, is_vip, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 0, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
        RETURNING *`,
       [
         req.params.id,
@@ -516,7 +536,8 @@ router.post('/:id/lots', authenticateToken, requirePermission('eventos', 'lotes'
         promo.value.promo_enabled,
         promo.value.promo_qty,
         promo.value.promo_price,
-        promo.value.promo_mode
+        promo.value.promo_mode,
+        isVip
       ]
     );
 
@@ -539,8 +560,17 @@ router.put('/:eventId/lots/:lotId', authenticateToken, requirePermission('evento
     }
 
     const current = existing.rows[0];
-    const name = req.body.name != null ? String(req.body.name).trim() : current.name;
-    const price =
+    const isCurrentVip = current.is_vip === true;
+
+    if (req.body.is_vip === true && !isCurrentVip) {
+      return res.status(400).json({ error: 'Use a criação de lote VIP' });
+    }
+    if (req.body.is_vip === false && isCurrentVip) {
+      return res.status(400).json({ error: 'Não é possível remover o status VIP de um lote' });
+    }
+
+    let name = req.body.name != null ? String(req.body.name).trim() : current.name;
+    let price =
       req.body.price !== undefined ? Number(req.body.price) : Number(current.price);
     const quantity_total =
       req.body.quantity_total !== undefined
@@ -556,16 +586,25 @@ router.put('/:eventId/lots/:lotId', authenticateToken, requirePermission('evento
         : current.sales_end;
     const active =
       req.body.active !== undefined ? req.body.active !== false : current.active;
-    const promo_enabled =
+    let promo_enabled =
       req.body.promo_enabled !== undefined
         ? req.body.promo_enabled === true
         : current.promo_enabled === true;
-    const promo_qty =
+    let promo_qty =
       req.body.promo_qty !== undefined ? req.body.promo_qty : current.promo_qty;
-    const promo_price =
+    let promo_price =
       req.body.promo_price !== undefined ? req.body.promo_price : current.promo_price;
-    const promo_mode =
+    let promo_mode =
       req.body.promo_mode !== undefined ? req.body.promo_mode : current.promo_mode || 'repeat';
+
+    if (isCurrentVip) {
+      name = 'Ingresso VIP';
+      price = 0;
+      promo_enabled = false;
+      promo_qty = null;
+      promo_price = null;
+      promo_mode = 'repeat';
+    }
 
     if (!name) {
       return res.status(400).json({ error: 'Nome do lote é obrigatório' });
@@ -594,8 +633,8 @@ router.put('/:eventId/lots/:lotId', authenticateToken, requirePermission('evento
       `UPDATE ${table('ticket_lots')}
        SET name = $1, price = $2, quantity_total = $3, sales_start = $4,
            sales_end = $5, active = $6, promo_enabled = $7, promo_qty = $8,
-           promo_price = $9, promo_mode = $10, updated_at = NOW()
-       WHERE id = $11 AND event_id = $12
+           promo_price = $9, promo_mode = $10, is_vip = $11, updated_at = NOW()
+       WHERE id = $12 AND event_id = $13
        RETURNING *`,
       [
         name,
@@ -608,6 +647,7 @@ router.put('/:eventId/lots/:lotId', authenticateToken, requirePermission('evento
         promo.value.promo_qty,
         promo.value.promo_price,
         promo.value.promo_mode,
+        isCurrentVip,
         req.params.lotId,
         req.params.eventId
       ]

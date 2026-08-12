@@ -1,7 +1,4 @@
 const express = require('express');
-const path = require('path');
-const fs = require('fs');
-const multer = require('multer');
 const router = express.Router();
 const { query, table, getClient } = require('../config/database');
 const { authenticateToken, requirePermission, requireAnyPermission } = require('../config/auth');
@@ -22,40 +19,11 @@ const {
   participantOrderSql,
   computeTotalPages
 } = require('./loyaltyHelpers');
+const { createImageUploadMiddleware } = require('../middleware/imageUpload');
 
 const WINNERS_HALL_LIMIT = 5;
 
-const loyaltyUploadDir = path.join(__dirname, '..', 'uploads', 'loyalty');
-fs.mkdirSync(loyaltyUploadDir, { recursive: true });
-
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, loyaltyUploadDir),
-    filename: (req, file, cb) => {
-      const ext = (path.extname(file.originalname) || '').toLowerCase();
-      const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
-      const safeExt = allowed.includes(ext) ? ext : '.jpg';
-      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${safeExt}`);
-    }
-  }),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (/^image\/(jpeg|png|webp|gif)$/i.test(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Use uma imagem JPG, PNG, WebP ou GIF.'));
-    }
-  }
-});
-
-function uploadAvatarMiddleware(req, res, next) {
-  upload.single('image')(req, res, (err) => {
-    if (err) {
-      return res.status(400).json({ error: err.message || 'Erro no upload' });
-    }
-    next();
-  });
-}
+const uploadAvatarMiddleware = createImageUploadMiddleware('loyalty');
 
 async function getVisitsPerReward() {
   const settings = await getLoyaltySettings();
@@ -145,12 +113,9 @@ router.put('/settings', authenticateToken, requirePermission('fidelidade'), asyn
   }
 });
 
-// POST /api/loyalty/upload-avatar — admin
+// POST /api/loyalty/upload-avatar — admin; salva no banco
 router.post('/upload-avatar', authenticateToken, requirePermission('fidelidade'), uploadAvatarMiddleware, (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'Nenhum arquivo enviado' });
-  }
-  res.status(201).json({ url: `/uploads/loyalty/${req.file.filename}` });
+  res.status(201).json({ url: req.savedMedia.url, id: req.savedMedia.id });
 });
 
 // GET /api/loyalty/rankings — público

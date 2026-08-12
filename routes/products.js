@@ -1,7 +1,4 @@
 const express = require('express');
-const path = require('path');
-const fs = require('fs');
-const multer = require('multer');
 const router = express.Router();
 const { query, table } = require('../config/database');
 const { authenticateToken, requirePermission } = require('../config/auth');
@@ -11,39 +8,9 @@ const {
   validateOptions,
   mapProductRow
 } = require('./productHelpers');
+const { createImageUploadMiddleware } = require('../middleware/imageUpload');
 
-const productsUploadDir = path.join(__dirname, '..', 'uploads', 'products');
-fs.mkdirSync(productsUploadDir, { recursive: true });
-
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, productsUploadDir),
-    filename: (req, file, cb) => {
-      const ext = (path.extname(file.originalname) || '').toLowerCase();
-      const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
-      const safeExt = allowed.includes(ext) ? ext : '.jpg';
-      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${safeExt}`);
-    }
-  }),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (/^image\/(jpeg|png|webp|gif)$/i.test(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Use uma imagem JPG, PNG, WebP ou GIF.'));
-    }
-  }
-});
-
-function uploadProductImageMiddleware(req, res, next) {
-  upload.single('image')(req, res, (err) => {
-    if (err) {
-      const msg = err.message || 'Erro no upload';
-      return res.status(400).json({ error: msg });
-    }
-    next();
-  });
-}
+const uploadProductImageMiddleware = createImageUploadMiddleware('products');
 
 async function validateCategoryName(category) {
   const result = await query(
@@ -53,13 +20,9 @@ async function validateCategoryName(category) {
   return result.rows.length > 0;
 }
 
-// POST /api/products/upload-image — enviar imagem (autenticado)
+// POST /api/products/upload-image — enviar imagem (autenticado); salva no banco
 router.post('/upload-image', authenticateToken, requirePermission('produtos'), uploadProductImageMiddleware, (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'Nenhum arquivo enviado' });
-  }
-  const url = `/uploads/products/${req.file.filename}`;
-  res.status(201).json({ url });
+  res.status(201).json({ url: req.savedMedia.url, id: req.savedMedia.id });
 });
 
 // GET /api/products - Listar todos os produtos (público)

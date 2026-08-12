@@ -89,6 +89,13 @@ function toDatetimeLocalValue(value) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/** Data/hora de hoje 00:00 no formato datetime-local (pré-seleção de início de vendas). */
+function todayDatetimeLocalValue() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return toDatetimeLocalValue(d);
+}
+
 function fromDatetimeLocalValue(value) {
   if (!value) return null;
   // datetime-local já é horário local — gravar como TIMESTAMP WITHOUT TIME ZONE (sem deslocar para UTC).
@@ -758,6 +765,7 @@ function openLotModal(lotId = null, options = {}) {
     document.getElementById('lot-active').checked = true;
     document.getElementById('lot-promo-enabled').checked = false;
     document.getElementById('lot-promo-mode').value = 'repeat';
+    document.getElementById('lot-sales-start').value = todayDatetimeLocalValue();
     setLotVipMode(true);
     toggleLotPromoFields();
   } else {
@@ -767,6 +775,7 @@ function openLotModal(lotId = null, options = {}) {
     document.getElementById('lot-active').checked = true;
     document.getElementById('lot-promo-enabled').checked = false;
     document.getElementById('lot-promo-mode').value = 'repeat';
+    document.getElementById('lot-sales-start').value = todayDatetimeLocalValue();
     setLotVipMode(false);
     toggleLotPromoFields();
   }

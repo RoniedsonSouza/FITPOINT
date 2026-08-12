@@ -383,20 +383,18 @@
               <p class="daily-diario-cart-empty">Nenhum produto adicionado.</p>
             </div>
             <div id="daily-diario-cart-summary" class="daily-diario-cart-summary hidden">
-              <label class="daily-diario-cart-field daily-diario-cart-discount-field">
+              <div class="daily-diario-cart-summary-row">
                 <span>Desc. compra R$</span>
                 <input type="number" id="daily-diario-cart-discount" min="0" step="0.01" value="0" inputmode="decimal"
                   aria-label="Desconto na compra">
-              </label>
-              <div class="daily-diario-cart-summary-totals">
-                <p class="daily-diario-cart-summary-line">
-                  <span>Subtotal</span>
-                  <strong id="daily-diario-subtotal">R$&nbsp;0,00</strong>
-                </p>
-                <p class="daily-diario-cart-summary-line daily-diario-cart-summary-line--total">
-                  <span>Total</span>
-                  <strong id="daily-diario-total">R$&nbsp;0,00</strong>
-                </p>
+              </div>
+              <div class="daily-diario-cart-summary-row">
+                <span>Subtotal</span>
+                <strong id="daily-diario-subtotal">R$&nbsp;0,00</strong>
+              </div>
+              <div class="daily-diario-cart-summary-row daily-diario-cart-summary-row--total">
+                <span>Total</span>
+                <strong id="daily-diario-total">R$&nbsp;0,00</strong>
               </div>
             </div>
             <button type="submit" id="daily-diario-submit-btn" class="btn btn-primary btn-lg daily-diario-submit-btn">

@@ -38,6 +38,16 @@ function parseOrderAssignees(assignees) {
   return Array.isArray(assignees) ? assignees : [];
 }
 
+/** VIP paid sem tickets: sync deve re-chamar fulfill (não só retornar paid). */
+function shouldRefulfillPaidOrder(order, ticketCount) {
+  return (
+    !!order &&
+    order.status === 'paid' &&
+    Number(ticketCount) === 0 &&
+    order.source === 'vip'
+  );
+}
+
 /**
  * Gera tickets por titular, marca pedido como pago e envia e-mails agrupados.
  * Idempotente se o pedido já estiver paid e já tiver tickets.
@@ -623,6 +633,12 @@ router.post('/issue-vip', authenticateToken, requirePermission('eventos', 'lotes
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Lote VIP não encontrado' });
     }
+    if (!lot_id && lotRes.rows.length > 1) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        error: 'Há mais de um lote VIP neste evento; informe lot_id'
+      });
+    }
 
     const lot = lotRes.rows[0];
     if (!lot.event_active) {
@@ -899,19 +915,30 @@ router.post('/orders/:id/sync', async (req, res) => {
     }
 
     const orderRes = await query(
-      `SELECT id, status FROM ${table('ticket_orders')} WHERE id = $1`,
+      `SELECT id, status, source FROM ${table('ticket_orders')} WHERE id = $1`,
       [orderId]
     );
     if (orderRes.rows.length === 0) {
       return res.status(404).json({ error: 'Pedido não encontrado' });
     }
 
-    if (orderRes.rows[0].status === 'paid') {
+    const order = orderRes.rows[0];
+
+    if (order.status === 'paid') {
+      const ticketCountRes = await query(
+        `SELECT COUNT(*)::int AS count FROM ${table('tickets')} WHERE order_id = $1`,
+        [orderId]
+      );
+      const ticketCount = ticketCountRes.rows[0].count;
+      if (shouldRefulfillPaidOrder(order, ticketCount)) {
+        await fulfillPaidOrder(orderId, null);
+        return res.json({ status: 'paid', synced: true });
+      }
       return res.json({ status: 'paid', synced: false });
     }
 
-    if (orderRes.rows[0].status !== 'pending') {
-      return res.json({ status: orderRes.rows[0].status, synced: false });
+    if (order.status !== 'pending') {
+      return res.json({ status: order.status, synced: false });
     }
 
     const approved = await findApprovedPaymentByOrderId(orderId);
@@ -929,3 +956,4 @@ router.post('/orders/:id/sync', async (req, res) => {
 
 module.exports = router;
 module.exports.fulfillPaidOrder = fulfillPaidOrder;
+module.exports.shouldRefulfillPaidOrder = shouldRefulfillPaidOrder;

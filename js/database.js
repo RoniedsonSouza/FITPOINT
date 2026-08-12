@@ -771,6 +771,19 @@ const DB = {
     return response.json();
   },
 
+  async issueVipTicket(payload) {
+    const response = await fetch(`${getApiBaseUrl()}/tickets/issue-vip`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Erro ao emitir ingresso VIP');
+    }
+    return response.json();
+  },
+
   // Remove um produto
   async deleteProduct(id) {
     try {

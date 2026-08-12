@@ -560,6 +560,161 @@ router.post('/webhooks/mercadopago', async (req, res) => {
   }
 });
 
+// POST /api/tickets/issue-vip — admin (cortesia; sem Mercado Pago)
+router.post('/issue-vip', authenticateToken, requirePermission('eventos', 'lotes'), async (req, res) => {
+  const client = await getClient();
+  try {
+    const {
+      event_id,
+      lot_id,
+      quantity = 1,
+      buyer_name,
+      buyer_email,
+      buyer_phone
+    } = req.body;
+
+    if (!event_id) {
+      return res.status(400).json({ error: 'Evento é obrigatório' });
+    }
+    if (!buyer_name || !String(buyer_name).trim()) {
+      return res.status(400).json({ error: 'Nome é obrigatório' });
+    }
+    if (!buyer_email || !String(buyer_email).trim()) {
+      return res.status(400).json({ error: 'E-mail é obrigatório' });
+    }
+    const email = String(buyer_email).trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'E-mail inválido' });
+    }
+    const qty = parseInt(quantity, 10);
+    if (!qty || qty < 1 || qty > 10) {
+      return res.status(400).json({ error: 'Quantidade deve ser entre 1 e 10' });
+    }
+
+    const normalized = normalizeAssignees(req.body.assignees, qty);
+    if (!normalized.ok) {
+      return res.status(400).json({ error: normalized.error });
+    }
+
+    await client.query('BEGIN');
+
+    let lotRes;
+    if (lot_id) {
+      lotRes = await client.query(
+        `SELECT l.*, e.id AS event_id, e.title AS event_title, e.active AS event_active
+         FROM ${table('ticket_lots')} l
+         JOIN ${table('events')} e ON e.id = l.event_id
+         WHERE l.id = $1 AND l.is_vip = true AND l.event_id = $2
+         FOR UPDATE OF l`,
+        [lot_id, event_id]
+      );
+    } else {
+      lotRes = await client.query(
+        `SELECT l.*, e.id AS event_id, e.title AS event_title, e.active AS event_active
+         FROM ${table('ticket_lots')} l
+         JOIN ${table('events')} e ON e.id = l.event_id
+         WHERE l.event_id = $1 AND l.is_vip = true
+         FOR UPDATE OF l`,
+        [event_id]
+      );
+    }
+
+    if (lotRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Lote VIP não encontrado' });
+    }
+
+    const lot = lotRes.rows[0];
+    if (!lot.event_active) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Evento indisponível' });
+    }
+    if (lot.active === false) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Lote VIP inativo' });
+    }
+
+    const available = Number(lot.quantity_total) - Number(lot.quantity_sold);
+    if (qty > available) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: `Restam apenas ${available} ingresso(s) VIP` });
+    }
+
+    const reserve = await client.query(
+      `UPDATE ${table('ticket_lots')}
+       SET quantity_sold = quantity_sold + $1, updated_at = NOW()
+       WHERE id = $2
+         AND quantity_sold + $1 <= quantity_total
+       RETURNING *`,
+      [qty, lot.id]
+    );
+
+    if (reserve.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Estoque VIP insuficiente' });
+    }
+
+    const orderRes = await client.query(
+      `INSERT INTO ${table('ticket_orders')}
+        (event_id, lot_id, buyer_name, buyer_email, buyer_phone, quantity, amount, status, source, assignees, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 0, 'paid', 'vip', $7::jsonb, NOW(), NOW())
+       RETURNING *`,
+      [
+        lot.event_id,
+        lot.id,
+        String(buyer_name).trim(),
+        email,
+        buyer_phone ? String(buyer_phone).trim() : null,
+        qty,
+        JSON.stringify(normalized.value)
+      ]
+    );
+
+    const order = orderRes.rows[0];
+    await client.query('COMMIT');
+
+    let fulfill;
+    try {
+      fulfill = await fulfillPaidOrder(order.id, null);
+    } catch (fulfillErr) {
+      console.error('Pedido VIP criado, falha ao emitir ingressos:', fulfillErr);
+      return res.status(500).json({
+        error: 'Pedido criado, mas falha ao emitir ingressos. Tente sincronizar depois.',
+        order_id: order.id
+      });
+    }
+
+    if (!fulfill.ok) {
+      return res.status(500).json({
+        error: 'Pedido criado, mas falha ao emitir ingressos',
+        order_id: order.id
+      });
+    }
+
+    const tickets = (fulfill.tickets || []).map((t) => ({
+      id: t.id,
+      code: t.code,
+      buyer_name: t.buyer_name,
+      buyer_email: t.buyer_email
+    }));
+
+    return res.status(201).json({
+      order_id: order.id,
+      tickets
+    });
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (_) {
+      /* ignore */
+    }
+    console.error('Erro ao emitir VIP:', error);
+    res.status(500).json({ error: 'Erro ao emitir ingresso VIP' });
+  } finally {
+    client.release();
+  }
+});
+
 // GET /api/tickets — admin
 router.get('/', authenticateToken, requirePermission('eventos'), async (req, res) => {
   try {

@@ -79,6 +79,42 @@
       border: 1px solid var(--fp-green);
     }
 
+    .btn-sm {
+      min-height: 2.25rem;
+      padding: 0.4rem 0.85rem;
+      font-size: 0.8125rem;
+    }
+
+    .checkout-assignee-slot {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      padding: 0.875rem 1rem;
+      border: 1.5px solid #e5e7eb;
+      border-radius: var(--field-radius);
+      background: #fff;
+    }
+
+    .checkout-assignee-slot__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .checkout-assignee-slot__head p {
+      margin: 0;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--fp-ink);
+    }
+
+    .checkout-assignee-fields {
+      display: grid;
+      gap: 0.5rem;
+    }
+
     .container-edge {
       max-width: 72rem;
       margin: 0 auto;
@@ -505,11 +541,17 @@
           <div class="field">
             <label for="checkout-email">E-mail</label>
             <input type="email" id="checkout-email" required autocomplete="email" placeholder="Para receber o ingresso">
-            <p class="field-hint">Enviaremos o QR Code neste e-mail após a confirmação do pagamento.</p>
+            <p class="field-hint" id="checkout-email-hint">Enviaremos o QR Code neste e-mail após a confirmação do pagamento.</p>
           </div>
           <div class="field">
             <label for="checkout-phone">Telefone <span class="font-normal text-black/40">(opcional)</span></label>
             <input type="tel" id="checkout-phone" autocomplete="tel" inputmode="numeric" placeholder="(00) 00000-0000" maxlength="15">
+          </div>
+
+          <div id="checkout-gift-section" class="field hidden">
+            <label>Destinatários dos ingressos</label>
+            <p class="field-hint">Por padrão todos ficam no seu nome. Use “Dar ingresso” para enviar o QR a outra pessoa.</p>
+            <div id="checkout-assignee-slots"></div>
           </div>
 
           <div class="field">

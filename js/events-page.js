@@ -4,6 +4,9 @@
   let eventsData = [];
   let currentEvent = null;
   let currentLots = [];
+  let checkoutAssignees = [];
+  const DEFAULT_EMAIL_HINT = 'Enviaremos o QR Code neste e-mail após a confirmação do pagamento.';
+  const GIFTED_EMAIL_HINT = 'Cada pessoa receberá o QR no e-mail informado.';
 
   function apiBase() {
     return window.FitPointConfig?.API_BASE_URL ||
@@ -267,9 +270,169 @@
     }
 
     document.getElementById('checkout-qty').value = '1';
+    checkoutAssignees = [null];
+    renderCheckoutAssigneeSlots();
     resetPaymentPanels();
     updateTotal();
     panel.classList.remove('hidden');
+  }
+
+  function getCheckoutQty() {
+    const raw = parseInt(document.getElementById('checkout-qty')?.value, 10);
+    if (!raw || raw < 1) return 1;
+    return Math.min(10, raw);
+  }
+
+  function ensureCheckoutAssigneesLength(qty) {
+    const next = [];
+    for (let i = 0; i < qty; i++) {
+      next.push(checkoutAssignees[i] || null);
+    }
+    checkoutAssignees = next;
+  }
+
+  function updateCheckoutEmailHint() {
+    const hintEl = document.getElementById('checkout-email-hint');
+    if (!hintEl) return;
+    const hasGifts = checkoutAssignees.some((a) => a !== null);
+    hintEl.textContent = hasGifts ? GIFTED_EMAIL_HINT : DEFAULT_EMAIL_HINT;
+  }
+
+  function renderCheckoutAssigneeSlots() {
+    const section = document.getElementById('checkout-gift-section');
+    const container = document.getElementById('checkout-assignee-slots');
+    if (!container || !section) return;
+
+    const qty = getCheckoutQty();
+    ensureCheckoutAssigneesLength(qty);
+    section.classList.toggle('hidden', qty < 1);
+
+    container.innerHTML = checkoutAssignees
+      .map((assignee, index) => {
+        const gifted = assignee !== null;
+        const label =
+          gifted && String(assignee.name || '').trim()
+            ? escapeHtml(String(assignee.name).trim())
+            : gifted
+              ? 'Nome doado'
+              : 'Seu nome';
+        return `
+          <div class="checkout-assignee-slot" data-checkout-slot="${index}">
+            <div class="checkout-assignee-slot__head">
+              <p>Ingresso ${index + 1} — ${label}</p>
+              ${
+                gifted
+                  ? `<button type="button" class="btn btn-outline btn-sm" data-checkout-assignee-action="clear" data-checkout-slot="${index}">Limpar</button>`
+                  : `<button type="button" class="btn btn-outline btn-sm" data-checkout-assignee-action="gift" data-checkout-slot="${index}">Dar ingresso</button>`
+              }
+            </div>
+            ${
+              gifted
+                ? `<div class="checkout-assignee-fields">
+                    <input type="text" class="checkout-slot-name" data-checkout-slot="${index}" value="${escapeHtml(assignee.name || '')}" placeholder="Nome do destinatário" autocomplete="name">
+                    <input type="email" class="checkout-slot-email" data-checkout-slot="${index}" value="${escapeHtml(assignee.email || '')}" placeholder="E-mail do destinatário" autocomplete="email">
+                    <input type="tel" class="checkout-slot-phone" data-checkout-slot="${index}" value="${escapeHtml(assignee.phone || '')}" placeholder="Telefone (opcional)" autocomplete="tel">
+                  </div>`
+                : ''
+            }
+          </div>`;
+      })
+      .join('');
+
+    updateCheckoutEmailHint();
+  }
+
+  function giftCheckoutAssigneeSlot(index) {
+    ensureCheckoutAssigneesLength(getCheckoutQty());
+    if (index < 0 || index >= checkoutAssignees.length) return;
+    checkoutAssignees[index] = { name: '', email: '', phone: '' };
+    renderCheckoutAssigneeSlots();
+    document.querySelector(`.checkout-slot-name[data-checkout-slot="${index}"]`)?.focus();
+  }
+
+  function clearCheckoutAssigneeSlot(index) {
+    ensureCheckoutAssigneesLength(getCheckoutQty());
+    if (index < 0 || index >= checkoutAssignees.length) return;
+    checkoutAssignees[index] = null;
+    renderCheckoutAssigneeSlots();
+  }
+
+  function updateCheckoutAssigneeField(index, field, value) {
+    ensureCheckoutAssigneesLength(getCheckoutQty());
+    if (index < 0 || index >= checkoutAssignees.length) return;
+    if (!checkoutAssignees[index]) checkoutAssignees[index] = { name: '', email: '', phone: '' };
+    checkoutAssignees[index][field] = value;
+    const labelEl = document.querySelector(
+      `.checkout-assignee-slot[data-checkout-slot="${index}"] .checkout-assignee-slot__head p`
+    );
+    if (labelEl && field === 'name') {
+      const name = String(value || '').trim();
+      labelEl.textContent = `Ingresso ${index + 1} — ${name || 'Nome doado'}`;
+    }
+  }
+
+  function buildAssigneesPayload(qty) {
+    ensureCheckoutAssigneesLength(qty);
+    return checkoutAssignees.slice(0, qty).map((a) => {
+      if (!a) return null;
+      const phone = String(a.phone || '').trim();
+      return {
+        name: String(a.name || '').trim(),
+        email: String(a.email || '').trim(),
+        phone: phone || undefined
+      };
+    });
+  }
+
+  function validateCheckoutAssignees(qty) {
+    ensureCheckoutAssigneesLength(qty);
+    for (let i = 0; i < qty; i++) {
+      const a = checkoutAssignees[i];
+      if (!a) continue;
+      const name = String(a.name || '').trim();
+      const email = String(a.email || '').trim();
+      if (!name || !email) {
+        return `Preencha nome e e-mail do destinatário do ingresso ${i + 1}`;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return `E-mail do destinatário do ingresso ${i + 1} é inválido`;
+      }
+    }
+    return null;
+  }
+
+  function onCheckoutQtyChange() {
+    const qtyEl = document.getElementById('checkout-qty');
+    if (qtyEl) {
+      let qty = parseInt(qtyEl.value, 10);
+      if (!qty || qty < 1) qty = 1;
+      if (qty > 10) qty = 10;
+      qtyEl.value = String(qty);
+    }
+    renderCheckoutAssigneeSlots();
+    updateTotal();
+  }
+
+  function onCheckoutAssigneeClick(e) {
+    const btn = e.target.closest('[data-checkout-assignee-action]');
+    if (!btn) return;
+    const index = Number(btn.dataset.checkoutSlot);
+    if (Number.isNaN(index)) return;
+    if (btn.dataset.checkoutAssigneeAction === 'gift') giftCheckoutAssigneeSlot(index);
+    if (btn.dataset.checkoutAssigneeAction === 'clear') clearCheckoutAssigneeSlot(index);
+  }
+
+  function onCheckoutAssigneeInput(e) {
+    const input = e.target.closest('.checkout-slot-name, .checkout-slot-email, .checkout-slot-phone');
+    if (!input) return;
+    const index = Number(input.dataset.checkoutSlot);
+    if (Number.isNaN(index)) return;
+    const field = input.classList.contains('checkout-slot-name')
+      ? 'name'
+      : input.classList.contains('checkout-slot-email')
+        ? 'email'
+        : 'phone';
+    updateCheckoutAssigneeField(index, field, input.value);
   }
 
   async function loadEventDetail() {
@@ -811,12 +974,20 @@
     const errEl = document.getElementById('checkout-error');
     errEl?.classList.add('hidden');
 
+    const qty = parseInt(document.getElementById('checkout-qty').value, 10) || 1;
+    const assigneeError = validateCheckoutAssignees(qty);
+    if (assigneeError) {
+      showCheckoutError(assigneeError);
+      return;
+    }
+
     const payload = {
       lot_id: Number(document.getElementById('checkout-lot').value),
-      quantity: parseInt(document.getElementById('checkout-qty').value, 10) || 1,
+      quantity: qty,
       buyer_name: document.getElementById('checkout-name').value.trim(),
       buyer_email: document.getElementById('checkout-email').value.trim(),
       buyer_phone: onlyDigits(document.getElementById('checkout-phone').value) || undefined,
+      assignees: buildAssigneesPayload(qty),
       payment_method: paymentMethod
     };
 
@@ -882,7 +1053,9 @@
       loadEvents();
     }
     document.getElementById('checkout-lot')?.addEventListener('change', updateTotal);
-    document.getElementById('checkout-qty')?.addEventListener('input', updateTotal);
+    document.getElementById('checkout-qty')?.addEventListener('input', onCheckoutQtyChange);
+    document.getElementById('checkout-assignee-slots')?.addEventListener('click', onCheckoutAssigneeClick);
+    document.getElementById('checkout-assignee-slots')?.addEventListener('input', onCheckoutAssigneeInput);
     document.getElementById('checkout-form')?.addEventListener('submit', submitCheckout);
     document.getElementById('pay-method-pix')?.addEventListener('click', () => setPaymentMethod('pix'));
     document.getElementById('pay-method-card')?.addEventListener('click', () => setPaymentMethod('card'));

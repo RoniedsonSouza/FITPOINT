@@ -30,3 +30,7 @@ build/
 
 # Imagens enviadas pelo admin (geradas em runtime)
 uploads/
+
+# Git worktrees
+.worktrees/
+

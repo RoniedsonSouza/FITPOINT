@@ -377,6 +377,23 @@ RESEND_FROM=FitPoint <ingressos@seudominio.com>
 
 ---
 
+## 8. Ingresso VIP e Dar ingresso
+
+### Ingresso VIP (cortesia)
+
+- No admin → **Eventos** → aba **Lotes**, use **Criar lote VIP**. Cria um lote oculto (`is_vip`), nome fixo “Ingresso VIP”, preço R$ 0 — **no máximo um por evento**.
+- Esse lote **não aparece** em `eventos.html` / `evento.html` (listagens públicas filtram lotes VIP).
+- Emissão só no admin → aba **Ingressos** → **Emitir VIP**: quantidade 1–10, dados do emissor e slots **Dar ingresso**. Chama `POST /api/tickets/issue-vip` **sem Mercado Pago**; pedido nasce `paid` com `source = 'vip'`.
+- Cada titular recebe e-mail com QR (copy de cortesia). Na lista admin, ingressos VIP exibem badge **VIP**.
+
+### Dar ingresso (checkout pago)
+
+- No checkout público (lotes **não-VIP**), quantidade 1–10: por slot, **Dar ingresso** abre nome, e-mail e telefone do destinatário.
+- O body de `POST /api/tickets/checkout` pode incluir `assignees` (array do tamanho da quantidade; `null` = comprador, objeto = titular do slot).
+- Após pagamento, cada titular recebe só o(s) ingresso(s) dele. Lotes VIP via checkout retornam **400**.
+
+---
+
 ## Links úteis
 
 | Serviço | Link |

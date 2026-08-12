@@ -5,6 +5,8 @@ let editingLotId = null;
 let selectedEventId = null;
 let currentEventTab = 'lotes';
 let eventsCache = [];
+let eventLotsCache = [];
+let vipIssueAssignees = [];
 let savedEventLogoUrl = null;
 let savedEventCoverUrl = null;
 let ticketQrScanner = null;
@@ -332,6 +334,7 @@ async function loadEventDetail(id, tab = null) {
   lotsEl.innerHTML = '<p class="text-black/60 text-sm">Carregando lotes…</p>';
   try {
     const lots = await DB.getEventLots(id);
+    eventLotsCache = Array.isArray(lots) ? lots : [];
     if (!lots.length) {
       lotsEl.innerHTML = canManageLotsUi()
         ? '<p class="text-black/60 text-sm">Nenhum lote. Crie o primeiro lote de ingressos.</p>'
@@ -341,7 +344,10 @@ async function loadEventDetail(id, tab = null) {
       lotsEl.innerHTML = lots.map((lot) => `
         <div class="card flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h4 class="font-semibold text-sm">${escapeHtml(lot.name)}</h4>
+            <h4 class="font-semibold text-sm flex items-center gap-2 flex-wrap">
+              ${escapeHtml(lot.name)}
+              ${lot.is_vip ? '<span class="diario-option-badge">VIP</span>' : ''}
+            </h4>
             <p class="text-xs text-black/50 mt-1">
               ${formatBRL(lot.price)} · ${lot.quantity_sold}/${lot.quantity_total} vendidos
               · ${lot.quantity_available} disponíveis
@@ -364,6 +370,7 @@ async function loadEventDetail(id, tab = null) {
     refreshIcons();
   } catch (error) {
     if (handleAuthError(error)) return;
+    eventLotsCache = [];
     lotsEl.innerHTML = '<p class="text-red-600 text-sm">Erro ao carregar lotes.</p>';
   }
 }
@@ -685,7 +692,30 @@ async function deleteEvent(id) {
   }
 }
 
-function openLotModal(lotId = null) {
+function setLotVipMode(isVip) {
+  const isVipInput = document.getElementById('lot-is-vip');
+  const nameEl = document.getElementById('lot-name');
+  const priceEl = document.getElementById('lot-price');
+  const promoSection = document.getElementById('lot-promo-section');
+  const promoEnabled = document.getElementById('lot-promo-enabled');
+
+  if (isVipInput) isVipInput.value = isVip ? 'true' : 'false';
+  if (nameEl) {
+    nameEl.readOnly = isVip;
+    if (isVip) nameEl.value = 'Ingresso VIP';
+  }
+  if (priceEl) {
+    priceEl.readOnly = isVip;
+    if (isVip) priceEl.value = '0';
+  }
+  if (promoSection) promoSection.classList.toggle('hidden', isVip);
+  if (isVip && promoEnabled) {
+    promoEnabled.checked = false;
+    toggleLotPromoFields();
+  }
+}
+
+function openLotModal(lotId = null, options = {}) {
   if (!canManageLotsUi()) {
     showToast('Sem permissão para gerenciar lotes', 'error');
     return;
@@ -698,10 +728,12 @@ function openLotModal(lotId = null) {
   const modal = document.getElementById('lot-modal');
   const title = document.getElementById('lot-modal-title');
   const form = document.getElementById('lot-form');
+  const createVip = options.vip === true && !lotId;
 
   if (lotId) {
     title.textContent = 'Editar lote';
     DB.getEventLots(selectedEventId).then((lots) => {
+      eventLotsCache = Array.isArray(lots) ? lots : [];
       const lot = lots.find((l) => l.id === lotId);
       if (!lot) return;
       document.getElementById('lot-id-input').value = lot.id;
@@ -715,8 +747,19 @@ function openLotModal(lotId = null) {
       document.getElementById('lot-promo-qty').value = lot.promo_qty ?? '';
       document.getElementById('lot-promo-price').value = lot.promo_price ?? '';
       document.getElementById('lot-promo-mode').value = lot.promo_mode || 'repeat';
+      setLotVipMode(lot.is_vip === true);
+      if (lot.is_vip) title.textContent = 'Editar lote VIP';
       toggleLotPromoFields();
     });
+  } else if (createVip) {
+    title.textContent = 'Novo lote VIP';
+    form.reset();
+    document.getElementById('lot-id-input').value = '';
+    document.getElementById('lot-active').checked = true;
+    document.getElementById('lot-promo-enabled').checked = false;
+    document.getElementById('lot-promo-mode').value = 'repeat';
+    setLotVipMode(true);
+    toggleLotPromoFields();
   } else {
     title.textContent = 'Novo lote';
     form.reset();
@@ -724,6 +767,7 @@ function openLotModal(lotId = null) {
     document.getElementById('lot-active').checked = true;
     document.getElementById('lot-promo-enabled').checked = false;
     document.getElementById('lot-promo-mode').value = 'repeat';
+    setLotVipMode(false);
     toggleLotPromoFields();
   }
   modal.classList.add('active');
@@ -732,31 +776,61 @@ function openLotModal(lotId = null) {
 function closeLotModal() {
   document.getElementById('lot-modal')?.classList.remove('active');
   editingLotId = null;
+  setLotVipMode(false);
 }
 
 function editLot(id) {
   openLotModal(id);
 }
 
+async function openVipLotModal() {
+  if (!canManageLotsUi()) {
+    showToast('Sem permissão para gerenciar lotes', 'error');
+    return;
+  }
+  if (!selectedEventId) {
+    showToast('Abra um evento para gerenciar lotes', 'error');
+    return;
+  }
+  try {
+    let lots = eventLotsCache;
+    if (!Array.isArray(lots) || !lots.length) {
+      lots = await DB.getEventLots(selectedEventId);
+      eventLotsCache = Array.isArray(lots) ? lots : [];
+    }
+    const existing = (lots || []).find((l) => l.is_vip === true);
+    if (existing) {
+      showToast('Já existe lote VIP');
+      editLot(existing.id);
+      return;
+    }
+    openLotModal(null, { vip: true });
+  } catch (error) {
+    if (!handleAuthError(error)) showToast('Erro: ' + error.message, 'error');
+  }
+}
+
 async function saveLot(event) {
   event.preventDefault();
   if (!selectedEventId) return;
   const btn = event.submitter || document.querySelector('#lot-form button[type="submit"]');
-  const promoEnabled = document.getElementById('lot-promo-enabled').checked;
+  const isVip = document.getElementById('lot-is-vip')?.value === 'true';
+  const promoEnabled = !isVip && document.getElementById('lot-promo-enabled').checked;
   const promoQtyRaw = document.getElementById('lot-promo-qty').value;
   const promoPriceRaw = document.getElementById('lot-promo-price').value;
   const payload = {
-    name: document.getElementById('lot-name').value.trim(),
-    price: parseFloat(document.getElementById('lot-price').value),
+    name: isVip ? 'Ingresso VIP' : document.getElementById('lot-name').value.trim(),
+    price: isVip ? 0 : parseFloat(document.getElementById('lot-price').value),
     quantity_total: parseInt(document.getElementById('lot-quantity').value, 10),
     sales_start: fromDatetimeLocalValue(document.getElementById('lot-sales-start').value),
     sales_end: fromDatetimeLocalValue(document.getElementById('lot-sales-end').value),
     active: document.getElementById('lot-active').checked,
     promo_enabled: promoEnabled,
-    promo_qty: promoQtyRaw ? parseInt(promoQtyRaw, 10) : null,
-    promo_price: promoPriceRaw ? parseFloat(promoPriceRaw) : null,
-    promo_mode: document.getElementById('lot-promo-mode').value || 'repeat'
+    promo_qty: promoEnabled && promoQtyRaw ? parseInt(promoQtyRaw, 10) : null,
+    promo_price: promoEnabled && promoPriceRaw ? parseFloat(promoPriceRaw) : null,
+    promo_mode: promoEnabled ? (document.getElementById('lot-promo-mode').value || 'repeat') : 'repeat'
   };
+  if (isVip) payload.is_vip = true;
 
   if (promoEnabled) {
     if (!payload.promo_qty || payload.promo_qty < 2) {
@@ -780,7 +854,7 @@ async function saveLot(event) {
         showToast('Lote atualizado!');
       } else {
         await DB.addEventLot(selectedEventId, payload);
-        showToast('Lote criado!');
+        showToast(isVip ? 'Lote VIP criado!' : 'Lote criado!');
       }
       closeLotModal();
       await loadEventDetail(selectedEventId, 'lotes');
@@ -817,6 +891,10 @@ function renderTicketStatusText(status) {
   return ticketStatusInfo(status).label;
 }
 
+function renderVipBadge(isVip) {
+  return isVip ? '<span class="diario-option-badge">VIP</span>' : '';
+}
+
 async function loadTicketsAdmin() {
   const container = document.getElementById('tickets-admin-list');
   const statusFilter = document.getElementById('tickets-status-filter');
@@ -844,7 +922,10 @@ async function loadTicketsAdmin() {
           <article class="tickets-admin-card">
             <div class="tickets-admin-card-head">
               <span class="tickets-admin-card-code" title="${escapeHtml(t.code)}">${escapeHtml(t.code)}</span>
-              ${renderTicketStatusBadge(t.status)}
+              <span class="flex items-center gap-1.5">
+                ${renderVipBadge(t.is_vip)}
+                ${renderTicketStatusBadge(t.status)}
+              </span>
             </div>
             <p class="tickets-admin-card-buyer" title="${escapeHtml(t.buyer_name)}">${escapeHtml(t.buyer_name)}</p>
             <p class="tickets-admin-card-meta" title="${escapeHtml(t.buyer_email)} · ${escapeHtml(t.lot_name)}">
@@ -871,7 +952,12 @@ async function loadTicketsAdmin() {
               <tr class="border-b border-black/5">
                 <td class="py-2 pr-3 font-mono text-xs">${escapeHtml(t.code)}</td>
                 <td class="py-2 pr-3">${escapeHtml(t.buyer_name)}<br><span class="text-xs text-black/50">${escapeHtml(t.buyer_email)}</span></td>
-                <td class="py-2 pr-3">${escapeHtml(t.lot_name)}</td>
+                <td class="py-2 pr-3">
+                  <span class="inline-flex items-center gap-1.5 flex-wrap">
+                    ${escapeHtml(t.lot_name)}
+                    ${renderVipBadge(t.is_vip)}
+                  </span>
+                </td>
                 <td class="py-2">${renderTicketStatusText(t.status)}</td>
               </tr>`
               )
@@ -885,6 +971,183 @@ async function loadTicketsAdmin() {
     if (handleAuthError(error)) return;
     container.innerHTML = '<p class="text-red-600 text-sm">Erro ao carregar ingressos.</p>';
   }
+}
+
+function getVipIssueQty() {
+  const raw = parseInt(document.getElementById('vip-issue-qty')?.value, 10);
+  if (!raw || raw < 1) return 1;
+  return Math.min(10, raw);
+}
+
+function ensureVipIssueAssigneesLength(qty) {
+  const next = [];
+  for (let i = 0; i < qty; i++) {
+    next.push(vipIssueAssignees[i] || null);
+  }
+  vipIssueAssignees = next;
+}
+
+function renderVipAssigneeSlots() {
+  const container = document.getElementById('vip-assignee-slots');
+  if (!container) return;
+  const qty = getVipIssueQty();
+  ensureVipIssueAssigneesLength(qty);
+  container.innerHTML = vipIssueAssignees
+    .map((assignee, index) => {
+      const gifted = assignee !== null;
+      const label =
+        gifted && String(assignee.name || '').trim()
+          ? escapeHtml(String(assignee.name).trim())
+          : gifted
+            ? 'destinatário'
+            : 'você';
+      return `
+        <div class="border border-black/10 rounded-lg p-3" data-vip-slot="${index}">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <p class="text-sm font-semibold mb-0">Ingresso ${index + 1} — ${label}</p>
+            ${
+              gifted
+                ? `<button type="button" class="btn btn-outline btn-sm" onclick="clearVipAssigneeSlot(${index})">Remover</button>`
+                : `<button type="button" class="btn btn-outline btn-sm" onclick="giftVipAssigneeSlot(${index})">Dar ingresso</button>`
+            }
+          </div>
+          ${
+            gifted
+              ? `<div class="grid gap-2 mt-3">
+                  <input type="text" class="vip-slot-name" data-vip-slot="${index}" value="${escapeHtml(assignee.name || '')}" placeholder="Nome" required oninput="updateVipAssigneeField(${index}, 'name', this.value)">
+                  <input type="email" class="vip-slot-email" data-vip-slot="${index}" value="${escapeHtml(assignee.email || '')}" placeholder="E-mail" required oninput="updateVipAssigneeField(${index}, 'email', this.value)">
+                  <input type="tel" class="vip-slot-phone" data-vip-slot="${index}" value="${escapeHtml(assignee.phone || '')}" placeholder="Telefone" required oninput="updateVipAssigneeField(${index}, 'phone', this.value)">
+                </div>`
+              : ''
+          }
+        </div>`;
+    })
+    .join('');
+}
+
+function onVipIssueQtyChange() {
+  const qtyEl = document.getElementById('vip-issue-qty');
+  if (qtyEl) {
+    let qty = parseInt(qtyEl.value, 10);
+    if (!qty || qty < 1) qty = 1;
+    if (qty > 10) qty = 10;
+    qtyEl.value = String(qty);
+  }
+  renderVipAssigneeSlots();
+}
+
+function giftVipAssigneeSlot(index) {
+  ensureVipIssueAssigneesLength(getVipIssueQty());
+  if (index < 0 || index >= vipIssueAssignees.length) return;
+  vipIssueAssignees[index] = { name: '', email: '', phone: '' };
+  renderVipAssigneeSlots();
+  const nameInput = document.querySelector(`.vip-slot-name[data-vip-slot="${index}"]`);
+  nameInput?.focus();
+}
+
+function clearVipAssigneeSlot(index) {
+  ensureVipIssueAssigneesLength(getVipIssueQty());
+  if (index < 0 || index >= vipIssueAssignees.length) return;
+  vipIssueAssignees[index] = null;
+  renderVipAssigneeSlots();
+}
+
+function updateVipAssigneeField(index, field, value) {
+  ensureVipIssueAssigneesLength(getVipIssueQty());
+  if (index < 0 || index >= vipIssueAssignees.length) return;
+  if (!vipIssueAssignees[index]) vipIssueAssignees[index] = { name: '', email: '', phone: '' };
+  vipIssueAssignees[index][field] = value;
+}
+
+function buildVipAssigneesPayload(qty) {
+  ensureVipIssueAssigneesLength(qty);
+  return vipIssueAssignees.slice(0, qty).map((a) => {
+    if (!a || !String(a.name || '').trim()) return null;
+    return {
+      name: String(a.name || '').trim(),
+      email: String(a.email || '').trim(),
+      phone: String(a.phone || '').trim()
+    };
+  });
+}
+
+async function openVipIssueModal() {
+  if (!canManageLotsUi()) {
+    showToast('Sem permissão para emitir VIP', 'error');
+    return;
+  }
+  if (!selectedEventId) {
+    showToast('Abra um evento para emitir VIP', 'error');
+    return;
+  }
+  try {
+    let lots = eventLotsCache;
+    if (!Array.isArray(lots) || !lots.length) {
+      lots = await DB.getEventLots(selectedEventId);
+      eventLotsCache = Array.isArray(lots) ? lots : [];
+    }
+    const vipLot = (lots || []).find((l) => l.is_vip === true);
+    if (!vipLot) {
+      showToast('Crie um lote VIP antes de emitir', 'error');
+      return;
+    }
+  } catch (error) {
+    if (!handleAuthError(error)) showToast('Erro: ' + error.message, 'error');
+    return;
+  }
+
+  const form = document.getElementById('vip-issue-form');
+  form?.reset();
+  const qtyEl = document.getElementById('vip-issue-qty');
+  if (qtyEl) qtyEl.value = '1';
+  vipIssueAssignees = [null];
+  renderVipAssigneeSlots();
+  document.getElementById('vip-issue-modal')?.classList.add('active');
+  refreshIcons();
+}
+
+function closeVipIssueModal() {
+  document.getElementById('vip-issue-modal')?.classList.remove('active');
+  vipIssueAssignees = [];
+}
+
+async function submitVipIssue(event) {
+  event.preventDefault();
+  if (!selectedEventId) return;
+  const btn = event.submitter || document.querySelector('#vip-issue-form button[type="submit"]');
+  const quantity = getVipIssueQty();
+  const buyer_name = document.getElementById('vip-issue-name')?.value.trim() || '';
+  const buyer_email = document.getElementById('vip-issue-email')?.value.trim() || '';
+  const buyer_phone = document.getElementById('vip-issue-phone')?.value.trim() || '';
+  const assignees = buildVipAssigneesPayload(quantity);
+
+  for (let i = 0; i < assignees.length; i++) {
+    const a = assignees[i];
+    if (!a) continue;
+    if (!a.name || !a.email || !a.phone) {
+      showToast(`Preencha nome, e-mail e telefone do ingresso ${i + 1}`, 'error');
+      return;
+    }
+  }
+
+  await withButtonLoading(btn, async () => {
+    try {
+      await DB.issueVipTicket({
+        event_id: selectedEventId,
+        quantity,
+        buyer_name,
+        buyer_email,
+        buyer_phone,
+        assignees
+      });
+      closeVipIssueModal();
+      showToast('Ingresso(s) VIP emitido(s)!');
+      await loadTicketsAdmin();
+      if (selectedEventId) await loadEventDetail(selectedEventId, 'ingressos');
+    } catch (error) {
+      if (!handleAuthError(error)) showToast('Erro: ' + error.message, 'error');
+    }
+  }, 'Emitindo…');
 }
 
 async function submitTicketValidation(code, options = {}) {

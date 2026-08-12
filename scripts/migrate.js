@@ -315,6 +315,7 @@ async function migrate() {
         promo_qty INTEGER,
         promo_price DECIMAL(10,2),
         promo_mode VARCHAR(20) NOT NULL DEFAULT 'repeat',
+        is_vip BOOLEAN NOT NULL DEFAULT false,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       )
@@ -339,6 +340,11 @@ async function migrate() {
     `);
 
     await client.query(`
+      ALTER TABLE ${SCHEMA}.ticket_lots
+      ADD COLUMN IF NOT EXISTS is_vip BOOLEAN NOT NULL DEFAULT false
+    `);
+
+    await client.query(`
       CREATE INDEX IF NOT EXISTS idx_ticket_lots_event ON ${SCHEMA}.ticket_lots(event_id)
     `);
 
@@ -356,9 +362,31 @@ async function migrate() {
           CHECK (status IN ('pending', 'paid', 'cancelled', 'expired')),
         mp_preference_id VARCHAR(255),
         mp_payment_id VARCHAR(255),
+        source VARCHAR(20) NOT NULL DEFAULT 'checkout'
+          CHECK (source IN ('checkout', 'vip')),
+        assignees JSONB,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       )
+    `);
+
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.ticket_orders
+      ADD COLUMN IF NOT EXISTS source VARCHAR(20) NOT NULL DEFAULT 'checkout'
+    `);
+
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.ticket_orders
+      ADD COLUMN IF NOT EXISTS assignees JSONB
+    `);
+
+    await client.query(`
+      DO $$ BEGIN
+        ALTER TABLE ${SCHEMA}.ticket_orders
+          ADD CONSTRAINT ticket_orders_source_check
+          CHECK (source IN ('checkout', 'vip'));
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$;
     `);
 
     await client.query(`
@@ -381,8 +409,14 @@ async function migrate() {
         used_at TIMESTAMP,
         buyer_name VARCHAR(255) NOT NULL,
         buyer_email VARCHAR(255) NOT NULL,
+        buyer_phone VARCHAR(50),
         created_at TIMESTAMP DEFAULT NOW()
       )
+    `);
+
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.tickets
+      ADD COLUMN IF NOT EXISTS buyer_phone VARCHAR(50)
     `);
 
     await client.query(`

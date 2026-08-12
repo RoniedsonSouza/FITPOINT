@@ -1,7 +1,4 @@
 const express = require('express');
-const path = require('path');
-const fs = require('fs');
-const multer = require('multer');
 const jwt = require('jsonwebtoken');
 const router = express.Router();
 const { query, table } = require('../config/database');
@@ -12,6 +9,7 @@ const {
   loadUserById,
   userHasPermission
 } = require('../config/auth');
+const { createImageUploadMiddleware } = require('../middleware/imageUpload');
 
 const HERBALIFE_LEVELS = [
   'Distribuidor Independente',
@@ -36,37 +34,7 @@ const HERBALIFE_LEVELS = [
   'Equipe de Presidente 90K'
 ];
 
-const distributorsUploadDir = path.join(__dirname, '..', 'uploads', 'distributors');
-fs.mkdirSync(distributorsUploadDir, { recursive: true });
-
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, distributorsUploadDir),
-    filename: (req, file, cb) => {
-      const ext = (path.extname(file.originalname) || '').toLowerCase();
-      const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
-      const safeExt = allowed.includes(ext) ? ext : '.jpg';
-      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${safeExt}`);
-    }
-  }),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (/^image\/(jpeg|png|webp|gif)$/i.test(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Use uma imagem JPG, PNG, WebP ou GIF.'));
-    }
-  }
-});
-
-function uploadPhotoMiddleware(req, res, next) {
-  upload.single('image')(req, res, (err) => {
-    if (err) {
-      return res.status(400).json({ error: err.message || 'Erro no upload' });
-    }
-    next();
-  });
-}
+const uploadPhotoMiddleware = createImageUploadMiddleware('distributors');
 
 function mapDistributorRow(row) {
   return {
@@ -190,17 +158,14 @@ router.get('/levels', (req, res) => {
   res.json(HERBALIFE_LEVELS);
 });
 
-// POST /api/distributors/upload-photo — admin
+// POST /api/distributors/upload-photo — admin; salva no banco
 router.post(
   '/upload-photo',
   authenticateToken,
   requirePermission('distribuidores'),
   uploadPhotoMiddleware,
   (req, res) => {
-    if (!req.file) {
-      return res.status(400).json({ error: 'Nenhum arquivo enviado' });
-    }
-    res.status(201).json({ url: `/uploads/distributors/${req.file.filename}` });
+    res.status(201).json({ url: req.savedMedia.url, id: req.savedMedia.id });
   }
 );
 

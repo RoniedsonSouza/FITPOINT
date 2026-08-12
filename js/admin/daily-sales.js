@@ -186,7 +186,7 @@ function updateDiarioCartRowTotal(lineKey) {
     qtyInput?.value,
     discInput?.value
   );
-  const totalEl = row.querySelector('.daily-diario-cart-total strong');
+  const totalEl = row.querySelector('.daily-diario-cart-total');
   if (totalEl) totalEl.textContent = formatCurrency(computeDiarioLineTotal(preview));
   updateDiarioCartSummary();
 }
@@ -635,38 +635,16 @@ function renderDiarioCart() {
   container.innerHTML = diarioCart.map(line => {
     const lineTotal = computeDiarioLineTotal(line);
     const key = getDiarioCartLineKey(line);
-    const optionHint = line.optionName
-      ? `<span class="daily-diario-cart-option">${escapeHtml(line.optionName)}</span>`
-      : '';
+    const label = line.optionName ? `${line.name} · ${line.optionName}` : line.name;
     return `
       <div class="daily-diario-cart-row" data-cart-line="${escapeAttr(key)}">
-        
-        <div class="daily-diario-cart-row-name-header">
-          <div class="daily-diario-cart-row-name">
-            <span class="daily-diario-cart-title">${escapeHtml(line.name)}</span>
-            ${optionHint}
-            <span class="daily-diario-cart-base">Unit.: ${formatCurrency(line.basePrice)}</span>
-          </div>
-          <div>
-            <button type="button" class="btn btn-danger btn-sm btn-icon daily-diario-cart-remove" data-remove-line="${escapeAttr(key)}" title="Remover" aria-label="Remover produto">
-              <i data-lucide="x"></i>
-            </button>
-          </div>
-        </div>
-        <div class="daily-diario-cart-row-fields">
-          <label class="daily-diario-cart-field daily-diario-cart-field--qty">
-            <span>Qtd</span>
-            <input type="number" min="1" step="1" value="${line.quantity}" data-cart-qty inputmode="numeric">
-          </label>
-          <label class="daily-diario-cart-field daily-diario-cart-field--discount">
-            <span>Desc.</span>
-            <input type="number" min="0" step="0.01" value="${formatDecimalInput(line.discount, MONEY_DECIMALS)}" data-cart-discount inputmode="decimal" title="Desconto por unidade (R$)">
-          </label>
-        </div>
-        <div class="daily-diario-cart-total">
-          <span>Total &nbsp;</span>
-          <strong>${formatCurrency(lineTotal)}</strong>
-        </div>
+        <span class="daily-diario-cart-title" title="${escapeAttr(label)}">${escapeHtml(label)}</span>
+        <input type="number" min="1" step="1" value="${line.quantity}" data-cart-qty inputmode="numeric" class="daily-diario-cart-qty" aria-label="Quantidade">
+        <input type="number" min="0" step="0.01" value="${formatDecimalInput(line.discount, MONEY_DECIMALS)}" data-cart-discount inputmode="decimal" class="daily-diario-cart-discount" aria-label="Desconto por unidade (R$)">
+        <strong class="daily-diario-cart-total">${formatCurrency(lineTotal)}</strong>
+        <button type="button" class="diario-remove-btn" data-remove-line="${escapeAttr(key)}" title="Remover" aria-label="Remover produto">
+          <i data-lucide="x"></i>
+        </button>
       </div>
     `;
   }).join('');
@@ -1074,7 +1052,7 @@ function renderDailyDiarioList(items, summary) {
               <p class="daily-diario-sale-unit">${unitLine}</p>
             </div>
             <div class="daily-diario-sale-head-actions">
-              <button type="button" onclick="deleteDailySaleEntry(${item.id})" class="btn btn-danger btn-sm btn-icon" title="Excluir" aria-label="Excluir venda">
+              <button type="button" onclick="deleteDailySaleEntry(${item.id})" class="diario-remove-btn" title="Excluir" aria-label="Excluir venda">
                 <i data-lucide="trash"></i>
               </button>
             </div>

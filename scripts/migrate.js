@@ -452,6 +452,23 @@ async function migrate() {
       ON ${SCHEMA}.distributors (active, sort_order, name)
     `);
 
+    // Imagens persistidas no banco (substitui dependência de disco em /uploads)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA}.media (
+        id SERIAL PRIMARY KEY,
+        kind VARCHAR(40) NOT NULL DEFAULT 'generic',
+        mime_type VARCHAR(100) NOT NULL,
+        original_name VARCHAR(255),
+        byte_size INTEGER NOT NULL CHECK (byte_size > 0),
+        data BYTEA NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_media_kind_created
+      ON ${SCHEMA}.media (kind, created_at DESC)
+    `);
+
     console.log('✅ Tabelas criadas no schema\n');
 
     // Criar usuário admin padrão

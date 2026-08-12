@@ -16,6 +16,7 @@ const dailySalesRoutes = require('./routes/dailySales');
 const eventsRoutes = require('./routes/events');
 const ticketsRoutes = require('./routes/tickets');
 const distributorsRoutes = require('./routes/distributors');
+const mediaRoutes = require('./routes/media');
 const authRoutes = require('./routes/auth');
 
 const app = express();
@@ -35,13 +36,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// Uploads (imagens de produtos)
+// Uploads legados em disco (compatibilidade com URLs antigas /uploads/...)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Servir arquivos estáticos (frontend)
 app.use(express.static(path.join(__dirname)));
 
 // Rotas da API (públicas para leitura, autenticadas para escrita)
+app.use('/api/media', mediaRoutes);
 app.use('/api/products', productsRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/loyalty', loyaltyRoutes);
@@ -107,8 +109,10 @@ app.use((err, req, res, next) => {
 });
 
 const { ensureDatabase } = require('./config/database');
+const { ensureImagesMigrated } = require('./scripts/migrate-images-to-db');
 
 ensureDatabase()
+  .then(() => ensureImagesMigrated())
   .then(() => {
     app.listen(PORT, () => {
       console.log(`🚀 Servidor FitPoint rodando na porta ${PORT}`);
@@ -119,6 +123,6 @@ ensureDatabase()
     });
   })
   .catch((err) => {
-    console.error('Falha ao preparar o banco (ensureDatabase):', err.message);
+    console.error('Falha ao preparar o banco (ensureDatabase/imagens):', err.message);
     process.exit(1);
   });

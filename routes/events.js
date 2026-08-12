@@ -1,7 +1,4 @@
 const express = require('express');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const router = express.Router();
 const { query, table, getClient } = require('../config/database');
 const {
@@ -12,39 +9,10 @@ const {
   loadUserById
 } = require('../config/auth');
 const { validatePromoConfig } = require('../services/ticketPricing');
+const { createImageUploadMiddleware } = require('../middleware/imageUpload');
 const jwt = require('jsonwebtoken');
 
-const eventsUploadDir = path.join(__dirname, '..', 'uploads', 'events');
-fs.mkdirSync(eventsUploadDir, { recursive: true });
-
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, eventsUploadDir),
-    filename: (req, file, cb) => {
-      const ext = (path.extname(file.originalname) || '').toLowerCase();
-      const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
-      const safeExt = allowed.includes(ext) ? ext : '.jpg';
-      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${safeExt}`);
-    }
-  }),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (/^image\/(jpeg|png|webp|gif)$/i.test(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Use uma imagem JPG, PNG, WebP ou GIF.'));
-    }
-  }
-});
-
-function uploadEventImageMiddleware(req, res, next) {
-  upload.single('image')(req, res, (err) => {
-    if (err) {
-      return res.status(400).json({ error: err.message || 'Erro no upload' });
-    }
-    next();
-  });
-}
+const uploadEventImageMiddleware = createImageUploadMiddleware('events');
 
 function normalizeTimestampForDb(value) {
   if (value == null || value === '') return null;
@@ -219,13 +187,9 @@ async function tryAdminFromAuth(req) {
   }
 }
 
-// POST /api/events/upload-image — enviar imagem (autenticado)
+// POST /api/events/upload-image — autenticado; salva no banco (logo/capa/patrocinador)
 router.post('/upload-image', authenticateToken, requirePermission('eventos', 'lotes'), uploadEventImageMiddleware, (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'Nenhum arquivo enviado' });
-  }
-  const url = `/uploads/events/${req.file.filename}`;
-  res.status(201).json({ url });
+  res.status(201).json({ url: req.savedMedia.url, id: req.savedMedia.id });
 });
 
 // GET /api/events — público: só ativos; admin com ?all=1 vê todos

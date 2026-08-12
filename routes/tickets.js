@@ -12,7 +12,7 @@ const {
 } = require('../services/mercadopago');
 const { sendTicketEmail } = require('../services/email');
 const { computeOrderTotal } = require('../services/ticketPricing');
-const { resolveHolders } = require('../services/ticketAssignees');
+const { normalizeAssignees, resolveHolders } = require('../services/ticketAssignees');
 
 function generateTicketCode() {
   return crypto.randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase();
@@ -289,6 +289,11 @@ router.post('/checkout', async (req, res) => {
       return res.status(400).json({ error: 'Quantidade deve ser entre 1 e 10' });
     }
 
+    const normalized = normalizeAssignees(req.body.assignees, qty);
+    if (!normalized.ok) {
+      return res.status(400).json({ error: normalized.error });
+    }
+
     await client.query('BEGIN');
 
     const lotRes = await client.query(
@@ -306,6 +311,10 @@ router.post('/checkout', async (req, res) => {
     }
 
     const lot = lotRes.rows[0];
+    if (lot.is_vip === true) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Este lote não está disponível para compra' });
+    }
     if (!lot.event_active) {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: 'Evento indisponível' });
@@ -340,8 +349,8 @@ router.post('/checkout', async (req, res) => {
 
     const orderRes = await client.query(
       `INSERT INTO ${table('ticket_orders')}
-        (event_id, lot_id, buyer_name, buyer_email, buyer_phone, quantity, amount, status, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', NOW(), NOW())
+        (event_id, lot_id, buyer_name, buyer_email, buyer_phone, quantity, amount, status, source, assignees, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', 'checkout', $8::jsonb, NOW(), NOW())
        RETURNING *`,
       [
         lot.event_id,
@@ -350,7 +359,8 @@ router.post('/checkout', async (req, res) => {
         email,
         buyer_phone ? String(buyer_phone).trim() : null,
         qty,
-        amount
+        amount,
+        JSON.stringify(normalized.value)
       ]
     );
 

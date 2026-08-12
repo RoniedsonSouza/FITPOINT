@@ -766,7 +766,8 @@ router.get('/', authenticateToken, requirePermission('eventos'), async (req, res
 
     params.push(limitNum, offset);
     const listRes = await query(
-      `SELECT t.*, e.title AS event_title, l.name AS lot_name, o.amount AS order_amount
+      `SELECT t.*, e.title AS event_title, l.name AS lot_name, l.is_vip AS lot_is_vip,
+              o.amount AS order_amount, o.source AS order_source
        FROM ${table('tickets')} t
        JOIN ${table('events')} e ON e.id = t.event_id
        JOIN ${table('ticket_lots')} l ON l.id = t.lot_id
@@ -789,6 +790,8 @@ router.get('/', authenticateToken, requirePermission('eventos'), async (req, res
         event_title: row.event_title,
         lot_id: row.lot_id,
         lot_name: row.lot_name,
+        is_vip: row.lot_is_vip === true,
+        order_source: row.order_source || null,
         order_id: row.order_id,
         created_at: row.created_at
       })),

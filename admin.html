@@ -471,11 +471,16 @@
           </nav>
 
           <div id="event-tab-lotes" class="event-detail-tab-panel" data-event-tab-panel="lotes">
-            <div class="flex items-center justify-between gap-2 mb-3">
+            <div class="flex items-center justify-between gap-2 mb-3 flex-wrap">
               <h2 class="font-semibold text-sm">Lotes de ingressos</h2>
-              <button type="button" onclick="openLotModal()" class="btn btn-outline btn-sm" data-requires-event-lotes>
-                <i data-lucide="plus"></i> Novo lote
-              </button>
+              <div class="flex items-center gap-2 flex-wrap">
+                <button type="button" onclick="openLotModal()" class="btn btn-outline btn-sm" data-requires-event-lotes>
+                  <i data-lucide="plus"></i> Novo lote
+                </button>
+                <button type="button" onclick="openVipLotModal()" class="btn btn-outline btn-sm" data-requires-event-lotes>
+                  <i data-lucide="star"></i> Criar lote VIP
+                </button>
+              </div>
             </div>
             <div id="event-lots-list" class="grid gap-3"></div>
           </div>
@@ -503,6 +508,12 @@
 
           <div id="event-tab-ingressos" class="event-detail-tab-panel hidden" data-event-tab-panel="ingressos">
             <div class="card">
+              <div class="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                <h2 class="font-semibold text-sm mb-0">Ingressos vendidos</h2>
+                <button type="button" onclick="openVipIssueModal()" class="btn btn-primary btn-sm" data-requires-event-lotes>
+                  <i data-lucide="gift"></i> Emitir VIP
+                </button>
+              </div>
               <div class="events-filters events-filters--detail">
                 <div class="field">
                   <label for="tickets-status-filter">Status</label>
@@ -522,7 +533,6 @@
                   <i data-lucide="search"></i> Filtrar
                 </button>
               </div>
-              <h2 class="font-semibold text-sm mb-3">Ingressos vendidos</h2>
               <div id="tickets-admin-list">
                 <p class="text-black/60 text-sm">Carregue o evento para ver os ingressos.</p>
               </div>
@@ -869,6 +879,7 @@
       </div>
       <form id="lot-form" onsubmit="saveLot(event)">
         <input type="hidden" id="lot-id-input">
+        <input type="hidden" id="lot-is-vip" value="false">
         <div class="form-group">
           <label for="lot-name">Nome do lote</label>
           <input type="text" id="lot-name" required placeholder="Ex.: 1º lote">
@@ -893,7 +904,7 @@
             <input type="datetime-local" id="lot-sales-end">
           </div>
         </div>
-        <div class="form-group border border-black/10 rounded-lg p-3">
+        <div id="lot-promo-section" class="form-group border border-black/10 rounded-lg p-3">
           <label class="flex items-center gap-2 cursor-pointer font-semibold">
             <input type="checkbox" id="lot-promo-enabled" onchange="toggleLotPromoFields()"> Promoção por quantidade
           </label>
@@ -933,6 +944,46 @@
         <div class="modal-footer">
           <button type="button" onclick="closeLotModal()" class="btn btn-secondary btn-md">Cancelar</button>
           <button type="submit" class="btn btn-primary btn-lg">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Emitir VIP -->
+  <div id="vip-issue-modal" class="modal">
+    <div class="modal-content modal-content--sm">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-display text-xl font-bold">Emitir ingresso VIP</h3>
+        <button type="button" onclick="closeVipIssueModal()" class="modal-close" aria-label="Fechar">&times;</button>
+      </div>
+      <form id="vip-issue-form" onsubmit="submitVipIssue(event)">
+        <div class="form-group field-row">
+          <div class="field">
+            <label for="vip-issue-qty">Quantidade</label>
+            <input type="number" id="vip-issue-qty" min="1" max="10" step="1" value="1" required
+              oninput="onVipIssueQtyChange()">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="vip-issue-name">Nome do emissor</label>
+          <input type="text" id="vip-issue-name" required placeholder="Ex.: Maria Silva" autocomplete="name">
+        </div>
+        <div class="form-group">
+          <label for="vip-issue-email">E-mail</label>
+          <input type="email" id="vip-issue-email" required placeholder="Ex.: maria@email.com" autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label for="vip-issue-phone">Telefone</label>
+          <input type="tel" id="vip-issue-phone" required placeholder="Ex.: (27) 99999-9999" autocomplete="tel">
+        </div>
+        <div class="form-group">
+          <label>Destinatários</label>
+          <p class="text-xs text-black/50 mb-2">Por padrão ficam no nome do emissor. Use “Dar ingresso” para enviar o QR a outra pessoa.</p>
+          <div id="vip-assignee-slots" class="grid gap-2"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" onclick="closeVipIssueModal()" class="btn btn-secondary btn-md">Cancelar</button>
+          <button type="submit" class="btn btn-primary btn-lg">Emitir VIP</button>
         </div>
       </form>
     </div>

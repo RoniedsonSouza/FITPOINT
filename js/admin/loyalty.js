@@ -9,6 +9,11 @@ const loyaltyLimit = 10;
 let loyaltySearchTimer = null;
 let loyaltyLoading = false;
 let loyaltyPaginationMeta = null;
+let loyaltyActiveTab = 'customers';
+let loyaltyRewardsPage = 1;
+const loyaltyRewardsLimit = 10;
+let loyaltyRewardsLoading = false;
+let loyaltyRewardsPaginationMeta = null;
 
 function formatPhoneDisplay(phone) {
   const d = String(phone || '').replace(/\D/g, '');
@@ -69,6 +74,13 @@ function formatLoyaltyVisitAt(value) {
     minute: '2-digit'
   });
   return `${datePart} · ${timePart}`;
+}
+
+function formatRewardEarnedDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 }
 
 function loyaltyCycleHint(c) {
@@ -188,6 +200,13 @@ function renderLoyaltyCustomerCard(c) {
           ${statusBadges}
         </div>
       </div>
+      ${c.rewards_pending > 0 ? `
+      <div class="loyalty-card-rewards-pending">
+        <span>🎁 ${c.rewards_pending} prêmio${c.rewards_pending === 1 ? '' : 's'} pendente${c.rewards_pending === 1 ? '' : 's'}</span>
+        <button type="button" onclick="claimLoyaltyReward(event, ${c.id})" class="loyalty-claim-btn" title="Marcar prêmio como retirado" aria-label="Marcar prêmio como retirado">
+          <i data-lucide="check"></i> Retirado
+        </button>
+      </div>` : ''}
       <div class="loyalty-card-footer">
         ${lastVisit
           ? `<span class="loyalty-card-last-visit" title="Última alteração de visita">${escapeHtml(lastVisit)}</span>`
@@ -286,7 +305,108 @@ function loyaltyChangePage(page) {
   loadLoyaltyCustomers();
 }
 
+function switchLoyaltyTab(tab) {
+  loyaltyActiveTab = tab;
+  document.querySelectorAll('[data-loyalty-tab]').forEach(btn => {
+    const isActive = btn.dataset.loyaltyTab === tab;
+    btn.classList.toggle('is-active', isActive);
+    btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  });
+  document.getElementById('loyalty-tab-customers')?.classList.toggle('hidden', tab !== 'customers');
+  document.getElementById('loyalty-tab-rewards')?.classList.toggle('hidden', tab !== 'rewards');
+  if (tab === 'rewards') {
+    loadLoyaltyPendingRewards();
+  }
+}
+
+function updateLoyaltyRewardsTabBadge(total) {
+  const badge = document.getElementById('loyalty-rewards-tab-count');
+  if (!badge) return;
+  if (total > 0) {
+    badge.textContent = String(total);
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
+function renderLoyaltyRewardItem(item) {
+  return `
+    <div class="card loyalty-reward-card" data-reward-customer="${item.customer_id}">
+      <div class="loyalty-reward-card-info">
+        <span class="loyalty-reward-card-name">${escapeHtml(item.name)}</span>
+        <span class="loyalty-reward-card-meta">${escapeHtml(formatPhoneDisplay(item.phone))} · ${item.pending_count > 1 ? `${item.pending_count} prêmios · ` : ''}ganhou em ${formatRewardEarnedDate(item.oldest_earned_at)}</span>
+      </div>
+      <button type="button" onclick="claimLoyaltyReward(event, ${item.customer_id})" class="loyalty-claim-btn" title="Marcar prêmio como retirado" aria-label="Marcar prêmio como retirado">
+        <i data-lucide="check"></i> Retirado
+      </button>
+    </div>`;
+}
+
+function renderLoyaltyRewardsPagination(meta) {
+  const el = document.getElementById('loyalty-rewards-pagination');
+  if (!el) return;
+  if (!meta.total) {
+    el.classList.add('hidden');
+    el.innerHTML = '';
+    return;
+  }
+  el.classList.remove('hidden');
+  const prevDisabled = meta.page <= 1 || loyaltyRewardsLoading;
+  const nextDisabled = meta.page >= meta.total_pages || loyaltyRewardsLoading;
+  el.innerHTML = `
+    <div class="flex flex-wrap items-center justify-between gap-2 text-sm">
+      <p class="text-black/60">Página ${meta.page} de ${meta.total_pages} (${meta.total} pendente${meta.total === 1 ? '' : 's'})</p>
+      <div class="flex gap-2">
+        <button type="button" class="btn btn-outline btn-sm" ${prevDisabled ? 'disabled' : ''} onclick="loyaltyRewardsChangePage(${meta.page - 1})">Anterior</button>
+        <button type="button" class="btn btn-outline btn-sm" ${nextDisabled ? 'disabled' : ''} onclick="loyaltyRewardsChangePage(${meta.page + 1})">Próxima</button>
+      </div>
+    </div>`;
+}
+
+function loyaltyRewardsChangePage(page) {
+  if (page < 1 || loyaltyRewardsLoading) return;
+  loyaltyRewardsPage = page;
+  loadLoyaltyPendingRewards();
+}
+
+async function loadLoyaltyPendingRewards({ silent = false } = {}) {
+  const container = document.getElementById('loyalty-rewards-list');
+  if (!container || typeof DB === 'undefined') return;
+
+  loyaltyRewardsLoading = true;
+  if (!silent) container.innerHTML = '<p class="text-black/60">Carregando...</p>';
+  if (loyaltyRewardsPaginationMeta) renderLoyaltyRewardsPagination(loyaltyRewardsPaginationMeta);
+
+  try {
+    const data = await DB.getPendingLoyaltyRewards({ page: loyaltyRewardsPage, limit: loyaltyRewardsLimit });
+    const items = data.items || [];
+
+    if (data.total_pages > 0 && loyaltyRewardsPage > data.total_pages) {
+      loyaltyRewardsPage = data.total_pages;
+      loyaltyRewardsLoading = false;
+      return loadLoyaltyPendingRewards({ silent });
+    }
+
+    loyaltyRewardsPaginationMeta = data;
+    renderLoyaltyRewardsPagination(data);
+    updateLoyaltyRewardsTabBadge(data.total);
+
+    container.innerHTML = items.length === 0
+      ? '<p class="text-black/60">Nenhum prêmio pendente.</p>'
+      : items.map(renderLoyaltyRewardItem).join('');
+    refreshIcons();
+  } catch (error) {
+    if (!handleAuthError(error)) {
+      container.innerHTML = '<p class="text-red-600">Erro ao carregar prêmios pendentes.</p>';
+    }
+  } finally {
+    loyaltyRewardsLoading = false;
+  }
+}
+
 async function loadLoyaltyCustomers({ silent = false } = {}) {
+  loadLoyaltyPendingRewards({ silent: true });
   const container = document.getElementById('loyalty-list');
   if (!container || typeof DB === 'undefined') return;
 
@@ -499,6 +619,24 @@ async function applyLoyaltyVisitDelta(event, id, delta) {
   } finally {
     stepper?.classList.remove('is-busy');
   }
+}
+
+async function claimLoyaltyReward(event, id) {
+  const btn = event?.currentTarget || event?.target;
+  if (btn?.disabled) return;
+
+  await withButtonLoading(btn, async () => {
+    try {
+      const result = await DB.claimLoyaltyReward(id);
+      showToast('Prêmio marcado como retirado.', 'success');
+      if (result.customer && !updateLoyaltyCustomerCardDom(id, result.customer)) {
+        await loadLoyaltyCustomers({ silent: true });
+      }
+      await loadLoyaltyPendingRewards({ silent: true });
+    } catch (error) {
+      if (!handleAuthError(error)) showToast('Erro: ' + error.message, 'error');
+    }
+  }, '');
 }
 
 document.addEventListener('DOMContentLoaded', () => {

@@ -9,6 +9,10 @@ const {
   mapCustomerRow,
   applyVisitDelta,
   insertVisitEvents,
+  insertRewardEvents,
+  removeNewestPendingRewards,
+  countPendingRewards,
+  computeRewardsRemoved,
   mapVisitEventRow,
   parseNonNegativeInt,
   parseVisitsPerReward,
@@ -207,7 +211,10 @@ router.get('/customers', authenticateToken, requireAnyPermission('fidelidade', '
     const offsetIdx = searchPart.values.length + 2;
 
     const result = await query(
-      `SELECT * FROM ${table('loyalty_customers')}
+      `SELECT *,
+         (SELECT COUNT(*)::int FROM ${table('loyalty_rewards')} lr
+          WHERE lr.customer_id = ${table('loyalty_customers')}.id AND lr.claimed_at IS NULL) AS rewards_pending
+       FROM ${table('loyalty_customers')}
        ${baseWhere}
        ORDER BY name ASC
        LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
@@ -494,19 +501,130 @@ router.post('/customers/:id/visit', authenticateToken, requirePermission('fideli
       await insertVisitEvents(client, req.params.id, delta_applied, 'admin');
     }
 
+    if (rewards_earned > 0) {
+      await insertRewardEvents(client, req.params.id, rewards_earned, 'admin');
+    } else {
+      const removed = computeRewardsRemoved(row.total_rewards, rewards);
+      if (removed > 0) {
+        await removeNewestPendingRewards(client, req.params.id, removed);
+      }
+    }
+
+    const rewardsPendingTotal = await countPendingRewards(client, req.params.id);
+
     await client.query('COMMIT');
 
     res.json({
-      customer: mapCustomerRow(result.rows[0], { includePhone: true, visitsPerReward }),
+      customer: mapCustomerRow(
+        { ...result.rows[0], rewards_pending: rewardsPendingTotal },
+        { includePhone: true, visitsPerReward }
+      ),
       rewards_earned,
       reward_earned: rewards_earned > 0,
       delta_applied,
-      visits_per_reward: visitsPerReward
+      visits_per_reward: visitsPerReward,
+      rewards_pending_total: rewardsPendingTotal
     });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     console.error('Erro ao registrar visita:', error);
     res.status(500).json({ error: 'Erro ao registrar visita' });
+  } finally {
+    client.release();
+  }
+});
+
+// GET /api/loyalty/rewards/pending — admin (clientes com prêmio pendente, qualquer data)
+router.get('/rewards/pending', authenticateToken, requireAnyPermission('fidelidade', 'vendas'), async (req, res) => {
+  try {
+    const { page, limit, offset } = parsePaginationQuery(req.query);
+
+    const countResult = await query(
+      `SELECT COUNT(DISTINCT lr.customer_id)::int AS cnt
+       FROM ${table('loyalty_rewards')} lr
+       JOIN ${table('loyalty_customers')} lc ON lc.id = lr.customer_id
+       WHERE lr.claimed_at IS NULL AND lc.active = true`
+    );
+    const total = countResult.rows[0]?.cnt ?? 0;
+    const totalPages = computeTotalPages(total, limit);
+
+    const result = await query(
+      `SELECT
+         lc.id AS customer_id,
+         lc.name,
+         lc.phone,
+         COUNT(lr.id)::int AS pending_count,
+         MIN(lr.earned_at) AS oldest_earned_at
+       FROM ${table('loyalty_rewards')} lr
+       JOIN ${table('loyalty_customers')} lc ON lc.id = lr.customer_id
+       WHERE lr.claimed_at IS NULL AND lc.active = true
+       GROUP BY lc.id, lc.name, lc.phone
+       ORDER BY MIN(lr.earned_at) ASC
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+    const items = result.rows.map(row => ({
+      customer_id: row.customer_id,
+      name: row.name,
+      phone: row.phone,
+      pending_count: row.pending_count,
+      oldest_earned_at: row.oldest_earned_at ? new Date(row.oldest_earned_at).toISOString() : null
+    }));
+    res.json({ items, total, page, limit, total_pages: totalPages });
+  } catch (error) {
+    console.error('Erro ao buscar prêmios pendentes:', error);
+    res.status(500).json({ error: 'Erro ao buscar prêmios pendentes' });
+  }
+});
+
+// POST /api/loyalty/customers/:id/claim-reward — admin (retira o prêmio pendente mais antigo)
+router.post('/customers/:id/claim-reward', authenticateToken, requireAnyPermission('fidelidade', 'vendas'), async (req, res) => {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+
+    const pending = await client.query(
+      `SELECT id FROM ${table('loyalty_rewards')}
+       WHERE customer_id = $1 AND claimed_at IS NULL
+       ORDER BY earned_at ASC
+       LIMIT 1
+       FOR UPDATE`,
+      [req.params.id]
+    );
+    if (pending.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Nenhum prêmio pendente para este cliente' });
+    }
+
+    await client.query(
+      `UPDATE ${table('loyalty_rewards')} SET claimed_at = NOW() WHERE id = $1`,
+      [pending.rows[0].id]
+    );
+
+    const rewardsPendingTotal = await countPendingRewards(client, req.params.id);
+
+    const customerResult = await client.query(
+      `SELECT * FROM ${table('loyalty_customers')} WHERE id = $1`,
+      [req.params.id]
+    );
+
+    await client.query('COMMIT');
+
+    const visitsPerReward = await getVisitsPerReward();
+    res.json({
+      claimed: true,
+      rewards_pending_total: rewardsPendingTotal,
+      customer: customerResult.rows[0]
+        ? mapCustomerRow(
+            { ...customerResult.rows[0], rewards_pending: rewardsPendingTotal },
+            { includePhone: true, visitsPerReward }
+          )
+        : null
+    });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Erro ao marcar prêmio como retirado:', error);
+    res.status(500).json({ error: 'Erro ao marcar prêmio como retirado' });
   } finally {
     client.release();
   }

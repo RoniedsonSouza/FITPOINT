@@ -63,6 +63,7 @@ function mapCustomerRow(row, { includePhone = false, visitsPerReward = DEFAULT_V
     avatar: row.avatar || null,
     total_visits: totalVisits,
     total_rewards: totalRewards,
+    rewards_pending: row.rewards_pending != null ? Number(row.rewards_pending) : 0,
     progress: rawProgress,
     display_progress: displayProgress,
     cycle_complete: cycleComplete,
@@ -129,6 +130,54 @@ async function insertVisitEvents(db, customerId, appliedDelta, source) {
      VALUES ${placeholders.join(', ')}`,
     values
   );
+}
+
+async function insertRewardEvents(db, customerId, count, source) {
+  const n = Math.max(0, Math.trunc(Number(count) || 0));
+  if (n === 0) return;
+  const run = typeof db === 'function' ? db : (sql, params) => db.query(sql, params);
+  const placeholders = [];
+  const values = [];
+  for (let i = 0; i < n; i++) {
+    const base = i * 2;
+    placeholders.push(`($${base + 1}, $${base + 2})`);
+    values.push(customerId, source);
+  }
+  await run(
+    `INSERT INTO ${table('loyalty_rewards')} (customer_id, source)
+     VALUES ${placeholders.join(', ')}`,
+    values
+  );
+}
+
+async function removeNewestPendingRewards(db, customerId, count) {
+  const n = Math.max(0, Math.trunc(Number(count) || 0));
+  if (n === 0) return 0;
+  const run = typeof db === 'function' ? db : (sql, params) => db.query(sql, params);
+  const result = await run(
+    `DELETE FROM ${table('loyalty_rewards')}
+     WHERE id IN (
+       SELECT id FROM ${table('loyalty_rewards')}
+       WHERE customer_id = $1 AND claimed_at IS NULL
+       ORDER BY earned_at DESC
+       LIMIT $2
+     )`,
+    [customerId, n]
+  );
+  return result.rowCount || 0;
+}
+
+async function countPendingRewards(db, customerId) {
+  const run = typeof db === 'function' ? db : (sql, params) => db.query(sql, params);
+  const result = await run(
+    `SELECT COUNT(*)::int AS cnt FROM ${table('loyalty_rewards')} WHERE customer_id = $1 AND claimed_at IS NULL`,
+    [customerId]
+  );
+  return result.rows[0]?.cnt || 0;
+}
+
+function computeRewardsRemoved(rewardsBefore, rewardsAfter) {
+  return Math.max(0, (Number(rewardsBefore) || 0) - (Number(rewardsAfter) || 0));
 }
 
 function mapVisitEventRow(row) {
@@ -233,6 +282,10 @@ module.exports = {
   mapCustomerRow,
   applyVisitDelta,
   insertVisitEvents,
+  insertRewardEvents,
+  removeNewestPendingRewards,
+  countPendingRewards,
+  computeRewardsRemoved,
   mapVisitEventRow,
   parseNonNegativeInt,
   parseVisitsPerReward,

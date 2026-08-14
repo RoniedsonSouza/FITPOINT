@@ -351,6 +351,37 @@ const DB = {
     return response.json();
   },
 
+  async claimLoyaltyReward(id) {
+    const response = await fetch(`${getApiBaseUrl()}/loyalty/customers/${id}/claim-reward`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao marcar prêmio como retirado';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async getPendingLoyaltyRewards(params = {}) {
+    const qs = new URLSearchParams();
+    if (params.page) qs.set('page', String(params.page));
+    if (params.limit) qs.set('limit', String(params.limit));
+    const query = qs.toString();
+    const response = await fetch(`${getApiBaseUrl()}/loyalty/rewards/pending${query ? `?${query}` : ''}`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao buscar prêmios pendentes';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
   async getLoyaltyVisitHistory(id, { limit = 30 } = {}) {
     const qs = limit ? `?limit=${encodeURIComponent(limit)}` : '';
     const response = await fetch(`${getApiBaseUrl()}/loyalty/customers/${id}/visits${qs}`, {

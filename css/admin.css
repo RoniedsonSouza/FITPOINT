@@ -1521,6 +1521,121 @@ body.ticket-qr-open {
   color: #dc2626;
 }
 
+.admin-tabs {
+  display: flex;
+  gap: 1.25rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  margin-bottom: 1rem;
+}
+
+.admin-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.625rem 0.125rem;
+  margin-bottom: -1px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgba(14, 31, 22, 0.5);
+  cursor: pointer;
+}
+
+.admin-tab.is-active {
+  color: var(--fp-green);
+  border-bottom-color: var(--fp-green);
+}
+
+.admin-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--fp-orange);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.admin-tab-badge.hidden {
+  display: none;
+}
+
+.loyalty-reward-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+}
+
+.loyalty-reward-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.loyalty-reward-card-name {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: rgba(14, 31, 22, 0.9);
+}
+
+.loyalty-reward-card-meta {
+  font-size: 0.8125rem;
+  color: rgba(14, 31, 22, 0.55);
+}
+
+.loyalty-card-rewards-pending {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  background: rgba(245, 124, 0, 0.1);
+  border-radius: 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #c2410c;
+}
+
+.loyalty-claim-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  padding: 0.3rem 0.6rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--fp-green);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.loyalty-claim-btn:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.loyalty-claim-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.loyalty-claim-btn svg {
+  width: 0.8125rem;
+  height: 0.8125rem;
+}
+
 .loyalty-card-footer {
   display: flex;
   align-items: center;
@@ -2381,8 +2496,7 @@ body.ticket-qr-open {
 
 .daily-diario-cart-row {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 0.5rem;
   background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.08);
@@ -2390,8 +2504,15 @@ body.ticket-qr-open {
   padding: 0.5rem 0.625rem;
 }
 
+.daily-diario-cart-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .daily-diario-cart-title {
-  flex: 1 1 6rem;
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2401,14 +2522,38 @@ body.ticket-qr-open {
   line-height: 1.3;
 }
 
+.daily-diario-cart-row-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+}
+
+.daily-diario-cart-field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 0 0 auto;
+}
+
+.daily-diario-cart-field-label span {
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: rgba(14, 31, 22, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 .daily-diario-cart-qty,
 .daily-diario-cart-discount {
   flex: 0 0 auto;
   min-width: 0;
-  height: 1.75rem;
-  padding: 0.15rem 0.25rem;
-  border-radius: 0.5rem;
-  font-size: 0.75rem;
+  height: 1.75rem !important;
+  min-height: 1.75rem !important;
+  padding: 0.15rem 0.25rem !important;
+  border-radius: 0.5rem !important;
+  font-size: 0.75rem !important;
   text-align: center;
   box-sizing: border-box;
   -moz-appearance: textfield;
@@ -2416,25 +2561,23 @@ body.ticket-qr-open {
 }
 
 .daily-diario-cart-qty::-webkit-outer-spin-button,
-.daily-diario-cart-qty::-webkit-inner-spin-button,
-.daily-diario-cart-discount::-webkit-outer-spin-button,
-.daily-diario-cart-discount::-webkit-inner-spin-button {
+.daily-diario-cart-qty::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 
 .daily-diario-cart-qty {
-  width: 2.25rem;
+  width: 2.5rem !important;
 }
 
 .daily-diario-cart-discount {
-  width: 3.5rem;
+  width: 3.75rem !important;
 }
 
 .daily-diario-cart-total {
   flex: 0 0 auto;
-  margin: 0;
-  font-size: 0.8125rem;
+  margin-left: auto;
+  font-size: 0.875rem;
   line-height: 1.2;
   color: var(--fp-green);
   font-variant-numeric: tabular-nums;
@@ -2465,13 +2608,13 @@ body.ticket-qr-open {
 }
 
 .daily-diario-cart-summary-row input {
-  width: 5.5rem;
-  min-height: 1.75rem;
-  height: 1.75rem;
-  padding: 0.15rem 0.4rem;
-  font-size: 0.8125rem;
+  width: 6rem !important;
+  min-height: 1.75rem !important;
+  height: 1.75rem !important;
+  padding: 0.15rem 0.4rem !important;
+  font-size: 0.8125rem !important;
   text-align: right;
-  border-radius: 0.5rem;
+  border-radius: 0.5rem !important;
   box-sizing: border-box;
   -moz-appearance: textfield;
   appearance: textfield;
@@ -2544,6 +2687,73 @@ body.ticket-qr-open {
   font-size: 0.8125rem;
   line-height: 1.4;
   color: rgba(14, 31, 22, 0.5);
+}
+
+.daily-diario-reward-banners {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  margin-top: 1rem;
+}
+
+.daily-diario-reward-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.875rem;
+  background: rgba(29, 107, 58, 0.08);
+  border: 1px solid rgba(29, 107, 58, 0.2);
+  border-radius: 0.75rem;
+}
+
+.daily-diario-reward-banner-text {
+  min-width: 0;
+}
+
+.daily-diario-reward-banner-title {
+  display: block;
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: rgba(14, 31, 22, 0.9);
+}
+
+.daily-diario-reward-banner-sub {
+  display: block;
+  font-size: 0.75rem;
+  color: rgba(14, 31, 22, 0.6);
+  margin-top: 0.125rem;
+}
+
+.daily-diario-reward-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.daily-diario-reward-banner-dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: none;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: rgba(14, 31, 22, 0.4);
+  cursor: pointer;
+}
+
+.daily-diario-reward-banner-dismiss:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: rgba(14, 31, 22, 0.7);
+}
+
+.daily-diario-reward-banner-dismiss svg {
+  width: 0.875rem;
+  height: 0.875rem;
 }
 
 .daily-diario-list {

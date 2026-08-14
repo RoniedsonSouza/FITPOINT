@@ -261,13 +261,35 @@
           <p class="text-xs text-black/50 mt-2" id="loyalty-access-help">Vendas no Diário contam visitas
             automaticamente: a cada R$ 27 em compras, 1 visita.</p>
         </div>
-        <div class="mb-3">
-          <input type="search" id="loyalty-search" class="max-w-md" placeholder="Buscar por nome ou telefone…"
-            autocomplete="off" aria-label="Buscar clientes de fidelidade">
+
+        <div class="admin-tabs" role="tablist">
+          <button type="button" class="admin-tab is-active" data-loyalty-tab="customers"
+            onclick="switchLoyaltyTab('customers')" role="tab" aria-selected="true">
+            Clientes
+          </button>
+          <button type="button" class="admin-tab" data-loyalty-tab="rewards" onclick="switchLoyaltyTab('rewards')"
+            role="tab" aria-selected="false">
+            Prêmios pendentes
+            <span id="loyalty-rewards-tab-count" class="admin-tab-badge hidden">0</span>
+          </button>
         </div>
-        <div id="loyalty-pagination" class="mb-3 hidden"></div>
-        <div id="loyalty-list" class="loyalty-list grid gap-3">
-          <p class="text-black/60">Selecione este módulo para carregar.</p>
+
+        <div id="loyalty-tab-customers">
+          <div class="mb-3">
+            <input type="search" id="loyalty-search" class="max-w-md" placeholder="Buscar por nome ou telefone…"
+              autocomplete="off" aria-label="Buscar clientes de fidelidade">
+          </div>
+          <div id="loyalty-pagination" class="mb-3 hidden"></div>
+          <div id="loyalty-list" class="loyalty-list grid gap-3">
+            <p class="text-black/60">Selecione este módulo para carregar.</p>
+          </div>
+        </div>
+
+        <div id="loyalty-tab-rewards" class="hidden">
+          <div id="loyalty-rewards-pagination" class="mb-3 hidden"></div>
+          <div id="loyalty-rewards-list" class="loyalty-rewards-list grid gap-3">
+            <p class="text-black/60">Nenhum prêmio pendente.</p>
+          </div>
         </div>
       </section>
 
@@ -385,7 +407,7 @@
             <div id="daily-diario-cart-summary" class="daily-diario-cart-summary hidden">
               <div class="daily-diario-cart-summary-row">
                 <span>Desc. compra R$</span>
-                <input type="number" id="daily-diario-cart-discount" min="0" step="0.01" value="0" inputmode="decimal"
+                <input type="text" id="daily-diario-cart-discount" value="0,00" inputmode="decimal"
                   aria-label="Desconto na compra">
               </div>
               <div class="daily-diario-cart-summary-row">
@@ -401,6 +423,7 @@
               <i data-lucide="plus"></i> Registrar
             </button>
           </form>
+          <div id="daily-diario-reward-banners" class="daily-diario-reward-banners"></div>
           <div class="daily-diario-day-section">
             <div class="daily-diario-day-header">
               <h2 class="daily-diario-day-title">Vendas do dia</h2>

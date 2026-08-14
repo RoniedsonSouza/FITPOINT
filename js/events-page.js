@@ -401,14 +401,14 @@
     return null;
   }
 
-  function onCheckoutQtyChange() {
+  function onCheckoutQtyInput() {
+    renderCheckoutAssigneeSlots();
+    updateTotal();
+  }
+
+  function onCheckoutQtyBlur() {
     const qtyEl = document.getElementById('checkout-qty');
-    if (qtyEl) {
-      let qty = parseInt(qtyEl.value, 10);
-      if (!qty || qty < 1) qty = 1;
-      if (qty > 10) qty = 10;
-      qtyEl.value = String(qty);
-    }
+    if (qtyEl) qtyEl.value = String(getCheckoutQty());
     renderCheckoutAssigneeSlots();
     updateTotal();
   }
@@ -1053,7 +1053,8 @@
       loadEvents();
     }
     document.getElementById('checkout-lot')?.addEventListener('change', updateTotal);
-    document.getElementById('checkout-qty')?.addEventListener('input', onCheckoutQtyChange);
+    document.getElementById('checkout-qty')?.addEventListener('input', onCheckoutQtyInput);
+    document.getElementById('checkout-qty')?.addEventListener('blur', onCheckoutQtyBlur);
     document.getElementById('checkout-assignee-slots')?.addEventListener('click', onCheckoutAssigneeClick);
     document.getElementById('checkout-assignee-slots')?.addEventListener('input', onCheckoutAssigneeInput);
     document.getElementById('checkout-form')?.addEventListener('submit', submitCheckout);

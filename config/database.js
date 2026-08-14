@@ -100,6 +100,24 @@ async function ensureDatabase() {
       ON ${SCHEMA}.loyalty_visit_events (customer_id, created_at DESC)
     `);
     await client.query(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA}.loyalty_rewards (
+        id SERIAL PRIMARY KEY,
+        customer_id INTEGER NOT NULL REFERENCES ${SCHEMA}.loyalty_customers(id) ON DELETE CASCADE,
+        earned_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        claimed_at TIMESTAMP NULL,
+        source VARCHAR(20) NOT NULL
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_loyalty_rewards_customer
+      ON ${SCHEMA}.loyalty_rewards (customer_id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_loyalty_rewards_pending
+      ON ${SCHEMA}.loyalty_rewards (claimed_at)
+      WHERE claimed_at IS NULL
+    `);
+    await client.query(`
       CREATE TABLE IF NOT EXISTS ${SCHEMA}.loyalty_settings (
         id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
         visits_per_reward INTEGER NOT NULL DEFAULT 10

@@ -70,6 +70,16 @@ function formatCurrency(value) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value) || 0);
 }
 
+function formatDiarioMoneyMaskDisplay(value) {
+  return (Number(value) || 0).toFixed(MONEY_DECIMALS).replace('.', ',');
+}
+
+function applyDiarioMoneyMask(input) {
+  const digits = input.value.replace(/\D/g, '');
+  const cents = parseInt(digits, 10) || 0;
+  input.value = formatDiarioMoneyMaskDisplay(cents / 100);
+}
+
 function formatSaleTime(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -580,7 +590,7 @@ function updateDiarioCartSummary() {
   if (diarioCart.length === 0) {
     wrap.classList.add('hidden');
     diarioCartDiscount = 0;
-    if (discountInput) discountInput.value = formatDecimalInput(0, MONEY_DECIMALS);
+    if (discountInput) discountInput.value = formatDiarioMoneyMaskDisplay(0);
     return;
   }
 
@@ -588,7 +598,7 @@ function updateDiarioCartSummary() {
   const subtotal = computeDiarioSubtotal();
   diarioCartDiscount = clampDecimal(diarioCartDiscount, 0, subtotal, 0, MONEY_DECIMALS);
   if (discountInput && document.activeElement !== discountInput) {
-    discountInput.value = formatDecimalInput(diarioCartDiscount, MONEY_DECIMALS);
+    discountInput.value = formatDiarioMoneyMaskDisplay(diarioCartDiscount);
   }
   if (subtotalEl) subtotalEl.textContent = formatCurrency(subtotal);
   if (totalEl) totalEl.textContent = formatCurrency(computeDiarioSaleTotal());
@@ -638,13 +648,23 @@ function renderDiarioCart() {
     const label = line.optionName ? `${line.name} · ${line.optionName}` : line.name;
     return `
       <div class="daily-diario-cart-row" data-cart-line="${escapeAttr(key)}">
-        <span class="daily-diario-cart-title" title="${escapeAttr(label)}">${escapeHtml(label)}</span>
-        <input type="number" min="1" step="1" value="${line.quantity}" data-cart-qty inputmode="numeric" class="daily-diario-cart-qty" aria-label="Quantidade">
-        <input type="number" min="0" step="0.01" value="${formatDecimalInput(line.discount, MONEY_DECIMALS)}" data-cart-discount inputmode="decimal" class="daily-diario-cart-discount" aria-label="Desconto por unidade (R$)">
-        <strong class="daily-diario-cart-total">${formatCurrency(lineTotal)}</strong>
-        <button type="button" class="diario-remove-btn" data-remove-line="${escapeAttr(key)}" title="Remover" aria-label="Remover produto">
-          <i data-lucide="x"></i>
-        </button>
+        <div class="daily-diario-cart-row-top">
+          <span class="daily-diario-cart-title" title="${escapeAttr(label)}">${escapeHtml(label)}</span>
+          <button type="button" class="diario-remove-btn" data-remove-line="${escapeAttr(key)}" title="Remover" aria-label="Remover produto">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="daily-diario-cart-row-controls">
+          <label class="daily-diario-cart-field-label">
+            <span>Qtd</span>
+            <input type="number" min="1" step="1" value="${line.quantity}" data-cart-qty inputmode="numeric" class="daily-diario-cart-qty" aria-label="Quantidade">
+          </label>
+          <label class="daily-diario-cart-field-label">
+            <span>Desc. R$</span>
+            <input type="text" inputmode="decimal" value="${formatDiarioMoneyMaskDisplay(line.discount)}" data-cart-discount class="daily-diario-cart-discount" aria-label="Desconto por unidade em reais">
+          </label>
+          <strong class="daily-diario-cart-total">${formatCurrency(lineTotal)}</strong>
+        </div>
       </div>
     `;
   }).join('');
@@ -680,10 +700,9 @@ function onDiarioCartInput(e) {
   }
 
   if (e.target.matches('[data-cart-discount]')) {
-    const restricted = restrictDecimalString(e.target.value, MONEY_DECIMALS);
-    if (e.target.value !== restricted) e.target.value = restricted;
-    const parsed = parseLooseDecimal(restricted, MONEY_DECIMALS);
-    if (parsed != null && parsed >= 0) {
+    applyDiarioMoneyMask(e.target);
+    const parsed = parseLooseDecimal(e.target.value, MONEY_DECIMALS);
+    if (parsed != null) {
       line.discount = Math.min(parsed, line.basePrice);
     }
     updateDiarioCartRowTotal(lineKey);
@@ -714,7 +733,7 @@ function onDiarioCartBlur(e) {
       0,
       MONEY_DECIMALS
     );
-    e.target.value = formatDecimalInput(line.discount, MONEY_DECIMALS);
+    e.target.value = formatDiarioMoneyMaskDisplay(line.discount);
     updateDiarioCartRowTotal(lineKey);
     updateDiarioLoyaltyUI();
   }
@@ -912,10 +931,9 @@ function onDiarioCartDiscountInput(e) {
   const input = e.target;
   if (!input || input.id !== 'daily-diario-cart-discount') return;
 
-  const restricted = restrictDecimalString(input.value, MONEY_DECIMALS);
-  if (input.value !== restricted) input.value = restricted;
-  const parsed = parseLooseDecimal(restricted, MONEY_DECIMALS);
-  if (parsed != null && parsed >= 0) {
+  applyDiarioMoneyMask(input);
+  const parsed = parseLooseDecimal(input.value, MONEY_DECIMALS);
+  if (parsed != null) {
     diarioCartDiscount = Math.min(parsed, computeDiarioSubtotal());
   }
   updateDiarioCartSummary();
@@ -933,7 +951,7 @@ function onDiarioCartDiscountBlur(e) {
     0,
     MONEY_DECIMALS
   );
-  input.value = formatDecimalInput(diarioCartDiscount, MONEY_DECIMALS);
+  input.value = formatDiarioMoneyMaskDisplay(diarioCartDiscount);
   updateDiarioCartSummary();
   updateDiarioLoyaltyUI();
 }
@@ -998,6 +1016,9 @@ function initDiarioComboboxes() {
     cartDiscount.addEventListener('input', onDiarioCartDiscountInput);
     cartDiscount.addEventListener('blur', onDiarioCartDiscountBlur);
   }
+
+  const rewardBanners = document.getElementById('daily-diario-reward-banners');
+  if (rewardBanners) rewardBanners.addEventListener('click', onDiarioRewardBannersClick);
 
   document.addEventListener('click', (e) => {
     if (!e.target.closest('#diario-product-combobox')) hideDiarioResults('product');
@@ -1133,7 +1154,10 @@ function clearDiarioFormState() {
     customerSelected.classList.add('hidden');
     customerSelected.innerHTML = '';
   }
-  if (cartDiscount) cartDiscount.value = formatDecimalInput(0, MONEY_DECIMALS);
+  if (cartDiscount) cartDiscount.value = formatDiarioMoneyMaskDisplay(0);
+
+  const rewardBanners = document.getElementById('daily-diario-reward-banners');
+  if (rewardBanners) rewardBanners.innerHTML = '';
 
   hideDiarioResults('product');
   hideDiarioResults('customer');
@@ -1228,6 +1252,58 @@ function onDailySalesDateChange() {
   loadDailySales();
 }
 
+function renderDiarioRewardBanner({ customerId, customerName, rewardsEarned, rewardsPendingTotal }) {
+  const container = document.getElementById('daily-diario-reward-banners');
+  if (!container) return;
+
+  const earnedLabel = rewardsEarned === 1 ? '1 prêmio' : `${rewardsEarned} prêmios`;
+  const pendingLabel = rewardsPendingTotal > 1 ? ` · ${rewardsPendingTotal} pendentes no total` : '';
+
+  const banner = document.createElement('div');
+  banner.className = 'daily-diario-reward-banner';
+  banner.dataset.rewardCustomer = String(customerId);
+  banner.innerHTML = `
+    <div class="daily-diario-reward-banner-text">
+      <span class="daily-diario-reward-banner-title">🎉 ${escapeHtml(customerName)} ganhou ${earnedLabel}!</span>
+      <span class="daily-diario-reward-banner-sub">Completou o ciclo de fidelidade${escapeHtml(pendingLabel)}</span>
+    </div>
+    <div class="daily-diario-reward-banner-actions">
+      <button type="button" class="loyalty-claim-btn" data-claim-banner title="Marcar prêmio como retirado" aria-label="Marcar prêmio como retirado">
+        <i data-lucide="check"></i> Marcar como retirado
+      </button>
+      <button type="button" class="daily-diario-reward-banner-dismiss" data-dismiss-banner title="Dispensar" aria-label="Dispensar aviso">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+  `;
+  container.prepend(banner);
+  refreshIcons();
+}
+
+async function onDiarioRewardBannersClick(e) {
+  const banner = e.target.closest('.daily-diario-reward-banner');
+  if (!banner) return;
+  const customerId = banner.dataset.rewardCustomer;
+
+  if (e.target.closest('[data-dismiss-banner]')) {
+    banner.remove();
+    return;
+  }
+
+  const claimBtn = e.target.closest('[data-claim-banner]');
+  if (claimBtn) {
+    await withButtonLoading(claimBtn, async () => {
+      try {
+        await DB.claimLoyaltyReward(customerId);
+        showToast('Prêmio marcado como retirado.', 'success');
+        banner.remove();
+      } catch (error) {
+        if (!handleAuthError(error)) showToast('Erro: ' + error.message, 'error');
+      }
+    }, '');
+  }
+}
+
 async function submitDailyDiario(event) {
   event.preventDefault();
   const btn = document.getElementById('daily-diario-submit-btn');
@@ -1260,6 +1336,15 @@ async function submitDailyDiario(event) {
       }
 
       const result = await DB.addDailySalesBatch(payload);
+
+      if (result.rewards_earned > 0 && diarioSelectedCustomer) {
+        renderDiarioRewardBanner({
+          customerId: diarioSelectedCustomer.id,
+          customerName: diarioSelectedCustomer.name,
+          rewardsEarned: result.rewards_earned,
+          rewardsPendingTotal: result.rewards_pending_total || result.rewards_earned
+        });
+      }
 
       diarioCart = [];
       diarioCartDiscount = 0;

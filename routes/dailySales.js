@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { query, getClient, table } = require('../config/database');
 const { authenticateToken, requirePermission } = require('../config/auth');
-const { applyVisitDelta, insertVisitEvents, computeLoyaltyVisitsFromAmount, DEFAULT_ACCESS_VALUE, DEFAULT_VISITS_PER_REWARD } = require('./loyaltyHelpers');
+const { applyVisitDelta, insertVisitEvents, insertRewardEvents, countPendingRewards, computeLoyaltyVisitsFromAmount, DEFAULT_ACCESS_VALUE, DEFAULT_VISITS_PER_REWARD } = require('./loyaltyHelpers');
 const { normalizeOptions } = require('./productHelpers');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -230,7 +230,7 @@ function computeSaleTotal(validatedItems) {
 
 async function applyLoyaltyForSale(client, customerId, validatedItems) {
   if (!customerId) {
-    return { loyaltyApplied: false, rewardsEarned: 0, loyaltyVisitsApplied: 0 };
+    return { loyaltyApplied: false, rewardsEarned: 0, loyaltyVisitsApplied: 0, rewardsPendingTotal: 0 };
   }
 
   const saleTotal = computeSaleTotal(validatedItems);
@@ -238,7 +238,7 @@ async function applyLoyaltyForSale(client, customerId, validatedItems) {
   const visitDelta = computeLoyaltyVisitsFromAmount(saleTotal, accessValue);
 
   if (visitDelta <= 0) {
-    return { loyaltyApplied: false, rewardsEarned: 0, loyaltyVisitsApplied: 0 };
+    return { loyaltyApplied: false, rewardsEarned: 0, loyaltyVisitsApplied: 0, rewardsPendingTotal: 0 };
   }
 
   const customerRow = (
@@ -270,10 +270,17 @@ async function applyLoyaltyForSale(client, customerId, validatedItems) {
     await insertVisitEvents(client, customerId, delta_applied, 'daily_sales');
   }
 
+  if (rewards_earned > 0) {
+    await insertRewardEvents(client, customerId, rewards_earned, 'daily_sales');
+  }
+
+  const rewardsPendingTotal = await countPendingRewards(client, customerId);
+
   return {
     loyaltyApplied: true,
     rewardsEarned: rewards_earned,
-    loyaltyVisitsApplied: delta_applied > 0 ? delta_applied : visitDelta
+    loyaltyVisitsApplied: delta_applied > 0 ? delta_applied : visitDelta,
+    rewardsPendingTotal
   };
 }
 
@@ -512,7 +519,8 @@ router.post('/batch', authenticateToken, requirePermission('vendas'), async (req
       summary,
       loyalty_applied: loyaltyResult.loyaltyApplied,
       loyalty_visits_applied: loyaltyResult.loyaltyVisitsApplied,
-      rewards_earned: loyaltyResult.rewardsEarned
+      rewards_earned: loyaltyResult.rewardsEarned,
+      rewards_pending_total: loyaltyResult.rewardsPendingTotal
     });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});

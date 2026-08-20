@@ -433,7 +433,7 @@ html {
 }
 
 .dashboard-daily-stats--month {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .dashboard-daily-stat-card {
@@ -480,10 +480,6 @@ html {
   .dashboard-daily-stats--month {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.5rem;
-  }
-
-  .dashboard-daily-stats--month .dashboard-daily-stat-card:last-child {
-    grid-column: 1 / -1;
   }
 
   .dashboard-daily-stat-card {
@@ -2055,6 +2051,7 @@ body.ticket-qr-open {
 
 .daily-sales-stats--month {
   margin-bottom: 1rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .daily-sales-stat-card {
@@ -2268,6 +2265,10 @@ body.ticket-qr-open {
   .daily-sales-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .daily-sales-stats--month {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 539px) {
@@ -2286,7 +2287,7 @@ body.ticket-qr-open {
     padding: 0.75rem 0.5rem;
   }
 
-  .daily-sales-stat-card:last-child {
+  .daily-sales-stats:not(.daily-sales-stats--month) .daily-sales-stat-card:last-child {
     grid-column: 1 / -1;
   }
 

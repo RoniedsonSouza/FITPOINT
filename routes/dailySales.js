@@ -27,6 +27,12 @@ function parseSaleDate(value) {
   return { value: str };
 }
 
+function computeMonthAccessAverage(monthAccesses, saleDate) {
+  const daysElapsed = Number(String(saleDate).slice(8, 10)) || 0;
+  if (daysElapsed <= 0) return 0;
+  return Math.round((Number(monthAccesses) || 0) / daysElapsed * 10) / 10;
+}
+
 function resolveUnitPrice(productRow) {
   const promo = productRow.promo_price != null ? Number(productRow.promo_price) : null;
   if (promo != null && !Number.isNaN(promo) && promo > 0) return promo;
@@ -166,13 +172,15 @@ async function fetchDaySummary(saleDate) {
 
   const day = dayResult.rows[0] || {};
   const month = monthResult.rows[0] || {};
+  const monthAccesses = Number(month.month_accesses) || 0;
   return {
     total_items: Number(day.total_items) || 0,
     total_accesses: Number(day.total_accesses) || 0,
     total_revenue: Number(day.total_revenue) || 0,
     top_product: topResult.rows[0]?.name || null,
     month_items: Number(month.month_items) || 0,
-    month_accesses: Number(month.month_accesses) || 0,
+    month_accesses: monthAccesses,
+    month_access_avg: computeMonthAccessAverage(monthAccesses, saleDate),
     month_revenue: Number(month.month_revenue) || 0
   };
 }

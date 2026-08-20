@@ -8,13 +8,18 @@ const { normalizeOptions } = require('./productHelpers');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+function todayYmdBrazil() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date());
+}
+
 function parseSaleDate(value) {
   if (value === undefined || value === null || value === '') {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, '0');
-    const d = String(today.getDate()).padStart(2, '0');
-    return { value: `${y}-${m}-${d}` };
+    return { value: todayYmdBrazil() };
   }
   const str = String(value).trim();
   if (!DATE_RE.test(str)) {
@@ -27,10 +32,10 @@ function parseSaleDate(value) {
   return { value: str };
 }
 
-function computeMonthAccessAverage(monthAccesses, saleDate) {
-  const daysElapsed = Number(String(saleDate).slice(8, 10)) || 0;
-  if (daysElapsed <= 0) return 0;
-  return Math.round((Number(monthAccesses) || 0) / daysElapsed * 10) / 10;
+function computeMonthAccessAverage(monthAccesses, daysWithData) {
+  const days = Number(daysWithData) || 0;
+  if (days <= 0) return 0;
+  return Math.round((Number(monthAccesses) || 0) / days * 10) / 10;
 }
 
 function resolveUnitPrice(productRow) {
@@ -138,7 +143,8 @@ function mapSaleRow(row) {
 }
 
 async function fetchDaySummary(saleDate) {
-  const [dayResult, monthResult, topResult] = await Promise.all([
+  const today = todayYmdBrazil();
+  const [dayResult, monthResult, topResult, avgResult] = await Promise.all([
     query(
       `SELECT
          COALESCE(SUM(quantity), 0)::int AS total_items,
@@ -167,20 +173,29 @@ async function fetchDaySummary(saleDate) {
        ORDER BY qty DESC, p.name ASC
        LIMIT 1`,
       [saleDate]
+    ),
+    query(
+      `SELECT
+         COUNT(DISTINCT access_id)::int AS month_accesses,
+         COUNT(DISTINCT sale_date)::int AS month_days
+       FROM ${table('daily_sales')}
+       WHERE sale_date >= date_trunc('month', $1::date)
+         AND sale_date < date_trunc('month', $1::date) + interval '1 month'`,
+      [today]
     )
   ]);
 
   const day = dayResult.rows[0] || {};
   const month = monthResult.rows[0] || {};
-  const monthAccesses = Number(month.month_accesses) || 0;
+  const avgRow = avgResult.rows[0] || {};
   return {
     total_items: Number(day.total_items) || 0,
     total_accesses: Number(day.total_accesses) || 0,
     total_revenue: Number(day.total_revenue) || 0,
     top_product: topResult.rows[0]?.name || null,
     month_items: Number(month.month_items) || 0,
-    month_accesses: monthAccesses,
-    month_access_avg: computeMonthAccessAverage(monthAccesses, saleDate),
+    month_accesses: Number(month.month_accesses) || 0,
+    month_access_avg: computeMonthAccessAverage(avgRow.month_accesses, avgRow.month_days),
     month_revenue: Number(month.month_revenue) || 0
   };
 }

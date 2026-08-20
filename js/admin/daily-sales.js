@@ -218,6 +218,7 @@ function updateDailySalesSummary(summary) {
   const revenueEl = document.getElementById('daily-sales-stat-revenue');
   const monthItemsEl = document.getElementById('daily-sales-stat-month-items');
   const monthAccessesEl = document.getElementById('daily-sales-stat-month-accesses');
+  const monthAccessAvgEl = document.getElementById('daily-sales-stat-month-access-avg');
   const monthRevenueEl = document.getElementById('daily-sales-stat-month-revenue');
   const topEl = document.getElementById('daily-sales-stat-top');
   if (itemsEl) itemsEl.textContent = String(summary?.total_items ?? 0);
@@ -225,6 +226,12 @@ function updateDailySalesSummary(summary) {
   if (revenueEl) revenueEl.textContent = formatCurrency(summary?.total_revenue ?? 0);
   if (monthItemsEl) monthItemsEl.textContent = String(summary?.month_items ?? 0);
   if (monthAccessesEl) monthAccessesEl.textContent = String(summary?.month_accesses ?? 0);
+  if (monthAccessAvgEl) {
+    monthAccessAvgEl.textContent = Number(summary?.month_access_avg ?? 0).toLocaleString('pt-BR', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 1
+    });
+  }
   if (monthRevenueEl) monthRevenueEl.textContent = formatCurrency(summary?.month_revenue ?? 0);
   if (topEl) topEl.textContent = summary?.top_product || '—';
 }

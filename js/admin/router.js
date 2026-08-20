@@ -258,6 +258,7 @@ const AdminRouter = {
     const dashTop = document.getElementById('dashboard-stat-top');
     const dashMonthItems = document.getElementById('dashboard-stat-month-items');
     const dashMonthAccesses = document.getElementById('dashboard-stat-month-accesses');
+    const dashMonthAccessAvg = document.getElementById('dashboard-stat-month-access-avg');
     const dashMonthRevenue = document.getElementById('dashboard-stat-month-revenue');
     const dashSummary = document.getElementById('dashboard-daily-summary');
 
@@ -307,6 +308,7 @@ const AdminRouter = {
         const topProduct = salesToday?.top_product;
         const monthItems = salesToday?.month_items ?? 0;
         const monthAccesses = salesToday?.month_accesses ?? 0;
+        const monthAccessAvg = salesToday?.month_access_avg ?? 0;
         const monthRevenue = salesToday?.month_revenue ?? 0;
 
         if (salesEl) {
@@ -322,6 +324,12 @@ const AdminRouter = {
         if (dashTop) dashTop.textContent = topProduct || '—';
         if (dashMonthItems) dashMonthItems.textContent = String(monthItems);
         if (dashMonthAccesses) dashMonthAccesses.textContent = String(monthAccesses);
+        if (dashMonthAccessAvg) {
+          dashMonthAccessAvg.textContent = Number(monthAccessAvg).toLocaleString('pt-BR', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 1
+          });
+        }
         if (dashMonthRevenue) dashMonthRevenue.textContent = formatBRL(monthRevenue);
       } else if (dashSummary) {
         dashSummary.classList.add('hidden');

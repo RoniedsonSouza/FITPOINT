@@ -3116,6 +3116,19 @@ body.ticket-qr-open {
   height: 0.875rem;
 }
 
+.loyalty-reactivation {
+  max-width: 36rem;
+}
+
+.loyalty-reactivation-summary--error {
+  color: #b42318;
+}
+
+.loyalty-reactivation #btn-loyalty-reactivation:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
   .daily-diario {
     padding: 0.25rem 0 1.5rem;

@@ -133,6 +133,22 @@ async function ensureDatabase() {
       ON CONFLICT (id) DO NOTHING
     `);
     await client.query(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA}.loyalty_whatsapp_messages (
+        id SERIAL PRIMARY KEY,
+        customer_id INTEGER REFERENCES ${SCHEMA}.loyalty_customers(id) ON DELETE CASCADE,
+        phone VARCHAR(20) NOT NULL,
+        template_name VARCHAR(120) NOT NULL,
+        status VARCHAR(20) NOT NULL,
+        provider_message_id VARCHAR(120),
+        error_message TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_loyalty_whatsapp_messages_customer_created
+      ON ${SCHEMA}.loyalty_whatsapp_messages (customer_id, created_at DESC)
+    `);
+    await client.query(`
       CREATE TABLE IF NOT EXISTS ${SCHEMA}.daily_sales (
         id SERIAL PRIMARY KEY,
         sale_date DATE NOT NULL DEFAULT CURRENT_DATE,

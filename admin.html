@@ -289,6 +289,16 @@
           </div>
           <p class="text-xs text-black/50 mt-2" id="loyalty-access-help">Vendas no Diário contam visitas
             automaticamente: a cada R$ 27 em compras, 1 visita.</p>
+          <div class="loyalty-reactivation mt-4 pt-3 border-t border-black/10">
+            <p class="text-sm font-semibold mb-1">WhatsApp — clientes ausentes</p>
+            <p class="text-xs text-black/50 mb-2">O texto é o template aprovado na Meta. Variáveis: nome e dias
+              ausente.</p>
+            <p id="loyalty-reactivation-summary" class="text-sm text-black/70 mb-2">Carregando preview…</p>
+            <button type="button" id="btn-loyalty-reactivation" onclick="sendLoyaltyReactivationBatch()"
+              class="btn btn-primary btn-md">
+              <i data-lucide="message-circle"></i> Enviar WhatsApp aos ausentes
+            </button>
+          </div>
         </div>
 
         <div class="admin-tabs" role="tablist">

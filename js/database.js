@@ -250,6 +250,46 @@ const DB = {
     return response.json();
   },
 
+  async previewLoyaltyReactivation() {
+    const response = await fetch(`${getApiBaseUrl()}/loyalty/reactivation/preview`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao pré-visualizar reativação';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async sendLoyaltyReactivation() {
+    const response = await fetch(`${getApiBaseUrl()}/loyalty/reactivation/send`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const errorMsg = data.error || 'Erro ao enviar reativação';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return data;
+  },
+
+  async getLoyaltyReactivationStatus() {
+    const response = await fetch(`${getApiBaseUrl()}/loyalty/reactivation/status`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao consultar envio WhatsApp';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
   async getLoyaltyRankings(params = {}) {
     const qs = new URLSearchParams();
     if (params.q) qs.set('q', params.q);

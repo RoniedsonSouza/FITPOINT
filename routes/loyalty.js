@@ -6,6 +6,11 @@ const {
   DEFAULT_VISITS_PER_REWARD,
   DEFAULT_ACCESS_VALUE,
   normalizePhone,
+  formatPhoneForWhatsApp,
+  firstNameFromDisplayName,
+  inactiveDaysFromRow,
+  classifyReactivationRecipient,
+  buildInactiveVisitSqlClause,
   mapCustomerRow,
   applyVisitDelta,
   insertVisitEvents,
@@ -24,10 +29,161 @@ const {
   computeTotalPages
 } = require('./loyaltyHelpers');
 const { createImageUploadMiddleware } = require('../middleware/imageUpload');
+const {
+  isWhatsAppConfigured,
+  getWhatsAppConfig,
+  sendReactivationTemplate
+} = require('../services/whatsapp');
 
 const WINNERS_HALL_LIMIT = 5;
+const SEND_GAP_MS = 500;
 
 const uploadAvatarMiddleware = createImageUploadMiddleware('loyalty');
+
+function emptyReactivationJob() {
+  return {
+    running: false,
+    processed: 0,
+    total: 0,
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+    errors: []
+  };
+}
+
+let reactivationJob = emptyReactivationJob();
+
+function reactivationStatusPayload() {
+  return {
+    running: reactivationJob.running,
+    processed: reactivationJob.processed,
+    total: reactivationJob.total,
+    sent: reactivationJob.sent,
+    failed: reactivationJob.failed,
+    skipped: reactivationJob.skipped,
+    errors: reactivationJob.errors,
+    configured: isWhatsAppConfigured()
+  };
+}
+
+async function listInactiveCustomersForReactivation() {
+  const inactiveClause = buildInactiveVisitSqlClause('c').clause;
+  const result = await query(
+    `SELECT c.*,
+       (SELECT m.created_at FROM ${table('loyalty_whatsapp_messages')} m
+        WHERE m.customer_id = c.id AND m.status = 'sent'
+        ORDER BY m.created_at DESC
+        LIMIT 1) AS last_whatsapp_sent_at
+     FROM ${table('loyalty_customers')} c
+     WHERE c.active IS DISTINCT FROM false
+     ${inactiveClause}
+     ORDER BY c.name ASC`
+  );
+  return result.rows;
+}
+
+function summarizeReactivationRecipients(rows) {
+  const eligibleRows = [];
+  const skippedRows = [];
+  let eligible = 0;
+  let skipped_cooldown = 0;
+  let skipped_phone = 0;
+
+  for (const row of rows) {
+    const kind = classifyReactivationRecipient(row, row.last_whatsapp_sent_at);
+    if (kind === 'eligible') {
+      eligible += 1;
+      eligibleRows.push(row);
+    } else if (kind === 'skip_cooldown') {
+      skipped_cooldown += 1;
+      skippedRows.push({ row, reason: 'cooldown' });
+    } else {
+      skipped_phone += 1;
+      skippedRows.push({ row, reason: 'phone' });
+    }
+  }
+
+  return { eligible, skipped_cooldown, skipped_phone, eligibleRows, skippedRows };
+}
+
+async function insertWhatsappLog({ customerId, phone, templateName, status, providerMessageId, errorMessage }) {
+  await query(
+    `INSERT INTO ${table('loyalty_whatsapp_messages')}
+      (customer_id, phone, template_name, status, provider_message_id, error_message)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [customerId, phone, templateName, status, providerMessageId || null, errorMessage || null]
+  );
+}
+
+async function runReactivationJob(eligibleRows, skippedRows) {
+  const { templateName } = getWhatsAppConfig();
+  reactivationJob = {
+    ...emptyReactivationJob(),
+    running: true,
+    total: eligibleRows.length + skippedRows.length
+  };
+
+  try {
+    for (const { row, reason } of skippedRows) {
+      const phone = formatPhoneForWhatsApp(row.phone) || String(row.phone || 'invalid');
+      await insertWhatsappLog({
+        customerId: row.id,
+        phone,
+        templateName,
+        status: 'skipped',
+        errorMessage: reason === 'cooldown' ? 'Cooldown de 7 dias' : 'Telefone inválido'
+      });
+      reactivationJob.skipped += 1;
+      reactivationJob.processed += 1;
+    }
+
+    for (let i = 0; i < eligibleRows.length; i++) {
+      const row = eligibleRows[i];
+      const to = formatPhoneForWhatsApp(row.phone);
+      const name = firstNameFromDisplayName(row.name);
+      const days = inactiveDaysFromRow(row);
+      try {
+        const result = await sendReactivationTemplate({ to, name, days });
+        await insertWhatsappLog({
+          customerId: row.id,
+          phone: to,
+          templateName,
+          status: 'sent',
+          providerMessageId: result.id
+        });
+        reactivationJob.sent += 1;
+      } catch (err) {
+        await insertWhatsappLog({
+          customerId: row.id,
+          phone: to || String(row.phone || 'invalid'),
+          templateName,
+          status: 'failed',
+          errorMessage: err.message
+        });
+        reactivationJob.failed += 1;
+        if (reactivationJob.errors.length < 20) {
+          reactivationJob.errors.push({
+            customer_id: row.id,
+            name: row.name,
+            error: err.message
+          });
+        }
+      }
+      reactivationJob.processed += 1;
+      if (i < eligibleRows.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, SEND_GAP_MS));
+      }
+    }
+  } catch (error) {
+    console.error('Erro no lote de reativação WhatsApp:', error);
+    if (reactivationJob.errors.length < 20) {
+      reactivationJob.errors.push({ error: error.message });
+    }
+  } finally {
+    reactivationJob.running = false;
+  }
+}
 
 async function getVisitsPerReward() {
   const settings = await getLoyaltySettings();
@@ -114,6 +270,65 @@ router.put('/settings', authenticateToken, requirePermission('fidelidade'), asyn
   } catch (error) {
     console.error('Erro ao atualizar configurações de fidelidade:', error);
     res.status(500).json({ error: 'Erro ao atualizar configurações de fidelidade' });
+  }
+});
+
+// GET /api/loyalty/reactivation/preview — admin
+router.get('/reactivation/preview', authenticateToken, requirePermission('fidelidade'), async (req, res) => {
+  try {
+    const rows = await listInactiveCustomersForReactivation();
+    const summary = summarizeReactivationRecipients(rows);
+    res.json({
+      eligible: summary.eligible,
+      skipped_cooldown: summary.skipped_cooldown,
+      skipped_phone: summary.skipped_phone,
+      configured: isWhatsAppConfigured()
+    });
+  } catch (error) {
+    console.error('Erro ao pré-visualizar reativação WhatsApp:', error);
+    res.status(500).json({ error: 'Erro ao pré-visualizar reativação WhatsApp' });
+  }
+});
+
+// GET /api/loyalty/reactivation/status — admin
+router.get('/reactivation/status', authenticateToken, requirePermission('fidelidade'), (req, res) => {
+  res.json(reactivationStatusPayload());
+});
+
+// POST /api/loyalty/reactivation/send — admin
+router.post('/reactivation/send', authenticateToken, requirePermission('fidelidade'), async (req, res) => {
+  try {
+    if (!isWhatsAppConfigured()) {
+      return res.status(503).json({
+        error: 'WhatsApp Cloud API não configurada. Defina WHATSAPP_TOKEN e WHATSAPP_PHONE_NUMBER_ID.'
+      });
+    }
+    if (reactivationJob.running) {
+      return res.status(409).json({
+        error: 'Já existe um envio em andamento.',
+        ...reactivationStatusPayload()
+      });
+    }
+
+    const rows = await listInactiveCustomersForReactivation();
+    const summary = summarizeReactivationRecipients(rows);
+    if (summary.eligible === 0) {
+      return res.status(400).json({
+        error: 'Nenhum cliente ausente elegível para envio.',
+        eligible: 0,
+        skipped_cooldown: summary.skipped_cooldown,
+        skipped_phone: summary.skipped_phone,
+        sent: 0,
+        failed: 0,
+        skipped: summary.skipped_cooldown + summary.skipped_phone
+      });
+    }
+
+    runReactivationJob(summary.eligibleRows, summary.skippedRows);
+    res.status(202).json(reactivationStatusPayload());
+  } catch (error) {
+    console.error('Erro ao iniciar envio de reativação WhatsApp:', error);
+    res.status(500).json({ error: 'Erro ao iniciar envio de reativação WhatsApp' });
   }
 });
 

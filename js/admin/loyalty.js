@@ -252,8 +252,98 @@ async function loadLoyaltySettings() {
     const accessInput = document.getElementById('loyalty-access-value');
     if (accessInput) accessInput.value = loyaltyAccessValue;
     updateLoyaltyRuleText();
+    loadLoyaltyReactivationPreview();
   } catch (error) {
     console.error('Erro ao carregar configurações de fidelidade:', error);
+  }
+}
+
+const LOYALTY_WHATSAPP_NOT_CONFIGURED_MSG =
+  'WhatsApp não está configurado corretamente. Defina WHATSAPP_TOKEN e WHATSAPP_PHONE_NUMBER_ID no .env, confira o template aprovado na Meta e reinicie o servidor.';
+
+function setLoyaltyReactivationSummary(text, isError = false) {
+  const summaryEl = document.getElementById('loyalty-reactivation-summary');
+  if (!summaryEl) return;
+  summaryEl.textContent = text;
+  summaryEl.classList.toggle('loyalty-reactivation-summary--error', isError);
+}
+
+async function loadLoyaltyReactivationPreview() {
+  const summaryEl = document.getElementById('loyalty-reactivation-summary');
+  if (!summaryEl || typeof DB === 'undefined' || !DB.previewLoyaltyReactivation) return;
+
+  try {
+    const preview = await DB.previewLoyaltyReactivation();
+    if (!preview.configured) {
+      setLoyaltyReactivationSummary(LOYALTY_WHATSAPP_NOT_CONFIGURED_MSG, true);
+      return;
+    }
+    const extra = [];
+    if (preview.skipped_cooldown) extra.push(`${preview.skipped_cooldown} em cooldown (7 dias)`);
+    if (preview.skipped_phone) extra.push(`${preview.skipped_phone} sem telefone válido`);
+    const extraText = extra.length ? ` ${extra.join('; ')}.` : '';
+    if (preview.eligible === 1) {
+      setLoyaltyReactivationSummary(`1 cliente ausente receberá a mensagem.${extraText}`);
+    } else {
+      setLoyaltyReactivationSummary(`${preview.eligible} clientes ausentes receberão a mensagem.${extraText}`);
+    }
+  } catch (error) {
+    if (handleAuthError(error)) return;
+    setLoyaltyReactivationSummary(
+      'Não foi possível verificar o WhatsApp. Confira a configuração da Cloud API e tente de novo.',
+      true
+    );
+  }
+}
+
+function sleepMs(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function sendLoyaltyReactivationBatch() {
+  const btn = document.getElementById('btn-loyalty-reactivation');
+  if (!btn || btn.classList.contains('is-loading')) return;
+
+  try {
+    const preview = await DB.previewLoyaltyReactivation();
+    if (!preview.configured) {
+      setLoyaltyReactivationSummary(LOYALTY_WHATSAPP_NOT_CONFIGURED_MSG, true);
+      showToast(LOYALTY_WHATSAPP_NOT_CONFIGURED_MSG, 'error');
+      return;
+    }
+    if (!preview.eligible) {
+      showToast('Nenhum cliente ausente elegível no momento.', 'info');
+      await loadLoyaltyReactivationPreview();
+      return;
+    }
+    const ok = confirm(`Enviar WhatsApp para ${preview.eligible} cliente(s) ausente(s)?`);
+    if (!ok) return;
+
+    await withButtonLoading(btn, async () => {
+      await DB.sendLoyaltyReactivation();
+      let status = await DB.getLoyaltyReactivationStatus();
+      while (status.running) {
+        await sleepMs(800);
+        status = await DB.getLoyaltyReactivationStatus();
+      }
+      const parts = [
+        `Enviados: ${status.sent}`,
+        `Falhas: ${status.failed}`,
+        `Pulados: ${status.skipped}`
+      ];
+      showToast(parts.join('. ') + '.', status.failed > 0 ? 'error' : 'success');
+    }, 'Enviando…');
+
+    await loadLoyaltyReactivationPreview();
+  } catch (error) {
+    if (!handleAuthError(error)) {
+      const raw = String(error.message || '');
+      const notConfigured = /não configurad|WHATSAPP_TOKEN|WHATSAPP_PHONE/i.test(raw);
+      const message = notConfigured ? LOYALTY_WHATSAPP_NOT_CONFIGURED_MSG : ('Erro: ' + raw);
+      if (notConfigured) setLoyaltyReactivationSummary(LOYALTY_WHATSAPP_NOT_CONFIGURED_MSG, true);
+      showToast(message, 'error');
+    }
+    await loadLoyaltyReactivationPreview();
   }
 }
 

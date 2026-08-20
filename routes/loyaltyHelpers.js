@@ -1,10 +1,55 @@
 const DEFAULT_VISITS_PER_REWARD = 10;
 const DEFAULT_ACCESS_VALUE = 27;
 const INACTIVE_VISIT_DAYS = 3;
+const REACTIVATION_COOLDOWN_DAYS = 7;
 const { table } = require('../config/database');
 
 function normalizePhone(phone) {
   return String(phone || '').replace(/\D/g, '').slice(0, 11);
+}
+
+function formatPhoneForWhatsApp(phone) {
+  const digits = normalizePhone(phone);
+  if (digits.length < 10 || digits.length > 11) return null;
+  return `55${digits}`;
+}
+
+function firstNameFromDisplayName(name) {
+  const trimmed = String(name || '').trim();
+  if (!trimmed) return 'Cliente';
+  return trimmed.split(/\s+/)[0].slice(0, 60);
+}
+
+function inactiveDaysFromRow(row, now = Date.now()) {
+  const lastPositive = row?.last_positive_visit_at ? new Date(row.last_positive_visit_at) : null;
+  if (!lastPositive || Number.isNaN(lastPositive.getTime())) {
+    return INACTIVE_VISIT_DAYS;
+  }
+  return Math.max(0, Math.floor((now - lastPositive.getTime()) / (24 * 60 * 60 * 1000)));
+}
+
+function isWithinCooldown(lastSentAt, now = Date.now()) {
+  if (!lastSentAt) return false;
+  const t = lastSentAt instanceof Date ? lastSentAt : new Date(lastSentAt);
+  if (Number.isNaN(t.getTime())) return false;
+  return now - t.getTime() < REACTIVATION_COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
+}
+
+function classifyReactivationRecipient(row, lastSentAt, now = Date.now()) {
+  if (!formatPhoneForWhatsApp(row?.phone)) return 'skip_phone';
+  if (isWithinCooldown(lastSentAt, now)) return 'skip_cooldown';
+  return 'eligible';
+}
+
+function buildInactiveVisitSqlClause(alias = '') {
+  const col = alias ? `${alias}.` : '';
+  return {
+    clause: ` AND (
+      (${col}last_positive_visit_at IS NOT NULL
+        AND ${col}last_positive_visit_at < NOW() - INTERVAL '${INACTIVE_VISIT_DAYS} days')
+      OR (${col}last_positive_visit_at IS NULL AND COALESCE(${col}total_visits, 0) > 0)
+    )`
+  };
 }
 
 function getProgress(totalVisits, visitsPerReward = DEFAULT_VISITS_PER_REWARD) {
@@ -273,7 +318,14 @@ module.exports = {
   DEFAULT_VISITS_PER_REWARD,
   DEFAULT_ACCESS_VALUE,
   INACTIVE_VISIT_DAYS,
+  REACTIVATION_COOLDOWN_DAYS,
   normalizePhone,
+  formatPhoneForWhatsApp,
+  firstNameFromDisplayName,
+  inactiveDaysFromRow,
+  isWithinCooldown,
+  classifyReactivationRecipient,
+  buildInactiveVisitSqlClause,
   getProgress,
   getDisplayProgress,
   isCycleComplete,

@@ -21,6 +21,7 @@ const AdminRouter = {
     this.bindSidebar();
     this.bindModuleCards();
     this.bindMobileMenu();
+    this.bindRefreshButton();
   },
 
   isAuthenticated() {
@@ -71,6 +72,58 @@ const AdminRouter = {
   closeMobileSidebar() {
     document.getElementById('admin-sidebar')?.classList.remove('is-open');
     document.getElementById('admin-sidebar-overlay')?.classList.remove('is-visible');
+  },
+
+  bindRefreshButton() {
+    const btn = document.getElementById('admin-refresh-btn');
+    if (!btn || btn.dataset.refreshBound === '1') return;
+    btn.dataset.refreshBound = '1';
+    btn.addEventListener('click', () => {
+      if (typeof refreshAdminPanel === 'function') {
+        refreshAdminPanel();
+      }
+    });
+  },
+
+  getRefreshLabel() {
+    const parsed = this.parseHash();
+    const module = this.canAccessModule(parsed.module) ? parsed.module : 'dashboard';
+    const route = this.routes[module];
+    const name = route?.label || 'painel';
+    return `Atualizando ${name}…`;
+  },
+
+  async refreshCurrentModule() {
+    if (!this.isAuthenticated()) return;
+    if (typeof Auth !== 'undefined' && Auth.mustChangePassword()) return;
+
+    const parsed = this.parseHash();
+    let module = parsed.module;
+
+    if (!this.canAccessModule(module)) {
+      module = 'dashboard';
+    }
+
+    if (module === 'eventos') {
+      if (typeof isTicketQrOverlayOpen === 'function' && isTicketQrOverlayOpen()) {
+        if (typeof stopTicketQrScanner === 'function') {
+          await stopTicketQrScanner({ reason: 'refresh' });
+        }
+      }
+    }
+
+    const route = this.routes[module];
+    if (!route) return;
+
+    if (module === 'dashboard') {
+      await this.loadDashboardStats();
+      return;
+    }
+
+    const loaderName = route.loader;
+    if (loaderName && typeof window[loaderName] === 'function') {
+      await window[loaderName]();
+    }
   },
 
   parseHash() {
@@ -200,8 +253,12 @@ const AdminRouter = {
     const eventsEl = document.getElementById('stat-events');
     const distEl = document.getElementById('stat-distributors');
     const dashItems = document.getElementById('dashboard-stat-items');
+    const dashAccesses = document.getElementById('dashboard-stat-accesses');
     const dashRevenue = document.getElementById('dashboard-stat-revenue');
     const dashTop = document.getElementById('dashboard-stat-top');
+    const dashMonthItems = document.getElementById('dashboard-stat-month-items');
+    const dashMonthAccesses = document.getElementById('dashboard-stat-month-accesses');
+    const dashMonthRevenue = document.getElementById('dashboard-stat-month-revenue');
     const dashSummary = document.getElementById('dashboard-daily-summary');
 
     const canCat = this.canAccessModule('categorias');
@@ -245,19 +302,27 @@ const AdminRouter = {
 
       if (canSales) {
         const totalItems = salesToday?.total_items ?? 0;
+        const totalAccesses = salesToday?.total_accesses ?? 0;
         const totalRevenue = salesToday?.total_revenue ?? 0;
         const topProduct = salesToday?.top_product;
+        const monthItems = salesToday?.month_items ?? 0;
+        const monthAccesses = salesToday?.month_accesses ?? 0;
+        const monthRevenue = salesToday?.month_revenue ?? 0;
 
         if (salesEl) {
           salesEl.textContent = totalItems > 0
-            ? `${totalItems} venda${totalItems !== 1 ? 's' : ''} · ${formatBRL(totalRevenue)} hoje`
+            ? `${totalItems} venda${totalItems !== 1 ? 's' : ''} · ${totalAccesses} acesso${totalAccesses !== 1 ? 's' : ''} · ${formatBRL(totalRevenue)} hoje`
             : 'Nenhuma venda hoje';
         }
 
         if (dashSummary) dashSummary.classList.remove('hidden');
         if (dashItems) dashItems.textContent = String(totalItems);
+        if (dashAccesses) dashAccesses.textContent = String(totalAccesses);
         if (dashRevenue) dashRevenue.textContent = formatBRL(totalRevenue);
         if (dashTop) dashTop.textContent = topProduct || '—';
+        if (dashMonthItems) dashMonthItems.textContent = String(monthItems);
+        if (dashMonthAccesses) dashMonthAccesses.textContent = String(monthAccesses);
+        if (dashMonthRevenue) dashMonthRevenue.textContent = formatBRL(monthRevenue);
       } else if (dashSummary) {
         dashSummary.classList.add('hidden');
       }
@@ -280,8 +345,12 @@ const AdminRouter = {
       if (eventsEl) eventsEl.textContent = '—';
       if (distEl) distEl.textContent = '—';
       if (dashItems) dashItems.textContent = '—';
+      if (dashAccesses) dashAccesses.textContent = '—';
       if (dashRevenue) dashRevenue.textContent = '—';
       if (dashTop) dashTop.textContent = '—';
+      if (dashMonthItems) dashMonthItems.textContent = '—';
+      if (dashMonthAccesses) dashMonthAccesses.textContent = '—';
+      if (dashMonthRevenue) dashMonthRevenue.textContent = '—';
     }
   },
 

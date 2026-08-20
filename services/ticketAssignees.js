@@ -2,6 +2,10 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function isValidPhone(phone) {
+  return String(phone || '').replace(/\D/g, '').length >= 10;
+}
+
 function normalizeAssignees(assignees, quantity) {
   const qty = parseInt(quantity, 10);
   if (!qty || qty < 1 || qty > 10) {
@@ -29,10 +33,13 @@ function normalizeAssignees(assignees, quantity) {
     }
     const name = raw.name != null ? String(raw.name).trim() : '';
     const email = raw.email != null ? String(raw.email).trim().toLowerCase() : '';
-    const phone = raw.phone != null && String(raw.phone).trim() ? String(raw.phone).trim() : null;
+    const phone = String(raw.phone || '').replace(/\D/g, '');
     if (!name) return { ok: false, error: `Nome do destinatário ${i + 1} é obrigatório` };
     if (!email || !isValidEmail(email)) {
       return { ok: false, error: `E-mail do destinatário ${i + 1} é inválido` };
+    }
+    if (!isValidPhone(phone)) {
+      return { ok: false, error: `Telefone do destinatário ${i + 1} é obrigatório (mínimo 10 dígitos)` };
     }
     value.push({ name, email, phone });
   }
@@ -63,4 +70,4 @@ function resolveHolders(order) {
   return holders;
 }
 
-module.exports = { normalizeAssignees, resolveHolders, isValidEmail };
+module.exports = { normalizeAssignees, resolveHolders, isValidEmail, isValidPhone };

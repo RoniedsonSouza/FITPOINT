@@ -50,7 +50,7 @@
       </div>
       <nav class="flex items-center gap-3">
         <a href="/" class="text-sm hover:text-fp-green no-underline text-inherit hidden sm:inline">Voltar ao Site</a>
-        <button type="button" onclick="location.reload()" class="btn btn-secondary btn-sm">
+        <button type="button" id="admin-refresh-btn" class="btn btn-refresh btn-sm" aria-label="Atualizar módulo atual">
           <i data-lucide="refresh-cw"></i>
           <span class="hidden sm:inline">Atualizar</span>
         </button>
@@ -140,6 +140,12 @@
     </aside>
 
     <main class="admin-main">
+      <div id="admin-page-loading" class="admin-page-loading hidden" aria-live="polite" aria-hidden="true">
+        <div class="admin-page-loading-inner">
+          <span class="admin-page-loading-spinner" aria-hidden="true"></span>
+          <p id="admin-page-loading-label">Atualizando…</p>
+        </div>
+      </div>
       <!-- Dashboard -->
       <section id="view-dashboard" class="admin-view is-active">
         <div class="admin-view-header">
@@ -184,20 +190,43 @@
             <span class="module-card-stat" id="stat-distributors">—</span>
           </button>
         </div>
-        <div id="dashboard-daily-summary" class="card mt-4 hidden">
-          <h3 class="font-semibold text-sm mb-3">Resumo de hoje</h3>
-          <div class="grid gap-3 sm:grid-cols-3 text-sm">
-            <div>
-              <p class="text-black/50 text-xs mb-1">Vendas</p>
-              <p class="font-semibold" id="dashboard-stat-items">—</p>
+        <div id="dashboard-daily-summary" class="hidden">
+          <div class="dashboard-daily-block">
+            <h3 class="dashboard-daily-heading">Resumo do dia</h3>
+            <div class="dashboard-daily-stats dashboard-daily-stats--day" aria-label="Resumo do dia">
+              <div class="card dashboard-daily-stat-card">
+                <p class="dashboard-daily-stat-label">Vendas</p>
+                <p class="dashboard-daily-stat-value" id="dashboard-stat-items">—</p>
+              </div>
+              <div class="card dashboard-daily-stat-card">
+                <p class="dashboard-daily-stat-label">Acessos</p>
+                <p class="dashboard-daily-stat-value" id="dashboard-stat-accesses">—</p>
+              </div>
+              <div class="card dashboard-daily-stat-card">
+                <p class="dashboard-daily-stat-label">Faturamento</p>
+                <p class="dashboard-daily-stat-value dashboard-daily-stat-value--revenue" id="dashboard-stat-revenue">—</p>
+              </div>
+              <div class="card dashboard-daily-stat-card">
+                <p class="dashboard-daily-stat-label">Mais vendido</p>
+                <p class="dashboard-daily-stat-value dashboard-daily-stat-value--top" id="dashboard-stat-top">—</p>
+              </div>
             </div>
-            <div>
-              <p class="text-black/50 text-xs mb-1">Faturamento</p>
-              <p class="font-semibold text-fp-green" id="dashboard-stat-revenue">—</p>
-            </div>
-            <div>
-              <p class="text-black/50 text-xs mb-1">Mais vendido</p>
-              <p class="font-semibold" id="dashboard-stat-top">—</p>
+          </div>
+          <div class="dashboard-daily-block">
+            <h3 class="dashboard-daily-heading">Resumo do mês</h3>
+            <div class="dashboard-daily-stats dashboard-daily-stats--month" aria-label="Resumo do mês">
+              <div class="card dashboard-daily-stat-card">
+                <p class="dashboard-daily-stat-label">Vendas no mês</p>
+                <p class="dashboard-daily-stat-value" id="dashboard-stat-month-items">—</p>
+              </div>
+              <div class="card dashboard-daily-stat-card">
+                <p class="dashboard-daily-stat-label">Acessos no mês</p>
+                <p class="dashboard-daily-stat-value" id="dashboard-stat-month-accesses">—</p>
+              </div>
+              <div class="card dashboard-daily-stat-card">
+                <p class="dashboard-daily-stat-label">Faturamento no mês</p>
+                <p class="dashboard-daily-stat-value dashboard-daily-stat-value--revenue" id="dashboard-stat-month-revenue">—</p>
+              </div>
             </div>
           </div>
         </div>
@@ -338,21 +367,60 @@
           </div>
         </div>
 
-        <div class="daily-sales-stats">
+        <div class="daily-sales-stats" aria-label="Resumo do dia">
           <div class="card daily-sales-stat-card">
             <p class="daily-sales-stat-label">Vendas</p>
             <p class="daily-sales-stat-value" id="daily-sales-stat-items">—</p>
           </div>
-
+          <div class="card daily-sales-stat-card">
+            <p class="daily-sales-stat-label">Quantidade de acessos</p>
+            <p class="daily-sales-stat-value" id="daily-sales-stat-accesses">—</p>
+          </div>
           <div class="card daily-sales-stat-card">
             <p class="daily-sales-stat-label">Faturamento</p>
             <p class="daily-sales-stat-value daily-sales-stat-value--revenue" id="daily-sales-stat-revenue">—</p>
           </div>
-          
+        </div>
+
+        <div class="daily-sales-stats daily-sales-stats--month" aria-label="Resumo do mês">
+          <div class="card daily-sales-stat-card">
+            <p class="daily-sales-stat-label">Vendas no mês</p>
+            <p class="daily-sales-stat-value" id="daily-sales-stat-month-items">—</p>
+          </div>
+          <div class="card daily-sales-stat-card">
+            <p class="daily-sales-stat-label">Acessos no mês</p>
+            <p class="daily-sales-stat-value" id="daily-sales-stat-month-accesses">—</p>
+          </div>
+          <div class="card daily-sales-stat-card">
+            <p class="daily-sales-stat-label">Faturamento no mês</p>
+            <p class="daily-sales-stat-value daily-sales-stat-value--revenue" id="daily-sales-stat-month-revenue">—</p>
+          </div>
+        </div>
+
+        <div class="daily-sales-charts">
+          <div class="card daily-sales-chart-card">
+            <p class="daily-sales-chart-title">Vendas e acessos no mês</p>
+            <div class="daily-sales-chart-wrap">
+              <canvas id="daily-sales-chart-volume" aria-label="Gráfico de vendas e acessos no mês"></canvas>
+            </div>
+          </div>
+          <div class="card daily-sales-chart-card">
+            <p class="daily-sales-chart-title">Faturamento no mês</p>
+            <div class="daily-sales-chart-wrap">
+              <canvas id="daily-sales-chart-revenue" aria-label="Gráfico de faturamento no mês"></canvas>
+            </div>
+          </div>
+          <div class="card daily-sales-chart-card">
+            <p class="daily-sales-chart-title">Produtos do dia</p>
+            <div class="daily-sales-chart-wrap daily-sales-chart-wrap--doughnut">
+              <canvas id="daily-sales-chart-products" aria-label="Gráfico de produtos do dia"></canvas>
+            </div>
+            <p id="daily-sales-chart-products-empty" class="daily-sales-chart-empty hidden">Nenhuma venda neste dia.</p>
+          </div>
         </div>
 
         <div id="daily-sales-list" class="daily-sales-list">
-          <p class="text-black/60">Selecione este módulo para carregar.</p>
+          <p class="daily-diario-list-empty">Selecione este módulo para carregar.</p>
         </div>
       </section>
 
@@ -1025,7 +1093,8 @@
         </div>
         <div class="form-group">
           <label>Telefone</label>
-          <input type="tel" id="loyalty-phone" required placeholder="Ex.: (27) 99999-9999">
+          <input type="tel" id="loyalty-phone" required autocomplete="tel" inputmode="numeric"
+            placeholder="(00) 00000-0000" maxlength="15">
         </div>
         <div class="form-group">
           <label>Avatar (opcional)</label>
@@ -1268,7 +1337,9 @@
   <script src="/js/admin/categories.js"></script>
   <script src="/js/admin/products.js"></script>
   <script src="/js/admin/loyalty.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="/js/admin/daily-sales.js"></script>
+  <script src="/js/datetime.js"></script>
   <script src="/js/admin/events.js"></script>
   <script src="/js/admin/distributors.js"></script>
   <script src="/js/admin/users.js"></script>

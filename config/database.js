@@ -155,8 +155,34 @@ async function ensureDatabase() {
       ALTER TABLE ${SCHEMA}.daily_sales
       ADD COLUMN IF NOT EXISTS selected_options JSONB NOT NULL DEFAULT '[]'::jsonb
     `);
+    try {
+      await client.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto`);
+    } catch (error) {
+      // PostgreSQL 13+ já expõe gen_random_uuid() sem a extensão
+    }
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.daily_sales
+      ADD COLUMN IF NOT EXISTS access_id UUID
+    `);
+    await client.query(`
+      UPDATE ${SCHEMA}.daily_sales ds
+      SET access_id = g.access_id
+      FROM (
+        SELECT sale_date, created_at, loyalty_customer_id, gen_random_uuid() AS access_id
+        FROM ${SCHEMA}.daily_sales
+        WHERE access_id IS NULL
+        GROUP BY sale_date, created_at, loyalty_customer_id
+      ) g
+      WHERE ds.access_id IS NULL
+        AND ds.sale_date = g.sale_date
+        AND ds.created_at IS NOT DISTINCT FROM g.created_at
+        AND ds.loyalty_customer_id IS NOT DISTINCT FROM g.loyalty_customer_id
+    `);
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_daily_sales_date ON ${SCHEMA}.daily_sales(sale_date)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_daily_sales_access_id ON ${SCHEMA}.daily_sales(access_id)
     `);
     await client.query(`
       CREATE TABLE IF NOT EXISTS ${SCHEMA}.daily_diary_days (

@@ -10,22 +10,14 @@ const {
 } = require('../config/auth');
 const { validatePromoConfig } = require('../services/ticketPricing');
 const { createImageUploadMiddleware } = require('../middleware/imageUpload');
+const {
+  normalizeTimestampForDb,
+  serializeTimestampForApi,
+  parseTimestampInstant
+} = require('../services/datetime');
 const jwt = require('jsonwebtoken');
 
 const uploadEventImageMiddleware = createImageUploadMiddleware('events');
-
-function normalizeTimestampForDb(value) {
-  if (value == null || value === '') return null;
-  const s = String(value).trim();
-  const naiveMatch = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::\d{2})?$/.exec(s);
-  if (naiveMatch && !s.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(s)) {
-    return `${naiveMatch[1]}:00`;
-  }
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return null;
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-}
 
 function mapEventRow(row) {
   const logo_url = row.logo_url || null;
@@ -35,7 +27,7 @@ function mapEventRow(row) {
     title: row.title,
     description: row.description || '',
     venue: row.venue || '',
-    starts_at: row.starts_at,
+    starts_at: serializeTimestampForApi(row.starts_at),
     image_url: cover_url || logo_url || row.image_url || null,
     logo_url,
     cover_url,
@@ -68,8 +60,8 @@ function mapLotRow(row) {
     quantity_total: total,
     quantity_sold: sold,
     quantity_available: Math.max(0, total - sold),
-    sales_start: row.sales_start,
-    sales_end: row.sales_end,
+    sales_start: serializeTimestampForApi(row.sales_start),
+    sales_end: serializeTimestampForApi(row.sales_end),
     active: row.active !== false,
     promo_enabled: row.promo_enabled === true,
     promo_qty: row.promo_qty != null ? Number(row.promo_qty) : null,
@@ -83,8 +75,14 @@ function mapLotRow(row) {
 
 function isLotOnSale(lot, now = new Date()) {
   if (lot.active === false) return false;
-  if (lot.sales_start && new Date(lot.sales_start) > now) return false;
-  if (lot.sales_end && new Date(lot.sales_end) < now) return false;
+  if (lot.sales_start) {
+    const start = parseTimestampInstant(lot.sales_start);
+    if (start && start > now) return false;
+  }
+  if (lot.sales_end) {
+    const end = parseTimestampInstant(lot.sales_end);
+    if (end && end < now) return false;
+  }
   return (Number(lot.quantity_total) - Number(lot.quantity_sold)) > 0;
 }
 

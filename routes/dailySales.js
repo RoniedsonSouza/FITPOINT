@@ -1,4 +1,5 @@
 const express = require('express');
+const { randomUUID } = require('crypto');
 const router = express.Router();
 const { query, getClient, table } = require('../config/database');
 const { authenticateToken, requirePermission } = require('../config/auth');
@@ -131,31 +132,95 @@ function mapSaleRow(row) {
 }
 
 async function fetchDaySummary(saleDate) {
-  const totalsResult = await query(
-    `SELECT
-       COALESCE(SUM(quantity), 0)::int AS total_items,
-       COALESCE(SUM(quantity * unit_price), 0)::numeric AS total_revenue
-     FROM ${table('daily_sales')}
-     WHERE sale_date = $1::date`,
-    [saleDate]
-  );
+  const [dayResult, monthResult, topResult] = await Promise.all([
+    query(
+      `SELECT
+         COALESCE(SUM(quantity), 0)::int AS total_items,
+         COUNT(DISTINCT access_id)::int AS total_accesses,
+         COALESCE(SUM(quantity * unit_price), 0)::numeric AS total_revenue
+       FROM ${table('daily_sales')}
+       WHERE sale_date = $1::date`,
+      [saleDate]
+    ),
+    query(
+      `SELECT
+         COALESCE(SUM(quantity), 0)::int AS month_items,
+         COUNT(DISTINCT access_id)::int AS month_accesses,
+         COALESCE(SUM(quantity * unit_price), 0)::numeric AS month_revenue
+       FROM ${table('daily_sales')}
+       WHERE sale_date >= date_trunc('month', $1::date)
+         AND sale_date < date_trunc('month', $1::date) + interval '1 month'`,
+      [saleDate]
+    ),
+    query(
+      `SELECT p.name, SUM(ds.quantity)::int AS qty
+       FROM ${table('daily_sales')} ds
+       JOIN ${table('products')} p ON p.id = ds.product_id
+       WHERE ds.sale_date = $1::date
+       GROUP BY p.name
+       ORDER BY qty DESC, p.name ASC
+       LIMIT 1`,
+      [saleDate]
+    )
+  ]);
 
-  const topResult = await query(
-    `SELECT p.name, SUM(ds.quantity)::int AS qty
-     FROM ${table('daily_sales')} ds
-     JOIN ${table('products')} p ON p.id = ds.product_id
-     WHERE ds.sale_date = $1::date
-     GROUP BY p.name
-     ORDER BY qty DESC, p.name ASC
-     LIMIT 1`,
-    [saleDate]
-  );
-
-  const row = totalsResult.rows[0] || {};
+  const day = dayResult.rows[0] || {};
+  const month = monthResult.rows[0] || {};
   return {
-    total_items: Number(row.total_items) || 0,
-    total_revenue: Number(row.total_revenue) || 0,
-    top_product: topResult.rows[0]?.name || null
+    total_items: Number(day.total_items) || 0,
+    total_accesses: Number(day.total_accesses) || 0,
+    total_revenue: Number(day.total_revenue) || 0,
+    top_product: topResult.rows[0]?.name || null,
+    month_items: Number(month.month_items) || 0,
+    month_accesses: Number(month.month_accesses) || 0,
+    month_revenue: Number(month.month_revenue) || 0
+  };
+}
+
+async function fetchSalesCharts(saleDate) {
+  const [daysResult, productsResult] = await Promise.all([
+    query(
+      `SELECT
+         d::date::text AS day,
+         COALESCE(SUM(ds.quantity), 0)::int AS items,
+         COUNT(DISTINCT ds.access_id)::int AS accesses,
+         COALESCE(SUM(ds.quantity * ds.unit_price), 0)::numeric AS revenue
+       FROM generate_series(
+         date_trunc('month', $1::date)::date,
+         (date_trunc('month', $1::date) + interval '1 month - 1 day')::date,
+         interval '1 day'
+       ) AS d
+       LEFT JOIN ${table('daily_sales')} ds ON ds.sale_date = d::date
+       GROUP BY d
+       ORDER BY d`,
+      [saleDate]
+    ),
+    query(
+      `SELECT
+         p.name,
+         SUM(ds.quantity)::int AS qty,
+         COALESCE(SUM(ds.quantity * ds.unit_price), 0)::numeric AS revenue
+       FROM ${table('daily_sales')} ds
+       JOIN ${table('products')} p ON p.id = ds.product_id
+       WHERE ds.sale_date = $1::date
+       GROUP BY p.name
+       ORDER BY qty DESC, p.name ASC`,
+      [saleDate]
+    )
+  ]);
+
+  return {
+    days: daysResult.rows.map((row) => ({
+      date: String(row.day).slice(0, 10),
+      items: Number(row.items) || 0,
+      accesses: Number(row.accesses) || 0,
+      revenue: Number(row.revenue) || 0
+    })),
+    products: productsResult.rows.map((row) => ({
+      name: row.name,
+      qty: Number(row.qty) || 0,
+      revenue: Number(row.revenue) || 0
+    }))
   };
 }
 
@@ -373,6 +438,19 @@ router.get('/summary', authenticateToken, requirePermission('vendas'), async (re
   }
 });
 
+// GET /api/daily-sales/charts?date= — admin
+router.get('/charts', authenticateToken, requirePermission('vendas'), async (req, res) => {
+  try {
+    const parsed = parseSaleDate(req.query.date);
+    if (parsed.error) return res.status(400).json({ error: parsed.error });
+    const charts = await fetchSalesCharts(parsed.value);
+    res.json({ date: parsed.value, ...charts });
+  } catch (error) {
+    console.error('Erro ao buscar gráficos de vendas:', error);
+    res.status(500).json({ error: 'Erro ao buscar gráficos de vendas' });
+  }
+});
+
 // GET /api/daily-sales?date= — admin
 router.get('/', authenticateToken, requirePermission('vendas'), async (req, res) => {
   try {
@@ -483,12 +561,14 @@ router.post('/batch', authenticateToken, requirePermission('vendas'), async (req
 
     await client.query('BEGIN');
 
+    const accessId = randomUUID();
+
     const insertedItems = [];
     for (const { product, qty, unitPrice, optionId, optionName, selectedOptions } of validatedItems) {
       const insertResult = await client.query(
         `INSERT INTO ${table('daily_sales')}
-           (sale_date, product_id, loyalty_customer_id, quantity, unit_price, option_id, option_name, selected_options, created_at)
-         VALUES ($1::date, $2, $3, $4, $5, $6, $7, $8::jsonb, NOW())
+           (sale_date, product_id, loyalty_customer_id, quantity, unit_price, option_id, option_name, selected_options, created_at, access_id)
+         VALUES ($1::date, $2, $3, $4, $5, $6, $7, $8::jsonb, NOW(), $9::uuid)
          RETURNING *`,
         [
           dateParsed.value,
@@ -498,7 +578,8 @@ router.post('/batch', authenticateToken, requirePermission('vendas'), async (req
           unitPrice,
           optionId,
           optionName,
-          JSON.stringify(selectedOptions || [])
+          JSON.stringify(selectedOptions || []),
+          accessId
         ]
       );
       insertedItems.push(mapSaleRow({
@@ -594,10 +675,10 @@ router.post('/', authenticateToken, requirePermission('vendas'), async (req, res
 
     const insertResult = await client.query(
       `INSERT INTO ${table('daily_sales')}
-         (sale_date, product_id, loyalty_customer_id, quantity, unit_price, created_at)
-       VALUES ($1::date, $2, $3, $4, $5, NOW())
+         (sale_date, product_id, loyalty_customer_id, quantity, unit_price, created_at, access_id)
+       VALUES ($1::date, $2, $3, $4, $5, NOW(), $6::uuid)
        RETURNING *`,
-      [dateParsed.value, product.id, customerId, qty, unitPrice]
+      [dateParsed.value, product.id, customerId, qty, unitPrice, randomUUID()]
     );
 
     const loyaltyResult = await applyLoyaltyForSale(client, customerId, [{ product, qty, unitPrice }]);

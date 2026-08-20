@@ -4,7 +4,7 @@ const INACTIVE_VISIT_DAYS = 3;
 const { table } = require('../config/database');
 
 function normalizePhone(phone) {
-  return String(phone || '').replace(/\D/g, '');
+  return String(phone || '').replace(/\D/g, '').slice(0, 11);
 }
 
 function getProgress(totalVisits, visitsPerReward = DEFAULT_VISITS_PER_REWARD) {

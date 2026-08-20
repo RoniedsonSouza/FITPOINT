@@ -1,5 +1,50 @@
 // Helpers compartilhados do admin
 
+const PHONE_MAX_DIGITS = 11;
+
+function onlyDigits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function formatPhoneMask(value) {
+  const d = onlyDigits(value).slice(0, PHONE_MAX_DIGITS);
+  if (d.length > 10) {
+    return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  }
+  if (d.length > 6) {
+    return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  }
+  if (d.length > 2) {
+    return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  }
+  if (d.length > 0) {
+    return `(${d}`;
+  }
+  return '';
+}
+
+function formatPhoneDisplay(phone) {
+  return formatPhoneMask(phone);
+}
+
+function isValidBrazilianPhone(value) {
+  const digits = onlyDigits(value);
+  return digits.length >= 10 && digits.length <= PHONE_MAX_DIGITS;
+}
+
+function normalizePhoneDigits(value) {
+  return onlyDigits(value).slice(0, PHONE_MAX_DIGITS);
+}
+
+function setupPhoneInputMask(inputId) {
+  const phoneEl = document.getElementById(inputId);
+  if (!phoneEl || phoneEl.dataset.phoneMaskBound === '1') return;
+  phoneEl.dataset.phoneMaskBound = '1';
+  phoneEl.addEventListener('input', () => {
+    phoneEl.value = formatPhoneMask(phoneEl.value);
+  });
+}
+
 function escapeAttr(str) {
   return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }

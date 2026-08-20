@@ -26,6 +26,10 @@ function getAuthHeadersMultipart() {
   return headers;
 }
 
+function normalizePhoneDigits(phone) {
+  return String(phone || '').replace(/\D/g, '').slice(0, 11);
+}
+
 const DB = {
   // === PRODUTOS ===
 
@@ -294,10 +298,12 @@ const DB = {
   },
 
   async addLoyaltyCustomer(customer) {
+    const payload = { ...customer };
+    if (payload.phone != null) payload.phone = normalizePhoneDigits(payload.phone);
     const response = await fetch(`${getApiBaseUrl()}/loyalty/customers`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify(customer)
+      body: JSON.stringify(payload)
     });
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
@@ -309,10 +315,12 @@ const DB = {
   },
 
   async updateLoyaltyCustomer(id, updates) {
+    const payload = { ...updates };
+    if (payload.phone != null) payload.phone = normalizePhoneDigits(payload.phone);
     const response = await fetch(`${getApiBaseUrl()}/loyalty/customers/${id}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
-      body: JSON.stringify(updates)
+      body: JSON.stringify(payload)
     });
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
@@ -474,6 +482,20 @@ const DB = {
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       const errorMsg = error.error || 'Erro ao buscar resumo de vendas';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async getDailySalesCharts(date) {
+    const qs = date ? `?date=${encodeURIComponent(date)}` : '';
+    const response = await fetch(`${getApiBaseUrl()}/daily-sales/charts${qs}`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao buscar gráficos de vendas';
       if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
       throw new Error(errorMsg);
     }

@@ -545,8 +545,8 @@
             <p class="field-hint" id="checkout-email-hint">Enviaremos o QR Code neste e-mail após a confirmação do pagamento.</p>
           </div>
           <div class="field">
-            <label for="checkout-phone">Telefone <span class="font-normal text-black/40">(opcional)</span></label>
-            <input type="tel" id="checkout-phone" autocomplete="tel" inputmode="numeric" placeholder="(00) 00000-0000" maxlength="15">
+            <label for="checkout-phone">Telefone</label>
+            <input type="tel" id="checkout-phone" required autocomplete="tel" inputmode="numeric" placeholder="(00) 00000-0000" maxlength="15">
           </div>
 
           <div id="checkout-gift-section" class="field hidden">
@@ -672,6 +672,7 @@
   <script src="/js/config.js"></script>
   <script src="/js/database.js"></script>
   <script src="/js/image-viewer.js"></script>
+  <script src="/js/datetime.js"></script>
   <script src="/js/events-page.js"></script>
   <script>
     lucide.createIcons();

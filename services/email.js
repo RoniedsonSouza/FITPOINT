@@ -1,5 +1,6 @@
 const { Resend } = require('resend');
 const { generateTicketQrPng } = require('./qrcode');
+const { formatTimestampPtBR } = require('./datetime');
 
 function getResendClient() {
   const apiKey = process.env.RESEND_API_KEY;
@@ -11,16 +12,6 @@ function getResendClient() {
 
 function getFromAddress() {
   return process.env.RESEND_FROM || 'FitPoint <onboarding@resend.dev>';
-}
-
-function formatDatePt(value) {
-  if (!value) return '—';
-  const d = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('pt-BR', {
-    dateStyle: 'long',
-    timeStyle: 'short'
-  });
 }
 
 function escapeHtml(str) {
@@ -74,7 +65,7 @@ async function sendTicketEmail({ to, buyerName, event, lot, tickets, complimenta
       <p>${introLine}</p>
       <div style="background:#F5F3EE;padding:16px;border-radius:12px;margin:16px 0;">
         <p style="margin:0 0 6px;"><strong>${escapeHtml(event.title)}</strong></p>
-        <p style="margin:0 0 6px;">${formatDatePt(event.starts_at)}</p>
+        <p style="margin:0 0 6px;">${formatTimestampPtBR(event.starts_at)}</p>
         <p style="margin:0 0 6px;">Local: ${escapeHtml(event.venue || 'A definir')}</p>
         <p style="margin:0;">Lote: ${escapeHtml(lot.name)}</p>
       </div>

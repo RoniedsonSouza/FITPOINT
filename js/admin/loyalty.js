@@ -15,17 +15,6 @@ const loyaltyRewardsLimit = 10;
 let loyaltyRewardsLoading = false;
 let loyaltyRewardsPaginationMeta = null;
 
-function formatPhoneDisplay(phone) {
-  const d = String(phone || '').replace(/\D/g, '');
-  if (d.length === 11) {
-    return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
-  }
-  if (d.length === 10) {
-    return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
-  }
-  return phone || '';
-}
-
 function updateLoyaltyRuleText() {
   const el = document.getElementById('loyalty-rule-text');
   if (el) {
@@ -88,6 +77,21 @@ function loyaltyCycleHint(c) {
   if (c.cycle_complete) return 'Prêmio!';
   const remaining = c.visits_to_reward ?? (n - (c.display_progress ?? c.progress ?? 0));
   return `Faltam ${remaining}`;
+}
+
+function getInactiveVisitDays(c) {
+  const lastPositive = c.last_positive_visit_at ? new Date(c.last_positive_visit_at) : null;
+  if (!lastPositive || Number.isNaN(lastPositive.getTime())) return null;
+  return Math.floor((Date.now() - lastPositive.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+function getInactiveVisitLabel(c) {
+  if (!c.inactive_visit) return '';
+  const days = getInactiveVisitDays(c);
+  if (days == null) return 'Sem visita há mais de 3 dias';
+  if (days === 0) return 'Sem visita hoje';
+  if (days === 1) return 'Ausente há 1 dia';
+  return `Ausente há ${days} dias`;
 }
 
 function loyaltyVisitSourceLabel(source) {
@@ -153,24 +157,33 @@ function renderLoyaltyCustomerCard(c) {
   const n = loyaltyVisitsPerReward;
   const display = c.display_progress ?? c.progress ?? 0;
   const progressPct = Math.round((display / n) * 100);
+  const inactiveLabel = getInactiveVisitLabel(c);
+  const lastPositiveVisit = formatLoyaltyVisitAt(c.last_positive_visit_at);
   const lastVisit = formatLoyaltyVisitAt(c.last_visit_at);
   const statusBadges = [
+    c.inactive_visit
+      ? `<span class="chip loyalty-chip-absent" title="Cliente sem visita há mais de 3 dias"><i data-lucide="clock"></i>${escapeHtml(inactiveLabel)}</span>`
+      : '',
     c.cycle_complete ? '<span class="chip loyalty-chip-cycle">Ciclo completo</span>' : '',
     !c.active ? '<span class="chip loyalty-chip-inactive">Inativo</span>' : ''
   ].filter(Boolean).join('');
-  const inactiveIcon = c.inactive_visit
-    ? `<span class="loyalty-card-inactive-icon" title="Sem visita há mais de 3 dias" aria-label="Sem visita há mais de 3 dias"><i data-lucide="alert-circle"></i></span>`
-    : '';
+  const cardClass = c.inactive_visit ? ' loyalty-card--inactive-visit' : '';
+  const lastVisitDisplay = c.inactive_visit
+    ? (lastPositiveVisit
+      ? `<span class="loyalty-card-last-visit loyalty-card-last-visit--stale" title="Última visita positiva">Última visita: ${escapeHtml(lastPositiveVisit)}</span>`
+      : '<span class="loyalty-card-last-visit loyalty-card-last-visit--stale" title="Sem registro de visita positiva">Sem visita registrada</span>')
+    : (lastVisit
+      ? `<span class="loyalty-card-last-visit" title="Última alteração de visita">${escapeHtml(lastVisit)}</span>`
+      : '<span class="loyalty-card-last-visit loyalty-card-last-visit--empty"></span>');
 
   return `
-    <div class="card loyalty-card" data-loyalty-id="${c.id}">
+    <div class="card loyalty-card${cardClass}" data-loyalty-id="${c.id}">
       <div class="loyalty-card-header">
         <div class="loyalty-card-identity">
           ${loyaltyAvatarHtml(c)}
           <div class="loyalty-card-info">
             <h3 class="loyalty-card-name">
               <span class="loyalty-card-name-text">${escapeHtml(c.name)}</span>
-              ${inactiveIcon}
             </h3>
             <p class="loyalty-card-phone">${formatPhoneDisplay(c.phone)}</p>
           </div>
@@ -208,9 +221,7 @@ function renderLoyaltyCustomerCard(c) {
         </button>
       </div>` : ''}
       <div class="loyalty-card-footer">
-        ${lastVisit
-          ? `<span class="loyalty-card-last-visit" title="Última alteração de visita">${escapeHtml(lastVisit)}</span>`
-          : '<span class="loyalty-card-last-visit loyalty-card-last-visit--empty"></span>'}
+        ${lastVisitDisplay}
         <div class="loyalty-visit-stepper">
           <button type="button" onclick="applyLoyaltyVisitDelta(event, ${c.id}, -1)" class="btn btn-outline btn-sm loyalty-visit-btn" title="Remover 1 visita" aria-label="Remover 1 visita">−1</button>
           <button type="button" onclick="applyLoyaltyVisitDelta(event, ${c.id}, 1)" class="btn btn-sm loyalty-visit-btn loyalty-visit-btn--add" title="Adicionar 1 visita" aria-label="Adicionar 1 visita">+1</button>
@@ -530,8 +541,15 @@ async function saveLoyaltyCustomer(event) {
   event.preventDefault();
   const btn = event.submitter || document.querySelector('#loyalty-form button[type="submit"]');
   const name = document.getElementById('loyalty-name').value.trim();
-  const phone = document.getElementById('loyalty-phone').value.trim();
+  const phoneInput = document.getElementById('loyalty-phone');
+  const phone = phoneInput?.value.trim() || '';
   const active = document.getElementById('loyalty-active').checked;
+
+  if (!isValidBrazilianPhone(phone)) {
+    showToast('Telefone inválido. Use DDD + número (10 ou 11 dígitos).', 'error');
+    phoneInput?.focus();
+    return;
+  }
   const total_visits = parseInt(document.getElementById('loyalty-total-visits').value, 10) || 0;
   const total_rewards = parseInt(document.getElementById('loyalty-total-rewards').value, 10) || 0;
   let avatar = document.getElementById('loyalty-avatar').value.trim() || null;
@@ -548,7 +566,7 @@ async function saveLoyaltyCustomer(event) {
       }
     }
 
-    const payload = { name, phone, avatar, total_visits, total_rewards };
+    const payload = { name, phone: normalizePhoneDigits(phone), avatar, total_visits, total_rewards };
 
     try {
       if (editingLoyaltyId) {
@@ -640,6 +658,8 @@ async function claimLoyaltyReward(event, id) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  setupPhoneInputMask('loyalty-phone');
+
   const loyaltySearchInput = document.getElementById('loyalty-search');
   if (loyaltySearchInput) {
     loyaltySearchInput.addEventListener('input', () => {

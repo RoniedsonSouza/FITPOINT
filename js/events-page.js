@@ -18,10 +18,7 @@
   }
 
   function formatDate(value) {
-    if (!value) return '—';
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short' });
+    return window.FitPointDatetime.formatTimestampPtBR(value);
   }
 
   function escapeHtml(str) {
@@ -331,7 +328,7 @@
                 ? `<div class="checkout-assignee-fields">
                     <input type="text" class="checkout-slot-name" data-checkout-slot="${index}" value="${escapeHtml(assignee.name || '')}" placeholder="Nome do destinatário" autocomplete="name">
                     <input type="email" class="checkout-slot-email" data-checkout-slot="${index}" value="${escapeHtml(assignee.email || '')}" placeholder="E-mail do destinatário" autocomplete="email">
-                    <input type="tel" class="checkout-slot-phone" data-checkout-slot="${index}" value="${escapeHtml(assignee.phone || '')}" placeholder="Telefone (opcional)" autocomplete="tel">
+                    <input type="tel" class="checkout-slot-phone" data-checkout-slot="${index}" value="${escapeHtml(assignee.phone || '')}" placeholder="Telefone" required autocomplete="tel">
                   </div>`
                 : ''
             }
@@ -375,11 +372,10 @@
     ensureCheckoutAssigneesLength(qty);
     return checkoutAssignees.slice(0, qty).map((a) => {
       if (!a) return null;
-      const phone = String(a.phone || '').trim();
       return {
         name: String(a.name || '').trim(),
         email: String(a.email || '').trim(),
-        phone: phone || undefined
+        phone: onlyDigits(a.phone)
       };
     });
   }
@@ -391,11 +387,15 @@
       if (!a) continue;
       const name = String(a.name || '').trim();
       const email = String(a.email || '').trim();
-      if (!name || !email) {
-        return `Preencha nome e e-mail do destinatário do ingresso ${i + 1}`;
+      const phone = onlyDigits(a.phone);
+      if (!name || !email || !phone) {
+        return `Preencha nome, e-mail e telefone do destinatário do ingresso ${i + 1}`;
       }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return `E-mail do destinatário do ingresso ${i + 1} é inválido`;
+      }
+      if (phone.length < 10) {
+        return `Telefone do destinatário do ingresso ${i + 1} é inválido (mínimo 10 dígitos)`;
       }
     }
     return null;
@@ -975,6 +975,11 @@
     errEl?.classList.add('hidden');
 
     const qty = parseInt(document.getElementById('checkout-qty').value, 10) || 1;
+    const buyerPhone = onlyDigits(document.getElementById('checkout-phone').value);
+    if (buyerPhone.length < 10) {
+      showCheckoutError('Informe um telefone válido (mínimo 10 dígitos).');
+      return;
+    }
     const assigneeError = validateCheckoutAssignees(qty);
     if (assigneeError) {
       showCheckoutError(assigneeError);
@@ -986,7 +991,7 @@
       quantity: qty,
       buyer_name: document.getElementById('checkout-name').value.trim(),
       buyer_email: document.getElementById('checkout-email').value.trim(),
-      buyer_phone: onlyDigits(document.getElementById('checkout-phone').value) || undefined,
+      buyer_phone: buyerPhone,
       assignees: buildAssigneesPayload(qty),
       payment_method: paymentMethod
     };

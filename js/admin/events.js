@@ -82,11 +82,7 @@ function updateLotPromoPreview() {
 }
 
 function toDatetimeLocalValue(value) {
-  if (!value) return '';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '';
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return window.FitPointDatetime.toDatetimeLocalValue(value);
 }
 
 /** Data/hora de hoje 00:00 no formato datetime-local (pré-seleção de início de vendas). */
@@ -105,10 +101,10 @@ function fromDatetimeLocalValue(value) {
 }
 
 function formatEventDate(value) {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  return window.FitPointDatetime.formatTimestampPtBR(value, {
+    dateStyle: 'short',
+    timeStyle: 'short'
+  });
 }
 
 function getDefaultEventTab() {

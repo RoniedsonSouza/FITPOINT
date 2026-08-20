@@ -30,6 +30,62 @@ async function withButtonLoading(btn, asyncFn, loadingLabel) {
   }
 }
 
+let adminPanelRefreshing = false;
+
+function setAdminPageLoading(loading, label) {
+  const overlay = document.getElementById('admin-page-loading');
+  const labelEl = document.getElementById('admin-page-loading-label');
+  const main = document.querySelector('.admin-main');
+
+  if (labelEl && label) {
+    labelEl.textContent = label;
+  }
+
+  if (overlay) {
+    overlay.classList.toggle('hidden', !loading);
+    overlay.setAttribute('aria-hidden', loading ? 'false' : 'true');
+  }
+
+  main?.classList.toggle('is-refreshing', loading);
+}
+
+function setAdminRefreshLoading(loading) {
+  const btn = document.getElementById('admin-refresh-btn');
+  if (!btn) return;
+
+  btn.disabled = loading;
+  btn.classList.toggle('is-loading', loading);
+  btn.setAttribute('aria-busy', loading ? 'true' : 'false');
+}
+
+async function refreshAdminPanel() {
+  const panel = document.getElementById('admin-panel');
+  if (adminPanelRefreshing) return;
+  if (!panel || panel.style.display === 'none') return;
+  if (typeof AdminRouter === 'undefined') return;
+
+  adminPanelRefreshing = true;
+  setAdminRefreshLoading(true);
+
+  const label = typeof AdminRouter.getRefreshLabel === 'function'
+    ? AdminRouter.getRefreshLabel()
+    : 'Atualizando…';
+  setAdminPageLoading(true, label);
+
+  try {
+    await AdminRouter.refreshCurrentModule();
+  } catch (error) {
+    if (!handleAuthError(error)) {
+      showToast('Erro ao atualizar. Tente novamente.', 'error');
+    }
+  } finally {
+    setAdminPageLoading(false);
+    setAdminRefreshLoading(false);
+    adminPanelRefreshing = false;
+    refreshIcons();
+  }
+}
+
 function showToast(message, type = 'success') {
   let container = document.getElementById('toast-container');
   if (!container) {

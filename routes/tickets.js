@@ -13,6 +13,7 @@ const {
 const { sendTicketEmail } = require('../services/email');
 const { computeOrderTotal } = require('../services/ticketPricing');
 const { normalizeAssignees, resolveHolders } = require('../services/ticketAssignees');
+const { parseTimestampInstant, serializeTimestampForApi } = require('../services/datetime');
 
 function generateTicketCode() {
   return crypto.randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase();
@@ -20,8 +21,14 @@ function generateTicketCode() {
 
 function isLotOnSale(lot, now = new Date()) {
   if (lot.active === false) return false;
-  if (lot.sales_start && new Date(lot.sales_start) > now) return false;
-  if (lot.sales_end && new Date(lot.sales_end) < now) return false;
+  if (lot.sales_start) {
+    const start = parseTimestampInstant(lot.sales_start);
+    if (start && start > now) return false;
+  }
+  if (lot.sales_end) {
+    const end = parseTimestampInstant(lot.sales_end);
+    if (end && end < now) return false;
+  }
   return Number(lot.quantity_sold) + 1 <= Number(lot.quantity_total);
 }
 
@@ -157,7 +164,7 @@ async function fulfillPaidOrder(orderId, mpPaymentId, options = {}) {
     const complimentary = order.source === 'vip';
     const eventPayload = {
       title: order.event_title,
-      starts_at: order.event_starts_at,
+      starts_at: serializeTimestampForApi(order.event_starts_at),
       venue: order.event_venue
     };
     const lotPayload = { name: order.lot_name };
@@ -294,6 +301,10 @@ router.post('/checkout', async (req, res) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({ error: 'E-mail inválido' });
     }
+    const buyerPhoneDigits = String(buyer_phone || '').replace(/\D/g, '');
+    if (buyerPhoneDigits.length < 10) {
+      return res.status(400).json({ error: 'Telefone é obrigatório (mínimo 10 dígitos)' });
+    }
     const qty = parseInt(quantity, 10);
     if (!qty || qty < 1 || qty > 10) {
       return res.status(400).json({ error: 'Quantidade deve ser entre 1 e 10' });
@@ -367,7 +378,7 @@ router.post('/checkout', async (req, res) => {
         lot.id,
         String(buyer_name).trim(),
         email,
-        buyer_phone ? String(buyer_phone).trim() : null,
+        buyerPhoneDigits,
         qty,
         amount,
         JSON.stringify(normalized.value)

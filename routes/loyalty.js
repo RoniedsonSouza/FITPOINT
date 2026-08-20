@@ -265,8 +265,8 @@ router.post('/customers', authenticateToken, requireAnyPermission('fidelidade', 
     if (!trimmedName) {
       return res.status(400).json({ error: 'Nome é obrigatório' });
     }
-    if (!normalizedPhone || normalizedPhone.length < 10) {
-      return res.status(400).json({ error: 'Telefone inválido (mínimo 10 dígitos)' });
+    if (!normalizedPhone || normalizedPhone.length < 10 || normalizedPhone.length > 11) {
+      return res.status(400).json({ error: 'Telefone inválido (10 ou 11 dígitos)' });
     }
 
     const visitsParsed = parseNonNegativeInt(total_visits, 'total_visits');
@@ -330,8 +330,8 @@ router.put('/customers/:id', authenticateToken, requirePermission('fidelidade'),
     }
     if (phone !== undefined) {
       const normalizedPhone = normalizePhone(phone);
-      if (!normalizedPhone || normalizedPhone.length < 10) {
-        return res.status(400).json({ error: 'Telefone inválido (mínimo 10 dígitos)' });
+      if (!normalizedPhone || normalizedPhone.length < 10 || normalizedPhone.length > 11) {
+        return res.status(400).json({ error: 'Telefone inválido (10 ou 11 dígitos)' });
       }
       const dup = await query(
         `SELECT id FROM ${table('loyalty_customers')} WHERE phone = $1 AND id != $2`,

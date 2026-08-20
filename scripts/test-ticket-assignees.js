@@ -17,23 +17,24 @@ eq('pads nulls to quantity', normalizeAssignees(undefined, 3), {
   value: [null, null, null]
 });
 eq('rejects too many', normalizeAssignees([null, null, null], 2).ok, false);
-eq('normalizes email', normalizeAssignees([{ name: 'A', email: 'A@X.COM', phone: '1' }], 1), {
+eq('normalizes email', normalizeAssignees([{ name: 'A', email: 'A@X.COM', phone: '11999998888' }], 1), {
   ok: true,
-  value: [{ name: 'A', email: 'a@x.com', phone: '1' }]
+  value: [{ name: 'A', email: 'a@x.com', phone: '11999998888' }]
 });
 eq('rejects bad email', normalizeAssignees([{ name: 'A', email: 'x' }], 1).ok, false);
 eq('rejects missing name', normalizeAssignees([{ name: ' ', email: 'a@b.com' }], 1).ok, false);
+eq('rejects missing phone', normalizeAssignees([{ name: 'A', email: 'a@b.com' }], 1).ok, false);
 
 const holders = resolveHolders({
   quantity: 3,
   buyer_name: 'Comprador',
   buyer_email: 'c@c.com',
   buyer_phone: '11',
-  assignees: [null, { name: 'Maria', email: 'm@m.com', phone: '22' }, null]
+  assignees: [null, { name: 'Maria', email: 'm@m.com', phone: '11988887777' }, null]
 });
 eq('resolve holders', holders, [
   { name: 'Comprador', email: 'c@c.com', phone: '11' },
-  { name: 'Maria', email: 'm@m.com', phone: '22' },
+  { name: 'Maria', email: 'm@m.com', phone: '11988887777' },
   { name: 'Comprador', email: 'c@c.com', phone: '11' }
 ]);
 

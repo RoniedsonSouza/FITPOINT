@@ -11,6 +11,13 @@ let diarioComboboxesBound = false;
 let diarioSearchTimers = { product: null, customer: null };
 let diarioOptionProduct = null;
 let diarioCustomerSearchSeq = 0;
+let dailySalesChartInstances = {
+  volume: null,
+  revenue: null,
+  products: null
+};
+
+const DAILY_SALES_CHART_PALETTE = ['#1D6B3A', '#2F9D57', '#F57C00', '#0E1F16', '#6B8F71', '#C45C12'];
 
 function getLocalDateString(date = new Date()) {
   const y = date.getFullYear();
@@ -207,11 +214,166 @@ function normalizeSearchText(text) {
 
 function updateDailySalesSummary(summary) {
   const itemsEl = document.getElementById('daily-sales-stat-items');
+  const accessesEl = document.getElementById('daily-sales-stat-accesses');
   const revenueEl = document.getElementById('daily-sales-stat-revenue');
+  const monthItemsEl = document.getElementById('daily-sales-stat-month-items');
+  const monthAccessesEl = document.getElementById('daily-sales-stat-month-accesses');
+  const monthRevenueEl = document.getElementById('daily-sales-stat-month-revenue');
   const topEl = document.getElementById('daily-sales-stat-top');
   if (itemsEl) itemsEl.textContent = String(summary?.total_items ?? 0);
+  if (accessesEl) accessesEl.textContent = String(summary?.total_accesses ?? 0);
   if (revenueEl) revenueEl.textContent = formatCurrency(summary?.total_revenue ?? 0);
+  if (monthItemsEl) monthItemsEl.textContent = String(summary?.month_items ?? 0);
+  if (monthAccessesEl) monthAccessesEl.textContent = String(summary?.month_accesses ?? 0);
+  if (monthRevenueEl) monthRevenueEl.textContent = formatCurrency(summary?.month_revenue ?? 0);
   if (topEl) topEl.textContent = summary?.top_product || '—';
+}
+
+function destroyDailySalesCharts() {
+  Object.keys(dailySalesChartInstances).forEach((key) => {
+    if (dailySalesChartInstances[key]) {
+      dailySalesChartInstances[key].destroy();
+      dailySalesChartInstances[key] = null;
+    }
+  });
+}
+
+function formatChartDayLabel(isoDate) {
+  const parts = String(isoDate || '').split('-');
+  if (parts.length < 3) return isoDate || '';
+  return `${parts[2]}/${parts[1]}`;
+}
+
+function chartCommonOptions() {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        labels: {
+          color: '#0E1F16',
+          font: { family: 'Inter, system-ui, sans-serif', size: 12 }
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks: { color: 'rgba(14, 31, 22, 0.65)', maxRotation: 0, autoSkip: true, maxTicksLimit: 12 },
+        grid: { display: false }
+      },
+      y: {
+        beginAtZero: true,
+        ticks: { color: 'rgba(14, 31, 22, 0.65)', precision: 0 },
+        grid: { color: 'rgba(14, 31, 22, 0.08)' }
+      }
+    }
+  };
+}
+
+function renderDailySalesCharts(data) {
+  if (typeof Chart === 'undefined') return;
+
+  destroyDailySalesCharts();
+
+  const days = Array.isArray(data?.days) ? data.days : [];
+  const products = Array.isArray(data?.products) ? data.products : [];
+  const labels = days.map((day) => formatChartDayLabel(day.date));
+  const emptyEl = document.getElementById('daily-sales-chart-products-empty');
+
+  const volumeCanvas = document.getElementById('daily-sales-chart-volume');
+  if (volumeCanvas) {
+    dailySalesChartInstances.volume = new Chart(volumeCanvas, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Vendas',
+            data: days.map((day) => day.items),
+            backgroundColor: '#1D6B3A',
+            borderRadius: 4
+          },
+          {
+            label: 'Acessos',
+            data: days.map((day) => day.accesses),
+            backgroundColor: '#F57C00',
+            borderRadius: 4
+          }
+        ]
+      },
+      options: chartCommonOptions()
+    });
+  }
+
+  const revenueCanvas = document.getElementById('daily-sales-chart-revenue');
+  if (revenueCanvas) {
+    dailySalesChartInstances.revenue = new Chart(revenueCanvas, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Faturamento',
+            data: days.map((day) => day.revenue),
+            borderColor: '#2F9D57',
+            backgroundColor: 'rgba(47, 157, 87, 0.15)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 2,
+            pointHoverRadius: 4
+          }
+        ]
+      },
+      options: {
+        ...chartCommonOptions(),
+        scales: {
+          ...chartCommonOptions().scales,
+          y: {
+            beginAtZero: true,
+            ticks: {
+              color: 'rgba(14, 31, 22, 0.65)',
+              callback: (value) => formatCurrency(value)
+            },
+            grid: { color: 'rgba(14, 31, 22, 0.08)' }
+          }
+        }
+      }
+    });
+  }
+
+  const productsCanvas = document.getElementById('daily-sales-chart-products');
+  if (productsCanvas) {
+    if (emptyEl) emptyEl.classList.toggle('hidden', products.length > 0);
+    dailySalesChartInstances.products = new Chart(productsCanvas, {
+      type: 'doughnut',
+      data: {
+        labels: products.length ? products.map((item) => item.name) : ['Sem vendas'],
+        datasets: [
+          {
+            data: products.length ? products.map((item) => item.qty) : [1],
+            backgroundColor: products.length
+              ? products.map((_, index) => DAILY_SALES_CHART_PALETTE[index % DAILY_SALES_CHART_PALETTE.length])
+              : ['#E6E4DC'],
+            borderWidth: 0
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              color: '#0E1F16',
+              font: { family: 'Inter, system-ui, sans-serif', size: 12 },
+              boxWidth: 12
+            }
+          }
+        }
+      }
+    });
+  }
 }
 
 async function fetchDailySalesCatalog() {
@@ -804,15 +966,15 @@ async function saveDiarioQuickCustomer(event) {
     showToast('Informe o nome do cliente.', 'error');
     return;
   }
-  const digits = phone.replace(/\D/g, '');
-  if (digits.length < 10) {
-    showToast('Telefone inválido (mínimo 10 dígitos).', 'error');
+  const digits = normalizePhoneDigits(phone);
+  if (!isValidBrazilianPhone(digits)) {
+    showToast('Telefone inválido. Use DDD + número (10 ou 11 dígitos).', 'error');
     return;
   }
 
   await withButtonLoading(btn, async () => {
     try {
-      const customer = await DB.addLoyaltyCustomer({ name, phone });
+      const customer = await DB.addLoyaltyCustomer({ name, phone: digits });
       upsertDiarioCustomerCache(customer);
       selectDiarioCustomer(customer);
       closeDiarioQuickCustomerModal();
@@ -1026,6 +1188,52 @@ function initDiarioComboboxes() {
   });
 }
 
+function buildDailySaleCardHtml(item) {
+  const qtySuffix = item.quantity > 1 ? ` × ${item.quantity}` : '';
+  const unitLine = `${formatCurrency(item.unit_price)} un.${qtySuffix}`;
+  const customerBadge = item.customer_name
+    ? `<span class="daily-diario-sale-badge daily-diario-sale-badge--customer">
+        <i data-lucide="user" aria-hidden="true"></i>
+        ${escapeHtml(item.customer_name)}
+      </span>`
+    : '';
+  const loyaltyBadge = item.loyalty_customer_id
+    ? `<span class="daily-diario-sale-badge daily-diario-sale-badge--loyalty">
+        <i data-lucide="gift" aria-hidden="true"></i>
+        Fidelidade
+      </span>`
+    : '';
+
+  return `
+    <div class="card daily-diario-sale-card">
+      <div class="daily-diario-sale-main">
+        <div class="daily-diario-sale-head">
+          <div>
+            <span class="daily-diario-sale-title">${escapeHtml(item.product_name)}</span>
+            <p class="daily-diario-sale-unit">${unitLine}</p>
+          </div>
+          <div class="daily-diario-sale-head-actions">
+            <button type="button" onclick="deleteDailySaleEntry(${item.id})" class="diario-remove-btn" title="Excluir" aria-label="Excluir venda">
+              <i data-lucide="trash"></i>
+            </button>
+          </div>
+        </div>
+        <div class="daily-diario-sale-meta">
+          <span class="daily-diario-sale-meta-item-header">
+            <div class="daily-diario-sale-meta-item">
+              <i data-lucide="clock" aria-hidden="true"></i>
+              ${formatSaleTime(item.created_at)}
+            </div>
+            <span class="daily-diario-sale-price">${formatCurrency(item.line_total)}</span>
+          </span>
+          ${customerBadge}
+          ${loyaltyBadge}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderDailyDiarioDayStats(summary) {
   const statsEl = document.getElementById('daily-diario-day-stats');
   if (!statsEl) return;
@@ -1048,51 +1256,7 @@ function renderDailyDiarioList(items, summary) {
     return;
   }
 
-  listEl.innerHTML = items.map(item => {
-    const qtySuffix = item.quantity > 1 ? ` × ${item.quantity}` : '';
-    const unitLine = `${formatCurrency(item.unit_price)} un.${qtySuffix}`;
-    const customerBadge = item.customer_name
-      ? `<span class="daily-diario-sale-badge daily-diario-sale-badge--customer">
-          <i data-lucide="user" aria-hidden="true"></i>
-          ${escapeHtml(item.customer_name)}
-        </span>`
-      : '';
-    const loyaltyBadge = item.loyalty_customer_id
-      ? `<span class="daily-diario-sale-badge daily-diario-sale-badge--loyalty">
-          <i data-lucide="gift" aria-hidden="true"></i>
-          Fidelidade
-        </span>`
-      : '';
-
-    return `
-      <div class="card daily-diario-sale-card">
-        <div class="daily-diario-sale-main">
-          <div class="daily-diario-sale-head">
-            <div>
-              <span class="daily-diario-sale-title">${escapeHtml(item.product_name)}</span>
-              <p class="daily-diario-sale-unit">${unitLine}</p>
-            </div>
-            <div class="daily-diario-sale-head-actions">
-              <button type="button" onclick="deleteDailySaleEntry(${item.id})" class="diario-remove-btn" title="Excluir" aria-label="Excluir venda">
-                <i data-lucide="trash"></i>
-              </button>
-            </div>
-          </div>
-          <div class="daily-diario-sale-meta">
-            <span class="daily-diario-sale-meta-item-header">
-              <div class="daily-diario-sale-meta-item">
-                <i data-lucide="clock" aria-hidden="true"></i>
-                ${formatSaleTime(item.created_at)}
-              </div>
-              <span class="daily-diario-sale-price">${formatCurrency(item.line_total)}</span>
-            </span>
-            ${customerBadge}
-            ${loyaltyBadge}
-          </div>
-        </div>
-      </div>
-    `;
-  }).join('');
+  listEl.innerHTML = items.map(buildDailySaleCardHtml).join('');
 
   refreshIcons();
 }
@@ -1207,40 +1371,28 @@ async function loadDailySales() {
     dateLabel.textContent = formatDisplayDate(dailySalesSelectedDate);
   }
 
-  listEl.innerHTML = '<p class="text-black/60">Carregando…</p>';
+  listEl.innerHTML = '<p class="daily-diario-list-empty">Carregando…</p>';
 
   try {
-    const data = await DB.getDailySales(dailySalesSelectedDate);
+    const [data, charts] = await Promise.all([
+      DB.getDailySales(dailySalesSelectedDate),
+      DB.getDailySalesCharts(dailySalesSelectedDate).catch(() => ({ days: [], products: [] }))
+    ]);
     updateDailySalesSummary(data.summary);
+    renderDailySalesCharts(charts);
 
     const items = data.items || [];
     if (items.length === 0) {
-      listEl.innerHTML = '<p class="text-black/60">Nenhuma venda registrada neste dia.</p>';
+      listEl.innerHTML = '<p class="daily-diario-list-empty">Nenhuma venda registrada neste dia.</p>';
       refreshIcons();
       return;
     }
 
-    listEl.innerHTML = items.map(item => `
-      <div class="card daily-sales-list-item">
-        <div class="daily-sales-list-item-main">
-          <p class="daily-sales-list-item-title">${escapeHtml(item.product_name)}${item.quantity > 1 ? ` <span class="text-black/50 font-normal">×${item.quantity}</span>` : ''}</p>
-          <p class="daily-sales-list-item-meta">
-            ${formatSaleTime(item.created_at)}
-            ${item.customer_name ? ` · ${escapeHtml(item.customer_name)}` : ''}
-          </p>
-        </div>
-        <div class="daily-sales-list-item-actions">
-          <span class="daily-sales-list-item-price">${formatCurrency(item.line_total)}</span>
-          <button type="button" onclick="deleteDailySaleEntry(${item.id})" class="btn btn-danger btn-sm btn-icon" title="Excluir" aria-label="Excluir venda">
-            <i data-lucide="trash"></i>
-          </button>
-        </div>
-      </div>
-    `).join('');
+    listEl.innerHTML = items.map(buildDailySaleCardHtml).join('');
     refreshIcons();
   } catch (error) {
     if (handleAuthError(error)) return;
-    listEl.innerHTML = '<p class="text-red-600">Erro ao carregar vendas.</p>';
+    listEl.innerHTML = '<p class="daily-diario-list-empty">Erro ao carregar vendas.</p>';
   }
 }
 

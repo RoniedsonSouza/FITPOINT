@@ -20,7 +20,7 @@ function summarizePermissions(user) {
   const parts = [];
   if (p.produtos) parts.push('Produtos');
   if (p.fidelidade) parts.push('Fidelidade');
-  if (p.vendas) parts.push('Vendas');
+  if (p.vendas) parts.push('Vendas (Diário e Relatórios)');
   if (p.distribuidores) parts.push('Distribuidores');
   if (p.eventos?.enabled) {
     const sub = ['Ingressos'];

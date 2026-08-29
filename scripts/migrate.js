@@ -291,6 +291,46 @@ async function migrate() {
     `);
 
     await client.query(`
+      ALTER TABLE ${SCHEMA}.daily_sales
+      ADD COLUMN IF NOT EXISTS amount_paid DECIMAL(10,2) NOT NULL DEFAULT 0
+    `);
+
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.daily_sales
+      ADD COLUMN IF NOT EXISTS amount_pending DECIMAL(10,2) NOT NULL DEFAULT 0
+    `);
+
+    await client.query(`
+      UPDATE ${SCHEMA}.daily_sales
+      SET amount_paid = ROUND((quantity * unit_price)::numeric, 2),
+          amount_pending = 0
+      WHERE amount_pending = 0
+        AND amount_paid = 0
+        AND (quantity * unit_price) > 0
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_daily_sales_debt_customer
+      ON ${SCHEMA}.daily_sales (loyalty_customer_id)
+      WHERE amount_pending > 0
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA}.daily_sale_debt_payments (
+        id SERIAL PRIMARY KEY,
+        daily_sale_id INTEGER NOT NULL REFERENCES ${SCHEMA}.daily_sales(id) ON DELETE CASCADE,
+        amount DECIMAL(10,2) NOT NULL CHECK (amount > 0),
+        note TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_daily_sale_debt_payments_sale
+      ON ${SCHEMA}.daily_sale_debt_payments (daily_sale_id, created_at DESC)
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS ${SCHEMA}.daily_diary_days (
         sale_date DATE PRIMARY KEY,
         registered BOOLEAN NOT NULL DEFAULT FALSE,

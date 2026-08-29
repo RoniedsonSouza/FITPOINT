@@ -120,11 +120,57 @@ function displayProductName(productName, optionName) {
   return `${productName} (${optionName})`;
 }
 
+function roundMoney(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function resolveItemPayment(raw, lineTotal) {
+  const total = roundMoney(lineTotal);
+  let amountPending = raw.amount_pending !== undefined && raw.amount_pending !== null && raw.amount_pending !== ''
+    ? Number(raw.amount_pending)
+    : null;
+  let amountPaid = raw.amount_paid !== undefined && raw.amount_paid !== null && raw.amount_paid !== ''
+    ? Number(raw.amount_paid)
+    : null;
+
+  if (amountPending == null && amountPaid == null) {
+    amountPaid = total;
+    amountPending = 0;
+  } else if (amountPending == null) {
+    amountPending = roundMoney(total - amountPaid);
+  } else if (amountPaid == null) {
+    amountPaid = roundMoney(total - amountPending);
+  }
+
+  amountPaid = roundMoney(amountPaid);
+  amountPending = roundMoney(amountPending);
+
+  if (!Number.isFinite(amountPaid) || !Number.isFinite(amountPending)) {
+    return { error: 'Valores de pagamento inválidos' };
+  }
+  if (amountPaid < 0 || amountPending < 0) {
+    return { error: 'Valores de pagamento não podem ser negativos' };
+  }
+  if (Math.abs(amountPaid + amountPending - total) > 0.01) {
+    return { error: 'Pago + pendente deve ser igual ao total do item' };
+  }
+  if (amountPending > total + 0.001) {
+    return { error: 'Valor pendente não pode exceder o total do item' };
+  }
+
+  return { amountPaid, amountPending };
+}
+
 function mapSaleRow(row) {
   const quantity = Number(row.quantity) || 1;
   const unitPrice = Number(row.unit_price);
+  const lineTotal = roundMoney(quantity * unitPrice);
   const selectedOptions = Array.isArray(row.selected_options) ? row.selected_options : [];
   const optionName = row.option_name || formatSelectedOptionLabel(selectedOptions) || null;
+  let amountPaid = row.amount_paid != null ? Number(row.amount_paid) : lineTotal;
+  let amountPending = row.amount_pending != null ? Number(row.amount_pending) : 0;
+  if (!Number.isFinite(amountPaid)) amountPaid = lineTotal;
+  if (!Number.isFinite(amountPending)) amountPending = 0;
   return {
     id: row.id,
     sale_date: row.sale_date,
@@ -135,9 +181,12 @@ function mapSaleRow(row) {
     selected_options: selectedOptions,
     quantity,
     unit_price: unitPrice,
-    line_total: Math.round(quantity * unitPrice * 100) / 100,
+    line_total: lineTotal,
+    amount_paid: roundMoney(amountPaid),
+    amount_pending: roundMoney(amountPending),
     loyalty_customer_id: row.loyalty_customer_id != null ? Number(row.loyalty_customer_id) : null,
     customer_name: row.customer_name || null,
+    customer_phone: row.customer_phone || null,
     created_at: row.created_at
   };
 }
@@ -277,13 +326,16 @@ async function fetchDayItems(saleDate) {
        ds.product_id,
        ds.quantity,
        ds.unit_price,
+       ds.amount_paid,
+       ds.amount_pending,
        ds.loyalty_customer_id,
        ds.option_id,
        ds.option_name,
        ds.selected_options,
        ds.created_at,
        p.name AS product_name,
-       lc.name AS customer_name
+       lc.name AS customer_name,
+       lc.phone AS customer_phone
      FROM ${table('daily_sales')} ds
      JOIN ${table('products')} p ON p.id = ds.product_id
      LEFT JOIN ${table('loyalty_customers')} lc ON lc.id = ds.loyalty_customer_id
@@ -572,14 +624,27 @@ router.post('/batch', authenticateToken, requirePermission('vendas'), async (req
       }
 
       unitPrice = Math.round(unitPrice * 100) / 100;
+      const lineTotal = roundMoney(qty * unitPrice);
+      const payment = resolveItemPayment(raw, lineTotal);
+      if (payment.error) {
+        return res.status(400).json({ error: `Item ${i + 1}: ${payment.error}` });
+      }
+
       validatedItems.push({
         product,
         qty,
         unitPrice,
+        amountPaid: payment.amountPaid,
+        amountPending: payment.amountPending,
         optionId: optionResolved.optionId,
         optionName: optionResolved.optionName,
         selectedOptions: optionResolved.selected
       });
+    }
+
+    const hasPending = validatedItems.some((item) => item.amountPending > 0);
+    if (hasPending && !customerId) {
+      return res.status(400).json({ error: 'Selecione um cliente para registrar itens em fiado' });
     }
 
     await client.query('BEGIN');
@@ -587,11 +652,14 @@ router.post('/batch', authenticateToken, requirePermission('vendas'), async (req
     const accessId = randomUUID();
 
     const insertedItems = [];
-    for (const { product, qty, unitPrice, optionId, optionName, selectedOptions } of validatedItems) {
+    for (const {
+      product, qty, unitPrice, amountPaid, amountPending, optionId, optionName, selectedOptions
+    } of validatedItems) {
       const insertResult = await client.query(
         `INSERT INTO ${table('daily_sales')}
-           (sale_date, product_id, loyalty_customer_id, quantity, unit_price, option_id, option_name, selected_options, created_at, access_id)
-         VALUES ($1::date, $2, $3, $4, $5, $6, $7, $8::jsonb, NOW(), $9::uuid)
+           (sale_date, product_id, loyalty_customer_id, quantity, unit_price, amount_paid, amount_pending,
+            option_id, option_name, selected_options, created_at, access_id)
+         VALUES ($1::date, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, NOW(), $11::uuid)
          RETURNING *`,
         [
           dateParsed.value,
@@ -599,6 +667,8 @@ router.post('/batch', authenticateToken, requirePermission('vendas'), async (req
           customerId,
           qty,
           unitPrice,
+          amountPaid,
+          amountPending,
           optionId,
           optionName,
           JSON.stringify(selectedOptions || []),
@@ -694,14 +764,16 @@ router.post('/', authenticateToken, requirePermission('vendas'), async (req, res
       customerName = customerResult.rows[0].name;
     }
 
+    const lineTotal = roundMoney(qty * unitPrice);
+
     await client.query('BEGIN');
 
     const insertResult = await client.query(
       `INSERT INTO ${table('daily_sales')}
-         (sale_date, product_id, loyalty_customer_id, quantity, unit_price, created_at, access_id)
-       VALUES ($1::date, $2, $3, $4, $5, NOW(), $6::uuid)
+         (sale_date, product_id, loyalty_customer_id, quantity, unit_price, amount_paid, amount_pending, created_at, access_id)
+       VALUES ($1::date, $2, $3, $4, $5, $6, 0, NOW(), $7::uuid)
        RETURNING *`,
-      [dateParsed.value, product.id, customerId, qty, unitPrice, randomUUID()]
+      [dateParsed.value, product.id, customerId, qty, unitPrice, lineTotal, randomUUID()]
     );
 
     const loyaltyResult = await applyLoyaltyForSale(client, customerId, [{ product, qty, unitPrice }]);
@@ -728,6 +800,250 @@ router.post('/', authenticateToken, requirePermission('vendas'), async (req, res
     await client.query('ROLLBACK').catch(() => {});
     console.error('Erro ao registrar venda:', error);
     res.status(500).json({ error: 'Erro ao registrar venda' });
+  } finally {
+    client.release();
+  }
+});
+
+function canAccessDebts(req) {
+  const user = req.user;
+  if (!user) return false;
+  if (user.isSuperAdmin || user.is_super_admin) return true;
+  const perms = user.permissions || {};
+  return !!(perms.vendas || perms.fidelidade);
+}
+
+async function fetchDebtsSummary(saleDate) {
+  const globalResult = await query(
+    `SELECT
+       COUNT(DISTINCT ds.loyalty_customer_id)::int AS customers_in_debt,
+       COUNT(*)::int AS pending_sales,
+       COALESCE(SUM(ds.amount_pending), 0)::numeric AS total_receivable
+     FROM ${table('daily_sales')} ds
+     WHERE ds.amount_pending > 0
+       AND ds.loyalty_customer_id IS NOT NULL`
+  );
+
+  const dayResult = await query(
+    `SELECT
+       COUNT(DISTINCT ds.loyalty_customer_id)::int AS day_customers_in_debt,
+       COUNT(*)::int AS day_pending_sales,
+       COALESCE(SUM(ds.amount_pending), 0)::numeric AS day_pending_total
+     FROM ${table('daily_sales')} ds
+     WHERE ds.amount_pending > 0
+       AND ds.loyalty_customer_id IS NOT NULL
+       AND ds.sale_date = $1::date`,
+    [saleDate]
+  );
+
+  const g = globalResult.rows[0] || {};
+  const d = dayResult.rows[0] || {};
+
+  return {
+    customers_in_debt: Number(g.customers_in_debt) || 0,
+    pending_sales: Number(g.pending_sales) || 0,
+    total_receivable: roundMoney(g.total_receivable),
+    day_customers_in_debt: Number(d.day_customers_in_debt) || 0,
+    day_pending_sales: Number(d.day_pending_sales) || 0,
+    day_pending_total: roundMoney(d.day_pending_total)
+  };
+}
+
+// GET /api/daily-sales/debts/summary?date=
+router.get('/debts/summary', authenticateToken, async (req, res) => {
+  try {
+    if (!canAccessDebts(req)) {
+      return res.status(403).json({ error: 'Sem permissão' });
+    }
+
+    const parsed = parseSaleDate(req.query.date);
+    if (parsed.error) return res.status(400).json({ error: parsed.error });
+
+    const summary = await fetchDebtsSummary(parsed.value);
+    res.json({ date: parsed.value, ...summary });
+  } catch (error) {
+    console.error('Erro ao buscar resumo de débitos:', error);
+    res.status(500).json({ error: 'Erro ao buscar resumo de débitos' });
+  }
+});
+
+// GET /api/daily-sales/debts/customers
+router.get('/debts/customers', authenticateToken, async (req, res) => {
+  try {
+    if (!canAccessDebts(req)) {
+      return res.status(403).json({ error: 'Sem permissão' });
+    }
+
+    const result = await query(
+      `SELECT
+         lc.id AS customer_id,
+         lc.name,
+         lc.phone,
+         COALESCE(SUM(ds.amount_pending), 0)::numeric AS pending_total
+       FROM ${table('daily_sales')} ds
+       JOIN ${table('loyalty_customers')} lc ON lc.id = ds.loyalty_customer_id
+       WHERE ds.amount_pending > 0
+         AND ds.loyalty_customer_id IS NOT NULL
+       GROUP BY lc.id, lc.name, lc.phone
+       HAVING COALESCE(SUM(ds.amount_pending), 0) > 0
+       ORDER BY pending_total DESC, lc.name ASC`
+    );
+
+    res.json({
+      customers: result.rows.map((row) => ({
+        customer_id: Number(row.customer_id),
+        name: row.name,
+        phone: row.phone || null,
+        pending_total: roundMoney(row.pending_total)
+      }))
+    });
+  } catch (error) {
+    console.error('Erro ao listar clientes com débitos:', error);
+    res.status(500).json({ error: 'Erro ao listar débitos' });
+  }
+});
+
+// GET /api/daily-sales/debts/customers/:id
+router.get('/debts/customers/:id', authenticateToken, async (req, res) => {
+  try {
+    if (!canAccessDebts(req)) {
+      return res.status(403).json({ error: 'Sem permissão' });
+    }
+
+    const customerId = parseInt(String(req.params.id), 10);
+    if (!Number.isInteger(customerId) || customerId < 1) {
+      return res.status(400).json({ error: 'Cliente inválido' });
+    }
+
+    const customerResult = await query(
+      `SELECT id, name, phone FROM ${table('loyalty_customers')} WHERE id = $1`,
+      [customerId]
+    );
+    if (customerResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Cliente não encontrado' });
+    }
+    const customer = customerResult.rows[0];
+
+    const itemsResult = await query(
+      `SELECT
+         ds.id,
+         ds.sale_date,
+         ds.product_id,
+         ds.quantity,
+         ds.unit_price,
+         ds.amount_paid,
+         ds.amount_pending,
+         ds.loyalty_customer_id,
+         ds.option_id,
+         ds.option_name,
+         ds.selected_options,
+         ds.created_at,
+         p.name AS product_name,
+         lc.name AS customer_name,
+         lc.phone AS customer_phone
+       FROM ${table('daily_sales')} ds
+       JOIN ${table('products')} p ON p.id = ds.product_id
+       LEFT JOIN ${table('loyalty_customers')} lc ON lc.id = ds.loyalty_customer_id
+       WHERE ds.loyalty_customer_id = $1
+         AND ds.amount_pending > 0
+       ORDER BY ds.sale_date DESC, ds.created_at DESC, ds.id DESC`,
+      [customerId]
+    );
+
+    const items = itemsResult.rows.map(mapSaleRow);
+    const pendingTotal = roundMoney(items.reduce((sum, item) => sum + item.amount_pending, 0));
+
+    res.json({
+      customer: {
+        customer_id: Number(customer.id),
+        name: customer.name,
+        phone: customer.phone || null,
+        pending_total: pendingTotal
+      },
+      items
+    });
+  } catch (error) {
+    console.error('Erro ao buscar débitos do cliente:', error);
+    res.status(500).json({ error: 'Erro ao buscar débitos do cliente' });
+  }
+});
+
+// POST /api/daily-sales/debts/sales/:id/payments
+router.post('/debts/sales/:id/payments', authenticateToken, async (req, res) => {
+  const client = await getClient();
+  try {
+    if (!canAccessDebts(req)) {
+      return res.status(403).json({ error: 'Sem permissão' });
+    }
+
+    const saleId = parseInt(String(req.params.id), 10);
+    if (!Number.isInteger(saleId) || saleId < 1) {
+      return res.status(400).json({ error: 'Venda inválida' });
+    }
+
+    const amount = roundMoney(req.body?.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ error: 'Informe um valor pago válido' });
+    }
+
+    const note = req.body?.note != null ? String(req.body.note).trim().slice(0, 500) : null;
+
+    await client.query('BEGIN');
+
+    const saleResult = await client.query(
+      `SELECT ds.*, p.name AS product_name, lc.name AS customer_name, lc.phone AS customer_phone
+       FROM ${table('daily_sales')} ds
+       JOIN ${table('products')} p ON p.id = ds.product_id
+       LEFT JOIN ${table('loyalty_customers')} lc ON lc.id = ds.loyalty_customer_id
+       WHERE ds.id = $1
+       FOR UPDATE OF ds`,
+      [saleId]
+    );
+    if (saleResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Venda não encontrada' });
+    }
+
+    const sale = saleResult.rows[0];
+    const pending = roundMoney(sale.amount_pending);
+    if (pending <= 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Este item não possui débito pendente' });
+    }
+    if (amount > pending + 0.001) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Valor pago não pode exceder o pendente' });
+    }
+
+    const newPending = roundMoney(pending - amount);
+    const newPaid = roundMoney(Number(sale.amount_paid) + amount);
+
+    await client.query(
+      `UPDATE ${table('daily_sales')}
+       SET amount_paid = $1, amount_pending = $2
+       WHERE id = $3`,
+      [newPaid, newPending, saleId]
+    );
+
+    await client.query(
+      `INSERT INTO ${table('daily_sale_debt_payments')} (daily_sale_id, amount, note, created_at)
+       VALUES ($1, $2, $3, NOW())`,
+      [saleId, amount, note || null]
+    );
+
+    await client.query('COMMIT');
+
+    const item = mapSaleRow({
+      ...sale,
+      amount_paid: newPaid,
+      amount_pending: newPending
+    });
+
+    res.status(201).json({ item, payment: { amount, note: note || null } });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Erro ao registrar pagamento de débito:', error);
+    res.status(500).json({ error: 'Erro ao registrar pagamento' });
   } finally {
     client.release();
   }

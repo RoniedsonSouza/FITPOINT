@@ -34,7 +34,8 @@ const AdminPermissions = {
 
     if (module === 'dashboard') return true;
     if (module === 'categorias' || module === 'usuarios') return false;
-    if (module === 'diario') return this.canAccess('vendas');
+    if (module === 'diario' || module === 'relatorios') return this.canAccess('vendas');
+    if (module === 'clientes') return this.canAccess('fidelidade');
 
     const perms = this.getPermissions();
     if (!perms) return false;

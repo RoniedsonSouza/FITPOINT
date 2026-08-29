@@ -1,4 +1,4 @@
-// Módulo Vendas do dia + Diário
+// Módulo Relatórios + Diário
 
 let dailySalesSelectedDate = null;
 let dailySalesProductsCache = [];
@@ -11,6 +11,7 @@ let diarioComboboxesBound = false;
 let diarioSearchTimers = { product: null, customer: null };
 let diarioOptionProduct = null;
 let diarioCustomerSearchSeq = 0;
+let diarioFiadoLineKey = null;
 let dailySalesChartInstances = {
   volume: null,
   revenue: null,
@@ -179,6 +180,51 @@ function computeDiarioLineTotal(line) {
   return Math.round(unit * qty * 100) / 100;
 }
 
+function syncDiarioLineDebtAfterTotalChange(line) {
+  if (!line || line.paid !== false) {
+    if (line) {
+      line.amountPending = 0;
+      line.debtMode = null;
+    }
+    return;
+  }
+  const total = computeDiarioLineTotal(line);
+  if (line.debtMode === 'full') {
+    line.amountPending = total;
+  } else {
+    line.amountPending = Math.min(Math.max(0, Number(line.amountPending) || 0), total);
+    if (line.amountPending <= 0) {
+      line.paid = true;
+      line.debtMode = null;
+      line.amountPending = 0;
+    }
+  }
+}
+
+function markDiarioLineAsPaid(line) {
+  if (!line) return;
+  line.paid = true;
+  line.debtMode = null;
+  line.amountPending = 0;
+}
+
+function applyDiarioLineFiado(line, mode, pendingAmount) {
+  if (!line) return false;
+  const total = computeDiarioLineTotal(line);
+  if (mode === 'full') {
+    line.paid = false;
+    line.debtMode = 'full';
+    line.amountPending = total;
+    return true;
+  }
+  const pending = Math.round((Number(pendingAmount) || 0) * 100) / 100;
+  if (!(pending > 0) || pending > total + 0.001) return false;
+  line.paid = false;
+  line.debtMode = 'partial';
+  line.amountPending = pending;
+  return true;
+}
+
 function getDiarioLinePreview(line, rawQty, rawDiscount) {
   const preview = { ...line };
   const parsedQty = parseLooseInt(rawQty);
@@ -234,6 +280,34 @@ function updateDailySalesSummary(summary) {
   }
   if (monthRevenueEl) monthRevenueEl.textContent = formatCurrency(summary?.month_revenue ?? 0);
   if (topEl) topEl.textContent = summary?.top_product || '—';
+}
+
+function updateDailySalesDebtSummary(debts) {
+  const customersEl = document.getElementById('daily-sales-stat-debt-customers');
+  const salesEl = document.getElementById('daily-sales-stat-debt-sales');
+  const totalEl = document.getElementById('daily-sales-stat-debt-total');
+  const dayTotalEl = document.getElementById('daily-sales-stat-debt-day-total');
+  const noteEl = document.getElementById('daily-sales-debts-note');
+
+  if (customersEl) customersEl.textContent = String(debts?.customers_in_debt ?? 0);
+  if (salesEl) salesEl.textContent = String(debts?.pending_sales ?? 0);
+  if (totalEl) totalEl.textContent = formatCurrency(debts?.total_receivable ?? 0);
+  if (dayTotalEl) dayTotalEl.textContent = formatCurrency(debts?.day_pending_total ?? 0);
+
+  if (noteEl && debts) {
+    const dayCustomers = Number(debts.day_customers_in_debt) || 0;
+    const daySales = Number(debts.day_pending_sales) || 0;
+    noteEl.textContent = daySales > 0
+      ? `Totais gerais consideram todos os débitos em aberto. No dia selecionado: ${dayCustomers} cliente${dayCustomers !== 1 ? 's' : ''} · ${daySales} lançamento${daySales !== 1 ? 's' : ''} pendente${daySales !== 1 ? 's' : ''}.`
+      : 'Totais gerais consideram todos os débitos em aberto. Nenhum débito pendente gerado na data selecionada.';
+  }
+}
+
+function openClientsDebtsFromReports() {
+  window.__clientsOpenDebtsTab = true;
+  if (typeof AdminRouter !== 'undefined') {
+    AdminRouter.navigate('clientes');
+  }
 }
 
 function destroyDailySalesCharts() {
@@ -667,6 +741,7 @@ function addProductToDiarioCart(productId, selectedOptions) {
   const existing = diarioCart.find(line => getDiarioCartLineKey(line) === key);
   if (existing) {
     existing.quantity += 1;
+    syncDiarioLineDebtAfterTotalChange(existing);
   } else {
     diarioCart.push({
       productId: product.id,
@@ -675,7 +750,10 @@ function addProductToDiarioCart(productId, selectedOptions) {
       name: product.name,
       basePrice: getDiarioUnitPriceFromSelected(product, selected),
       quantity: 1,
-      discount: 0
+      discount: 0,
+      paid: true,
+      debtMode: null,
+      amountPending: 0
     });
   }
 
@@ -719,21 +797,39 @@ function buildDiarioPayloadItems() {
     selectedOptions: Array.isArray(line.selectedOptions) ? line.selectedOptions : [],
     quantity: Math.max(1, Number(line.quantity) || 1),
     unitPrice: computeDiarioFinalPrice(line.basePrice, line.discount),
-    lineTotal: computeDiarioLineTotal(line)
+    lineTotal: computeDiarioLineTotal(line),
+    paid: line.paid !== false,
+    debtMode: line.debtMode,
+    amountPending: Number(line.amountPending) || 0
   }));
 
   const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
   const cartDisc = getDiarioCartDiscountApplied(subtotal);
 
-  const toPayload = (line, unitPrice) => ({
-    product_id: line.productId,
-    selected_options: line.selectedOptions,
-    quantity: line.quantity,
-    unit_price: unitPrice
-  });
+  const toPayload = (line, unitPrice, finalLineTotal) => {
+    let amountPending = 0;
+    let amountPaid = finalLineTotal;
+    if (!line.paid) {
+      if (line.debtMode === 'full') {
+        amountPending = finalLineTotal;
+        amountPaid = 0;
+      } else {
+        amountPending = Math.min(Math.max(0, line.amountPending), finalLineTotal);
+        amountPaid = Math.round((finalLineTotal - amountPending) * 100) / 100;
+      }
+    }
+    return {
+      product_id: line.productId,
+      selected_options: line.selectedOptions,
+      quantity: line.quantity,
+      unit_price: unitPrice,
+      amount_paid: amountPaid,
+      amount_pending: amountPending
+    };
+  };
 
   if (cartDisc <= 0 || subtotal <= 0) {
-    return lines.map(line => toPayload(line, line.unitPrice));
+    return lines.map(line => toPayload(line, line.unitPrice, line.lineTotal));
   }
 
   let remaining = cartDisc;
@@ -745,7 +841,7 @@ function buildDiarioPayloadItems() {
     remaining = Math.round((remaining - share) * 100) / 100;
     const discountedTotal = Math.max(0, Math.round((line.lineTotal - share) * 100) / 100);
     const unitPrice = Math.round((discountedTotal / line.quantity) * 100) / 100;
-    return toPayload(line, unitPrice);
+    return toPayload(line, unitPrice, discountedTotal);
   });
 }
 
@@ -815,6 +911,10 @@ function renderDiarioCart() {
     const lineTotal = computeDiarioLineTotal(line);
     const key = getDiarioCartLineKey(line);
     const label = line.optionName ? `${line.name} · ${line.optionName}` : line.name;
+    const isPaid = line.paid !== false;
+    const pendingHint = !isPaid
+      ? `<span class="daily-diario-cart-pending">Pendente ${formatCurrency(line.amountPending || 0)}</span>`
+      : '';
     return `
       <div class="daily-diario-cart-row" data-cart-line="${escapeAttr(key)}">
         <div class="daily-diario-cart-row-top">
@@ -832,8 +932,13 @@ function renderDiarioCart() {
             <span>Desc. R$</span>
             <input type="text" inputmode="decimal" value="${formatDiarioMoneyMaskDisplay(line.discount)}" data-cart-discount class="daily-diario-cart-discount" aria-label="Desconto por unidade em reais">
           </label>
+          <label class="daily-diario-cart-paid-label" title="Marcado = pago; desmarcado = fiado">
+            <input type="checkbox" data-cart-paid ${isPaid ? 'checked' : ''} aria-label="Pago">
+            <span>Pago</span>
+          </label>
           <strong class="daily-diario-cart-total">${formatCurrency(lineTotal)}</strong>
         </div>
+        ${pendingHint}
       </div>
     `;
   }).join('');
@@ -853,6 +958,110 @@ function onDiarioCartClick(e) {
   }
 }
 
+function onDiarioCartChange(e) {
+  if (!e.target.matches('[data-cart-paid]')) return;
+  const row = e.target.closest('[data-cart-line]');
+  if (!row) return;
+  const lineKey = row.dataset.cartLine;
+  const line = diarioCart.find(l => getDiarioCartLineKey(l) === lineKey);
+  if (!line) return;
+
+  if (e.target.checked) {
+    markDiarioLineAsPaid(line);
+    renderDiarioCart();
+    updateDiarioLoyaltyUI();
+    return;
+  }
+
+  e.target.checked = true;
+  openDiarioFiadoModal(lineKey);
+}
+
+function openDiarioFiadoModal(lineKey) {
+  const line = diarioCart.find(l => getDiarioCartLineKey(l) === lineKey);
+  const modal = document.getElementById('diario-fiado-modal');
+  if (!line || !modal) return;
+
+  diarioFiadoLineKey = lineKey;
+  const total = computeDiarioLineTotal(line);
+  const totalEl = document.getElementById('diario-fiado-line-total');
+  const pendingInput = document.getElementById('diario-fiado-pending');
+  const modeFull = document.getElementById('diario-fiado-mode-full');
+
+  if (totalEl) totalEl.textContent = formatCurrency(total);
+  if (modeFull) modeFull.checked = true;
+  if (pendingInput) {
+    pendingInput.value = formatDiarioMoneyMaskDisplay(total);
+  }
+
+  modal.classList.add('active');
+  updateDiarioFiadoModeUI();
+}
+
+function closeDiarioFiadoModal() {
+  const modal = document.getElementById('diario-fiado-modal');
+  if (modal) modal.classList.remove('active');
+  diarioFiadoLineKey = null;
+}
+
+function updateDiarioFiadoModeUI() {
+  const modeFull = document.getElementById('diario-fiado-mode-full');
+  const pendingInput = document.getElementById('diario-fiado-pending');
+  if (!pendingInput) return;
+
+  const isFull = Boolean(modeFull?.checked);
+  pendingInput.disabled = isFull;
+  pendingInput.setAttribute('aria-disabled', isFull ? 'true' : 'false');
+
+  if (isFull && diarioFiadoLineKey) {
+    const line = diarioCart.find(l => getDiarioCartLineKey(l) === diarioFiadoLineKey);
+    if (line) {
+      pendingInput.value = formatDiarioMoneyMaskDisplay(computeDiarioLineTotal(line));
+    }
+  } else if (!isFull) {
+    pendingInput.focus();
+  }
+}
+
+function onDiarioFiadoPendingInput(e) {
+  if (e.target.disabled) return;
+  applyDiarioMoneyMask(e.target);
+}
+
+function confirmDiarioFiadoModal() {
+  const line = diarioCart.find(l => getDiarioCartLineKey(l) === diarioFiadoLineKey);
+  if (!line) {
+    closeDiarioFiadoModal();
+    return;
+  }
+
+  const isFull = Boolean(document.getElementById('diario-fiado-mode-full')?.checked);
+  const total = computeDiarioLineTotal(line);
+
+  if (isFull) {
+    applyDiarioLineFiado(line, 'full');
+  } else {
+    const pendingInput = document.getElementById('diario-fiado-pending');
+    const pending = parseLooseDecimal(pendingInput?.value, MONEY_DECIMALS);
+    if (pending == null || !(pending > 0)) {
+      showToast('Informe o valor pendente.', 'error');
+      return;
+    }
+    if (pending > total + 0.001) {
+      showToast('Valor pendente não pode exceder o total do item.', 'error');
+      return;
+    }
+    if (!applyDiarioLineFiado(line, 'partial', pending)) {
+      showToast('Não foi possível aplicar o fiado.', 'error');
+      return;
+    }
+  }
+
+  closeDiarioFiadoModal();
+  renderDiarioCart();
+  updateDiarioLoyaltyUI();
+}
+
 function onDiarioCartInput(e) {
   const row = e.target.closest('[data-cart-line]');
   if (!row) return;
@@ -863,8 +1072,13 @@ function onDiarioCartInput(e) {
   if (e.target.matches('[data-cart-qty]')) {
     const parsed = parseLooseInt(e.target.value);
     if (parsed != null && parsed >= 1) line.quantity = parsed;
+    syncDiarioLineDebtAfterTotalChange(line);
     updateDiarioCartRowTotal(lineKey);
     updateDiarioLoyaltyUI();
+    const pendingEl = row.querySelector('.daily-diario-cart-pending');
+    if (pendingEl && line.paid === false) {
+      pendingEl.textContent = `Pendente ${formatCurrency(line.amountPending || 0)}`;
+    }
     return;
   }
 
@@ -874,8 +1088,13 @@ function onDiarioCartInput(e) {
     if (parsed != null) {
       line.discount = Math.min(parsed, line.basePrice);
     }
+    syncDiarioLineDebtAfterTotalChange(line);
     updateDiarioCartRowTotal(lineKey);
     updateDiarioLoyaltyUI();
+    const pendingEl = row.querySelector('.daily-diario-cart-pending');
+    if (pendingEl && line.paid === false) {
+      pendingEl.textContent = `Pendente ${formatCurrency(line.amountPending || 0)}`;
+    }
   }
 }
 
@@ -889,8 +1108,10 @@ function onDiarioCartBlur(e) {
   if (e.target.matches('[data-cart-qty]')) {
     line.quantity = clampInt(parseLooseInt(e.target.value), 1, 1);
     e.target.value = String(line.quantity);
+    syncDiarioLineDebtAfterTotalChange(line);
     updateDiarioCartRowTotal(lineKey);
     updateDiarioLoyaltyUI();
+    renderDiarioCart();
     return;
   }
 
@@ -903,8 +1124,10 @@ function onDiarioCartBlur(e) {
       MONEY_DECIMALS
     );
     e.target.value = formatDiarioMoneyMaskDisplay(line.discount);
+    syncDiarioLineDebtAfterTotalChange(line);
     updateDiarioCartRowTotal(lineKey);
     updateDiarioLoyaltyUI();
+    renderDiarioCart();
   }
 }
 
@@ -1178,6 +1401,7 @@ function initDiarioComboboxes() {
   if (customerSelected) customerSelected.addEventListener('click', onDiarioCartClick);
   if (cart) {
     cart.addEventListener('click', onDiarioCartClick);
+    cart.addEventListener('change', onDiarioCartChange);
     cart.addEventListener('input', onDiarioCartInput);
     cart.addEventListener('blur', onDiarioCartBlur, true);
   }
@@ -1210,6 +1434,13 @@ function buildDailySaleCardHtml(item) {
         Fidelidade
       </span>`
     : '';
+  const pending = Number(item.amount_pending) || 0;
+  const debtBadge = pending > 0
+    ? `<span class="daily-diario-sale-badge daily-diario-sale-badge--debt">
+        <i data-lucide="wallet" aria-hidden="true"></i>
+        Fiado ${formatCurrency(pending)}
+      </span>`
+    : '';
 
   return `
     <div class="card daily-diario-sale-card">
@@ -1235,6 +1466,7 @@ function buildDailySaleCardHtml(item) {
           </span>
           ${customerBadge}
           ${loyaltyBadge}
+          ${debtBadge}
         </div>
       </div>
     </div>
@@ -1365,9 +1597,9 @@ async function loadDailyDiario() {
 }
 
 async function loadDailySales() {
-  const listEl = document.getElementById('daily-sales-list');
   const dateLabel = document.getElementById('daily-sales-date-label');
-  if (!listEl || typeof DB === 'undefined') return;
+  const viewEl = document.getElementById('view-daily-sales');
+  if (!viewEl || typeof DB === 'undefined') return;
 
   if (!dailySalesSelectedDate) {
     dailySalesSelectedDate = getLocalDateString();
@@ -1378,28 +1610,22 @@ async function loadDailySales() {
     dateLabel.textContent = formatDisplayDate(dailySalesSelectedDate);
   }
 
-  listEl.innerHTML = '<p class="daily-diario-list-empty">Carregando…</p>';
-
   try {
-    const [data, charts] = await Promise.all([
-      DB.getDailySales(dailySalesSelectedDate),
-      DB.getDailySalesCharts(dailySalesSelectedDate).catch(() => ({ days: [], products: [] }))
+    const [summary, charts, debts] = await Promise.all([
+      DB.getDailySalesSummary(dailySalesSelectedDate),
+      DB.getDailySalesCharts(dailySalesSelectedDate).catch(() => ({ days: [], products: [] })),
+      DB.getDebtSummary(dailySalesSelectedDate).catch(() => null)
     ]);
-    updateDailySalesSummary(data.summary);
+    updateDailySalesSummary(summary);
+    updateDailySalesDebtSummary(debts);
     renderDailySalesCharts(charts);
-
-    const items = data.items || [];
-    if (items.length === 0) {
-      listEl.innerHTML = '<p class="daily-diario-list-empty">Nenhuma venda registrada neste dia.</p>';
-      refreshIcons();
-      return;
-    }
-
-    listEl.innerHTML = items.map(buildDailySaleCardHtml).join('');
     refreshIcons();
   } catch (error) {
     if (handleAuthError(error)) return;
-    listEl.innerHTML = '<p class="daily-diario-list-empty">Erro ao carregar vendas.</p>';
+    updateDailySalesSummary(null);
+    updateDailySalesDebtSummary(null);
+    renderDailySalesCharts({ days: [], products: [] });
+    showToast('Erro ao carregar relatórios.', 'error');
   }
 }
 
@@ -1475,6 +1701,7 @@ async function submitDailyDiario(event) {
   diarioCart.forEach(line => {
     line.quantity = clampInt(line.quantity, 1, 1);
     line.discount = clampDecimal(line.discount, 0, line.basePrice, 0, MONEY_DECIMALS);
+    syncDiarioLineDebtAfterTotalChange(line);
   });
   diarioCartDiscount = clampDecimal(
     diarioCartDiscount,
@@ -1483,6 +1710,13 @@ async function submitDailyDiario(event) {
     0,
     MONEY_DECIMALS
   );
+
+  const hasPending = diarioCart.some(line => line.paid === false && (Number(line.amountPending) || 0) > 0);
+  if (hasPending && !diarioSelectedCustomer) {
+    showToast('Selecione um cliente para registrar itens em fiado.', 'error');
+    document.getElementById('daily-diario-customer-search')?.focus();
+    return;
+  }
 
   await withButtonLoading(btn, async () => {
     try {
@@ -1540,10 +1774,7 @@ async function deleteDailySaleEntry(id) {
   try {
     await DB.deleteDailySale(id);
     showToast('Lançamento excluído.', 'success');
-    await Promise.all([
-      loadDailySales(),
-      loadDailyDiarioList()
-    ]);
+    await loadDailyDiarioList();
     AdminRouter.loadDashboardStats();
   } catch (error) {
     if (handleAuthError(error)) return;

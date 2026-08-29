@@ -2019,7 +2019,7 @@ body.ticket-qr-open {
   }
 }
 
-/* === Vendas do dia === */
+/* === Relatórios (ex-Vendas do dia) === */
 .daily-sales-toolbar {
   margin-bottom: 1rem;
 }
@@ -2078,6 +2078,42 @@ body.ticket-qr-open {
   color: var(--fp-green);
 }
 
+.daily-sales-stat-value--debt {
+  color: #b45309;
+}
+
+.daily-sales-debts-block {
+  margin-bottom: 1.25rem;
+}
+
+.daily-sales-debts-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.daily-sales-section-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: rgba(14, 31, 22, 0.85);
+}
+
+.daily-sales-stats--debts {
+  margin-bottom: 0.5rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.daily-sales-debts-note {
+  margin: 0 0 0.25rem;
+  font-size: 0.75rem;
+  color: rgba(14, 31, 22, 0.5);
+  line-height: 1.45;
+}
+
 .daily-sales-stat-value--top {
   font-size: 1rem;
   font-weight: 600;
@@ -2090,7 +2126,7 @@ body.ticket-qr-open {
   display: grid;
   gap: 0.75rem;
   grid-template-columns: 1fr 1fr;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 .daily-sales-chart-card {
@@ -2267,6 +2303,10 @@ body.ticket-qr-open {
   }
 
   .daily-sales-stats--month {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .daily-sales-stats--debts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -3086,6 +3126,143 @@ body.ticket-qr-open {
 .daily-diario-sale-badge--loyalty {
   background: rgba(29, 107, 58, 0.1);
   color: var(--fp-green);
+}
+
+.daily-diario-sale-badge--debt {
+  background: rgba(196, 92, 18, 0.12);
+  color: #c45c12;
+}
+
+.daily-diario-cart-paid-label {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(14, 31, 22, 0.55);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.daily-diario-cart-paid-label input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--fp-green, #1d6b3a);
+  cursor: pointer;
+}
+
+.daily-diario-cart-pending {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #c45c12;
+}
+
+.customer-debts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.customer-debts-empty {
+  color: rgba(14, 31, 22, 0.55);
+  font-size: 0.9rem;
+  margin: 0.5rem 0;
+}
+
+.customer-debt-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.customer-debt-card-main {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.customer-debt-card-main:hover {
+  background: rgba(14, 31, 22, 0.03);
+}
+
+.customer-debt-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.customer-debt-card-name {
+  font-size: 0.95rem;
+  color: #0e1f16;
+}
+
+.customer-debt-card-phone {
+  font-size: 0.8rem;
+  color: rgba(14, 31, 22, 0.55);
+}
+
+.customer-debt-card-pending {
+  color: #c45c12;
+  white-space: nowrap;
+}
+
+.customer-debt-detail {
+  border-top: 1px solid rgba(14, 31, 22, 0.08);
+  padding: 0.75rem 1rem 1rem;
+}
+
+.customer-debt-detail-head {
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+  color: rgba(14, 31, 22, 0.7);
+}
+
+.customer-debt-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.customer-debt-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.65rem;
+  background: rgba(14, 31, 22, 0.03);
+}
+
+.customer-debt-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  flex: 1 1 12rem;
+}
+
+.customer-debt-item-meta {
+  font-size: 0.75rem;
+  color: rgba(14, 31, 22, 0.55);
+}
+
+.customer-debt-item-pay {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
 }
 
 /* Botão de excluir compacto (carrinho e lista "Vendas do dia") */

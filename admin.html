@@ -116,11 +116,17 @@
       <button type="button" class="admin-nav-item" data-admin-nav="fidelidade">
         <i data-lucide="heart"></i> Fidelidade
       </button>
+      <button type="button" class="admin-nav-item" data-admin-nav="clientes">
+        <i data-lucide="users"></i> Clientes
+      </button>
       <button type="button" class="admin-nav-item" data-admin-nav="produtos">
         <i data-lucide="shopping-bag"></i> Produtos
       </button>
-      <button type="button" class="admin-nav-item" data-admin-nav="vendas">
-        <i data-lucide="receipt"></i> Vendas do dia
+      <button type="button" class="admin-nav-item" data-admin-nav="diario">
+        <i data-lucide="clipboard-list"></i> Diário
+      </button>
+      <button type="button" class="admin-nav-item" data-admin-nav="relatorios">
+        <i data-lucide="chart-column"></i> Relatórios
       </button>
       <button type="button" class="admin-nav-item" data-admin-nav="eventos">
         <i data-lucide="ticket"></i> Eventos
@@ -165,17 +171,29 @@
             <p>Programa de visitas e prêmios para clientes.</p>
             <span class="module-card-stat" id="stat-loyalty">—</span>
           </button>
+          <button type="button" class="module-card" data-module-card="clientes">
+            <span class="module-card-icon"><i data-lucide="users"></i></span>
+            <h2>Clientes</h2>
+            <p>Cadastro de clientes e acompanhamento de débitos.</p>
+            <span class="module-card-stat" id="stat-clients">—</span>
+          </button>
           <button type="button" class="module-card" data-module-card="produtos">
             <span class="module-card-icon"><i data-lucide="shopping-bag"></i></span>
             <h2>Produtos</h2>
             <p>Preços, promoções, kits e opções do cardápio.</p>
             <span class="module-card-stat" id="stat-products">—</span>
           </button>
-          <button type="button" class="module-card" data-module-card="vendas">
-            <span class="module-card-icon"><i data-lucide="receipt"></i></span>
-            <h2>Vendas do dia</h2>
-            <p>Registre vendas e acompanhe o levantamento diário.</p>
-            <span class="module-card-stat" id="stat-daily-sales">—</span>
+          <button type="button" class="module-card" data-module-card="diario">
+            <span class="module-card-icon"><i data-lucide="clipboard-list"></i></span>
+            <h2>Diário</h2>
+            <p>Registre acessos, vendas e fiados do dia.</p>
+            <span class="module-card-stat" id="stat-diario">—</span>
+          </button>
+          <button type="button" class="module-card" data-module-card="relatorios">
+            <span class="module-card-icon"><i data-lucide="chart-column"></i></span>
+            <h2>Relatórios</h2>
+            <p>Resumos e gráficos de vendas e acessos.</p>
+            <span class="module-card-stat" id="stat-relatorios">—</span>
           </button>
           <button type="button" class="module-card" data-module-card="eventos">
             <span class="module-card-icon"><i data-lucide="ticket"></i></span>
@@ -355,10 +373,10 @@
         </div>
       </section>
 
-      <!-- Vendas do dia -->
+      <!-- Relatórios (stats + gráficos) -->
       <section id="view-daily-sales" class="admin-view">
         <div class="admin-view-header">
-          <h1>Vendas do dia</h1>
+          <h1>Relatórios</h1>
           <p id="daily-sales-date-label" class="text-sm text-black/60 mt-1">—</p>
         </div>
 
@@ -372,11 +390,6 @@
             <button type="button" onclick="shiftDailySalesDate(1)" class="btn btn-outline btn-sm btn-icon"
               title="Próximo dia" aria-label="Próximo dia">
               <i data-lucide="chevron-right"></i>
-            </button>
-          </div>
-          <div class="module-toolbar-actions">
-            <button type="button" onclick="AdminRouter.navigate('diario')" class="btn btn-primary btn-md">
-              <i data-lucide="pen-line"></i> Registrar Acesso
             </button>
           </div>
         </div>
@@ -415,6 +428,36 @@
           </div>
         </div>
 
+        <div class="daily-sales-debts-block">
+          <div class="daily-sales-debts-heading">
+            <h2 class="daily-sales-section-title">Contas a receber</h2>
+            <button type="button" class="btn btn-outline btn-sm" onclick="openClientsDebtsFromReports()">
+              <i data-lucide="wallet"></i> Ver débitos
+            </button>
+          </div>
+          <div class="daily-sales-stats daily-sales-stats--debts" aria-label="Resumo de débitos">
+            <div class="card daily-sales-stat-card">
+              <p class="daily-sales-stat-label">Clientes em débito</p>
+              <p class="daily-sales-stat-value" id="daily-sales-stat-debt-customers">—</p>
+            </div>
+            <div class="card daily-sales-stat-card">
+              <p class="daily-sales-stat-label">Lançamentos em aberto</p>
+              <p class="daily-sales-stat-value" id="daily-sales-stat-debt-sales">—</p>
+            </div>
+            <div class="card daily-sales-stat-card">
+              <p class="daily-sales-stat-label">Total a receber</p>
+              <p class="daily-sales-stat-value daily-sales-stat-value--debt" id="daily-sales-stat-debt-total">—</p>
+            </div>
+            <div class="card daily-sales-stat-card">
+              <p class="daily-sales-stat-label">A receber do dia</p>
+              <p class="daily-sales-stat-value daily-sales-stat-value--debt" id="daily-sales-stat-debt-day-total" title="Débitos ainda pendentes gerados na data selecionada">—</p>
+            </div>
+          </div>
+          <p class="daily-sales-debts-note" id="daily-sales-debts-note">
+            Totais gerais consideram todos os débitos em aberto. “A receber do dia” usa a data selecionada.
+          </p>
+        </div>
+
         <div class="daily-sales-charts">
           <div class="card daily-sales-chart-card">
             <p class="daily-sales-chart-title">Vendas e acessos no mês</p>
@@ -435,10 +478,6 @@
             </div>
             <p id="daily-sales-chart-products-empty" class="daily-sales-chart-empty hidden">Nenhuma venda neste dia.</p>
           </div>
-        </div>
-
-        <div id="daily-sales-list" class="daily-sales-list">
-          <p class="daily-diario-list-empty">Selecione este módulo para carregar.</p>
         </div>
       </section>
 
@@ -465,6 +504,7 @@
               </label>
             </div>
           </div>
+
           <form id="daily-diario-form" class="daily-diario-form" onsubmit="submitDailyDiario(event)">
             <div class="daily-diario-field">
               <label for="daily-diario-product-search">Produtos</label>
@@ -512,12 +552,56 @@
           <div id="daily-diario-reward-banners" class="daily-diario-reward-banners"></div>
           <div class="daily-diario-day-section">
             <div class="daily-diario-day-header">
-              <h2 class="daily-diario-day-title">Vendas do dia</h2>
+              <h2 class="daily-diario-day-title">Lançamentos do dia</h2>
               <p id="daily-diario-day-stats" class="daily-diario-day-stats"></p>
             </div>
             <div id="daily-diario-list" class="daily-diario-list">
               <p class="daily-diario-list-empty">Nenhuma venda neste dia.</p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Clientes -->
+      <section id="view-clientes" class="admin-view">
+        <div class="admin-view-header">
+          <h1>Clientes</h1>
+          <p>Cadastro e débitos dos clientes (mesma base da fidelidade).</p>
+        </div>
+        <div class="module-toolbar">
+          <span></span>
+          <div class="module-toolbar-actions">
+            <button type="button" onclick="openClientsModal()" class="btn btn-primary btn-md">
+              <i data-lucide="plus"></i> Novo cliente
+            </button>
+          </div>
+        </div>
+
+        <div class="admin-tabs" role="tablist">
+          <button type="button" class="admin-tab is-active" data-clients-tab="all"
+            onclick="switchClientsTab('all')" role="tab" aria-selected="true">
+            Todos
+          </button>
+          <button type="button" class="admin-tab" data-clients-tab="debts"
+            onclick="switchClientsTab('debts')" role="tab" aria-selected="false">
+            Com débitos
+          </button>
+        </div>
+
+        <div id="clients-tab-all">
+          <div class="mb-3">
+            <input type="search" id="clients-search" class="max-w-md" placeholder="Buscar por nome ou telefone…"
+              autocomplete="off" aria-label="Buscar clientes">
+          </div>
+          <div id="clients-pagination" class="mb-3 hidden"></div>
+          <div id="clients-list" class="loyalty-list grid gap-3">
+            <p class="text-black/60">Selecione este módulo para carregar.</p>
+          </div>
+        </div>
+
+        <div id="clients-tab-debts" class="hidden">
+          <div id="clients-debts-list" class="customer-debts-list">
+            <p class="customer-debts-empty">Selecione esta aba para carregar.</p>
           </div>
         </div>
       </section>
@@ -1179,6 +1263,75 @@
     </div>
   </div>
 
+  <!-- Modal fiado (Diário) -->
+  <div id="diario-fiado-modal" class="modal">
+    <div class="modal-content modal-content--sm">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-display text-xl font-bold">Fiado / débito</h3>
+        <button type="button" onclick="closeDiarioFiadoModal()" class="modal-close" aria-label="Fechar">&times;</button>
+      </div>
+      <p class="text-sm text-black/60 mb-3">
+        Total do item: <strong id="diario-fiado-line-total">R$ 0,00</strong>
+      </p>
+      <div class="form-group">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="diario-fiado-mode-full" checked onchange="updateDiarioFiadoModeUI()">
+          <span>Valor integral em débito</span>
+        </label>
+      </div>
+      <div id="diario-fiado-partial-wrap" class="form-group">
+        <label for="diario-fiado-pending">Valor parcial pendente R$</label>
+        <input type="text" id="diario-fiado-pending" inputmode="decimal" value="0,00" disabled
+          oninput="onDiarioFiadoPendingInput(event)" aria-label="Valor parcial pendente">
+      </div>
+      <div class="modal-footer">
+        <button type="button" onclick="closeDiarioFiadoModal()" class="btn btn-secondary btn-md">Cancelar</button>
+        <button type="button" onclick="confirmDiarioFiadoModal()" class="btn btn-primary btn-lg">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Clientes -->
+  <div id="clients-modal" class="modal">
+    <div class="modal-content modal-content--sm">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-display text-xl font-bold" id="clients-modal-title">Novo cliente</h3>
+        <button type="button" onclick="closeClientsModal()" class="modal-close" aria-label="Fechar">&times;</button>
+      </div>
+      <form id="clients-form" onsubmit="saveClient(event)">
+        <input type="hidden" id="clients-id-input">
+        <div class="form-group">
+          <label>Nome</label>
+          <input type="text" id="clients-name" required placeholder="Ex.: Maria Silva">
+        </div>
+        <div class="form-group">
+          <label>Telefone</label>
+          <input type="tel" id="clients-phone" required autocomplete="tel" inputmode="numeric"
+            placeholder="(00) 00000-0000" maxlength="15">
+        </div>
+        <div class="form-group">
+          <label>Avatar (opcional)</label>
+          <input type="file" id="clients-avatar-file" accept="image/jpeg,image/png,image/webp,image/gif">
+          <p class="text-xs text-black/50 mt-1">JPG, PNG, WebP ou GIF · máx. 5 MB</p>
+          <div class="mt-3 flex items-center gap-3">
+            <img id="clients-avatar-preview" alt="Pré-visualização"
+              class="hidden h-16 w-16 rounded-full object-cover border border-black/10 bg-black/5">
+            <input type="hidden" id="clients-avatar">
+          </div>
+        </div>
+        <div class="form-group" id="clients-active-group" style="display: none;">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="clients-active" checked> Ativo
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" onclick="closeClientsModal()" class="btn btn-secondary btn-md">Cancelar</button>
+          <button type="submit" class="btn btn-primary btn-lg">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Cadastro rápido de produto (Diário) -->
   <div id="diario-quick-product-modal" class="modal">
     <div class="modal-content modal-content--sm">
@@ -1256,7 +1409,7 @@
               <input type="checkbox" id="user-perm-produtos"> Produtos
             </label>
             <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" id="user-perm-vendas"> Vendas do dia
+              <input type="checkbox" id="user-perm-vendas"> Vendas (Diário e Relatórios)
             </label>
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" id="user-perm-fidelidade"> Fidelidade
@@ -1355,6 +1508,8 @@
   <script src="/js/admin/categories.js"></script>
   <script src="/js/admin/products.js"></script>
   <script src="/js/admin/loyalty.js"></script>
+  <script src="/js/admin/clients.js"></script>
+  <script src="/js/admin/customer-debts.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="/js/admin/daily-sales.js"></script>
   <script src="/js/datetime.js"></script>

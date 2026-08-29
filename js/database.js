@@ -585,6 +585,63 @@ const DB = {
     return response.json();
   },
 
+  async getDebtCustomers() {
+    const response = await fetch(`${getApiBaseUrl()}/daily-sales/debts/customers`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao listar débitos';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async getDebtSummary(date) {
+    const qs = date ? `?date=${encodeURIComponent(date)}` : '';
+    const response = await fetch(`${getApiBaseUrl()}/daily-sales/debts/summary${qs}`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao buscar resumo de débitos';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async getCustomerDebts(customerId) {
+    const response = await fetch(`${getApiBaseUrl()}/daily-sales/debts/customers/${encodeURIComponent(customerId)}`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao buscar débitos do cliente';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async addDebtPayment(saleId, amount, note) {
+    const body = { amount: Number(amount) };
+    if (note != null && String(note).trim()) body.note = String(note).trim();
+    const response = await fetch(`${getApiBaseUrl()}/daily-sales/debts/sales/${encodeURIComponent(saleId)}/payments`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao registrar pagamento';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
   async deleteDailySale(id) {
     const response = await fetch(`${getApiBaseUrl()}/daily-sales/${id}`, {
       method: 'DELETE',

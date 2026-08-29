@@ -8,9 +8,10 @@ const AdminRouter = {
     dashboard: { hash: '#/', viewId: 'view-dashboard', label: 'Início' },
     categorias: { hash: '#/categorias', viewId: 'view-categories', label: 'Categorias', loader: 'loadCategories' },
     fidelidade: { hash: '#/fidelidade', viewId: 'view-loyalty', label: 'Fidelidade', loader: 'loadLoyaltyCustomers' },
+    clientes: { hash: '#/clientes', viewId: 'view-clientes', label: 'Clientes', loader: 'loadClients' },
     produtos: { hash: '#/produtos', viewId: 'view-products', label: 'Produtos', loader: 'loadProducts' },
-    vendas: { hash: '#/vendas', viewId: 'view-daily-sales', label: 'Vendas do dia', loader: 'loadDailySales' },
     diario: { hash: '#/diario', viewId: 'view-daily-diario', label: 'Diário', loader: 'loadDailyDiario' },
+    relatorios: { hash: '#/relatorios', viewId: 'view-daily-sales', label: 'Relatórios', loader: 'loadDailySales' },
     eventos: { hash: '#/eventos', viewId: 'view-events', label: 'Eventos', loader: 'loadEvents' },
     distribuidores: { hash: '#/distribuidores', viewId: 'view-distributors', label: 'Distribuidores', loader: 'loadDistributors' },
     usuarios: { hash: '#/usuarios', viewId: 'view-users', label: 'Usuários', loader: 'loadUsers' }
@@ -131,9 +132,11 @@ const AdminRouter = {
     if (hash === '#/' || hash === '#') return { module: 'dashboard' };
     if (hash.startsWith('#/categorias')) return { module: 'categorias' };
     if (hash.startsWith('#/fidelidade')) return { module: 'fidelidade' };
+    if (hash.startsWith('#/clientes')) return { module: 'clientes' };
     if (hash.startsWith('#/produtos')) return { module: 'produtos' };
     if (hash.startsWith('#/diario')) return { module: 'diario' };
-    if (hash.startsWith('#/vendas')) return { module: 'vendas' };
+    if (hash.startsWith('#/relatorios')) return { module: 'relatorios' };
+    if (hash.startsWith('#/vendas')) return { module: 'relatorios', redirectFromVendas: true };
     if (hash.startsWith('#/usuarios')) return { module: 'usuarios' };
     if (hash.startsWith('#/eventos')) {
       const match = hash.match(/^#\/eventos(?:\/(\d+)(?:\/(lotes|validar|ingressos))?)?\/?$/);
@@ -153,6 +156,12 @@ const AdminRouter = {
 
     const parsed = this.parseHash();
     let { module } = parsed;
+
+    // Compat: bookmarks antigos #/vendas → Relatórios
+    if (parsed.redirectFromVendas) {
+      window.location.hash = '#/relatorios';
+      return;
+    }
 
     if (!this.canAccessModule(module)) {
       window.location.hash = '#/';
@@ -222,8 +231,7 @@ const AdminRouter = {
     document.getElementById(route.viewId)?.classList.add('is-active');
 
     document.querySelectorAll('[data-admin-nav]').forEach(el => {
-      const navModule = module === 'diario' ? 'vendas' : module;
-      el.classList.toggle('is-active', el.dataset.adminNav === navModule);
+      el.classList.toggle('is-active', el.dataset.adminNav === module);
     });
 
     if (typeof AdminPermissions !== 'undefined') {
@@ -237,7 +245,7 @@ const AdminRouter = {
 
     const loaderName = route.loader;
     if (loaderName && typeof window[loaderName] === 'function') {
-      const alwaysReload = module === 'vendas' || module === 'diario' || module === 'fidelidade' || module === 'eventos' || module === 'usuarios';
+      const alwaysReload = module === 'relatorios' || module === 'diario' || module === 'fidelidade' || module === 'clientes' || module === 'eventos' || module === 'usuarios';
       if (forceReload || alwaysReload || !this.loadedModules.has(module)) {
         window[loaderName]();
         this.loadedModules.add(module);
@@ -248,8 +256,10 @@ const AdminRouter = {
   async loadDashboardStats() {
     const catEl = document.getElementById('stat-categories');
     const loyEl = document.getElementById('stat-loyalty');
+    const clientsEl = document.getElementById('stat-clients');
     const prodEl = document.getElementById('stat-products');
-    const salesEl = document.getElementById('stat-daily-sales');
+    const diarioEl = document.getElementById('stat-diario');
+    const relatoriosEl = document.getElementById('stat-relatorios');
     const eventsEl = document.getElementById('stat-events');
     const distEl = document.getElementById('stat-distributors');
     const dashItems = document.getElementById('dashboard-stat-items');
@@ -264,15 +274,18 @@ const AdminRouter = {
 
     const canCat = this.canAccessModule('categorias');
     const canLoy = this.canAccessModule('fidelidade');
+    const canClients = this.canAccessModule('clientes');
     const canProd = this.canAccessModule('produtos');
-    const canSales = this.canAccessModule('vendas');
+    const canSales = this.canAccessModule('diario') || this.canAccessModule('relatorios');
     const canEvents = this.canAccessModule('eventos');
     const canDist = this.canAccessModule('distribuidores');
 
     if (catEl && canCat) catEl.textContent = 'Carregando…';
     if (loyEl && canLoy) loyEl.textContent = 'Carregando…';
+    if (clientsEl && canClients) clientsEl.textContent = 'Carregando…';
     if (prodEl && canProd) prodEl.textContent = 'Carregando…';
-    if (salesEl && canSales) salesEl.textContent = 'Carregando…';
+    if (diarioEl && canSales) diarioEl.textContent = 'Carregando…';
+    if (relatoriosEl && canSales) relatoriosEl.textContent = 'Carregando…';
     if (eventsEl && canEvents) eventsEl.textContent = 'Carregando…';
     if (distEl && canDist) distEl.textContent = 'Carregando…';
 
@@ -283,7 +296,7 @@ const AdminRouter = {
       const [categories, products, loyaltyData, salesToday, events, distributors] = await Promise.all([
         canCat ? DB.getCategories().catch(() => []) : Promise.resolve([]),
         canProd ? DB.getProducts().catch(() => []) : Promise.resolve([]),
-        canLoy ? DB.getLoyaltyCustomers({ page: 1, limit: 1 }).catch(() => ({ total: 0, items: [] })) : Promise.resolve({ total: 0, items: [] }),
+        (canLoy || canClients) ? DB.getLoyaltyCustomers({ page: 1, limit: 1 }).catch(() => ({ total: 0, items: [] })) : Promise.resolve({ total: 0, items: [] }),
         canSales ? DB.getTodaySalesSummary().catch(() => null) : Promise.resolve(null),
         canEvents ? DB.getEvents({ all: true }).catch(() => []) : Promise.resolve([]),
         canDist ? DB.getDistributors({ all: true }).catch(() => []) : Promise.resolve([])
@@ -300,6 +313,10 @@ const AdminRouter = {
         const totalCustomers = loyaltyData.total ?? (loyaltyData.items || []).length;
         loyEl.textContent = `${totalCustomers} cliente${totalCustomers !== 1 ? 's' : ''}`;
       }
+      if (canClients && clientsEl) {
+        const totalCustomers = loyaltyData.total ?? (loyaltyData.items || []).length;
+        clientsEl.textContent = `${totalCustomers} cliente${totalCustomers !== 1 ? 's' : ''}`;
+      }
 
       if (canSales) {
         const totalItems = salesToday?.total_items ?? 0;
@@ -311,10 +328,15 @@ const AdminRouter = {
         const monthAccessAvg = salesToday?.month_access_avg ?? 0;
         const monthRevenue = salesToday?.month_revenue ?? 0;
 
-        if (salesEl) {
-          salesEl.textContent = totalItems > 0
-            ? `${totalItems} venda${totalItems !== 1 ? 's' : ''} · ${totalAccesses} acesso${totalAccesses !== 1 ? 's' : ''} · ${formatBRL(totalRevenue)} hoje`
-            : 'Nenhuma venda hoje';
+        const todayLine = totalItems > 0
+          ? `${totalItems} venda${totalItems !== 1 ? 's' : ''} · ${totalAccesses} acesso${totalAccesses !== 1 ? 's' : ''} · ${formatBRL(totalRevenue)} hoje`
+          : 'Nenhuma venda hoje';
+
+        if (diarioEl) diarioEl.textContent = todayLine;
+        if (relatoriosEl) {
+          relatoriosEl.textContent = monthItems > 0
+            ? `${monthItems} venda${monthItems !== 1 ? 's' : ''} · ${formatBRL(monthRevenue)} no mês`
+            : todayLine;
         }
 
         if (dashSummary) dashSummary.classList.remove('hidden');
@@ -348,8 +370,10 @@ const AdminRouter = {
       if (handleAuthError(error)) return;
       if (catEl) catEl.textContent = '—';
       if (loyEl) loyEl.textContent = '—';
+      if (clientsEl) clientsEl.textContent = '—';
       if (prodEl) prodEl.textContent = '—';
-      if (salesEl) salesEl.textContent = '—';
+      if (diarioEl) diarioEl.textContent = '—';
+      if (relatoriosEl) relatoriosEl.textContent = '—';
       if (eventsEl) eventsEl.textContent = '—';
       if (distEl) distEl.textContent = '—';
       if (dashItems) dashItems.textContent = '—';

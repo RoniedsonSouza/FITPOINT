@@ -301,6 +301,9 @@ async function previewEmailCampaignRecipients() {
           `Destinatários: ${result.count}` +
           (result.shortcutCount || result.manualCount
             ? ` (atalho ${result.shortcutCount || 0} · manual ${result.manualCount || 0})`
+            : '') +
+          (result.skippedUnsubscribed
+            ? ` · ${result.skippedUnsubscribed} descadastrado(s)`
             : '');
       }
       showToast(`${result.count} destinatário(s) após deduplicação.`, 'success');

@@ -19,6 +19,7 @@ const distributorsRoutes = require('./routes/distributors');
 const mediaRoutes = require('./routes/media');
 const authRoutes = require('./routes/auth');
 const emailCampaignsRoutes = require('./routes/emailCampaigns');
+const emailUnsubscribeRoutes = require('./routes/emailUnsubscribe');
 const { startEmailCampaignWorker } = require('./services/emailCampaignWorker');
 
 const app = express();
@@ -55,6 +56,7 @@ app.use('/api/tickets', ticketsRoutes);
 app.use('/api/distributors', distributorsRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/email-campaigns', emailCampaignsRoutes);
+app.use('/api/email', emailUnsubscribeRoutes);
 
 // Rota de health check
 app.get('/api/health', (req, res) => {

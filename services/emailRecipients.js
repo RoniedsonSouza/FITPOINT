@@ -4,6 +4,7 @@ const {
   EMAIL_CAMPAIGN_THEMES,
   isValidEmailCampaignTheme
 } = require('./emailCampaignThemes');
+const { filterUnsubscribedEmails } = require('./emailUnsubscribes');
 
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
@@ -128,11 +129,14 @@ async function resolveCampaignRecipients({ theme, eventId, lotId, manualEmails }
     emails.push(normalized);
   }
 
+  const deliverable = await filterUnsubscribedEmails(emails);
+
   return {
-    emails,
-    count: emails.length,
+    emails: deliverable,
+    count: deliverable.length,
     shortcutCount: shortcut.length,
-    manualCount: manual.length
+    manualCount: manual.length,
+    skippedUnsubscribed: emails.length - deliverable.length
   };
 }
 

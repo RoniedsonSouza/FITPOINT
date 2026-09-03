@@ -83,6 +83,8 @@ DB_SCHEMA=fitpoint
 - `MP_WEBHOOK_SECRET`: (opcional) segredo para validar notificações do Mercado Pago
 - `RESEND_API_KEY`: chave da API Resend para envio dos ingressos por e-mail
 - `RESEND_FROM`: remetente verificado no Resend (ex: `FitPoint <ingressos@seudominio.com>`)
+- `RESEND_REPLY_TO` (opcional): e-mail de resposta; se omitido, usa o endereço de `RESEND_FROM`
+- `RESEND_UNSUBSCRIBE_SECRET` (opcional): assina links de descadastro de campanhas; se omitido, usa `JWT_SECRET`
 
 Guia completo (passo a passo para obter as chaves): **[docs/INGRESSOS-CONFIG.md](docs/INGRESSOS-CONFIG.md)**
 

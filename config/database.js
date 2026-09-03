@@ -87,6 +87,15 @@ async function ensureDatabase() {
       ADD COLUMN IF NOT EXISTS last_positive_visit_at TIMESTAMP
     `);
     await client.query(`
+      ALTER TABLE ${SCHEMA}.loyalty_customers
+      ADD COLUMN IF NOT EXISTS email VARCHAR(255)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_loyalty_customers_email
+      ON ${SCHEMA}.loyalty_customers (LOWER(email))
+      WHERE email IS NOT NULL AND email <> ''
+    `);
+    await client.query(`
       CREATE TABLE IF NOT EXISTS ${SCHEMA}.loyalty_visit_events (
         id SERIAL PRIMARY KEY,
         customer_id INTEGER NOT NULL REFERENCES ${SCHEMA}.loyalty_customers(id) ON DELETE CASCADE,
@@ -490,6 +499,55 @@ async function ensureDatabase() {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_media_kind_created
       ON ${SCHEMA}.media (kind, created_at DESC)
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA}.email_campaigns (
+        id SERIAL PRIMARY KEY,
+        theme VARCHAR(20) NOT NULL CHECK (theme IN ('evento', 'cliente', 'produto')),
+        subject VARCHAR(500) NOT NULL,
+        body TEXT NOT NULL,
+        event_id INTEGER REFERENCES ${SCHEMA}.events(id) ON DELETE SET NULL,
+        lot_id INTEGER REFERENCES ${SCHEMA}.ticket_lots(id) ON DELETE SET NULL,
+        manual_emails JSONB NOT NULL DEFAULT '[]'::jsonb,
+        status VARCHAR(20) NOT NULL DEFAULT 'queued'
+          CHECK (status IN ('queued', 'sending', 'completed', 'failed', 'cancelled')),
+        total_count INTEGER NOT NULL DEFAULT 0,
+        sent_count INTEGER NOT NULL DEFAULT 0,
+        failed_count INTEGER NOT NULL DEFAULT 0,
+        created_by INTEGER REFERENCES ${SCHEMA}.admin_users(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        started_at TIMESTAMPTZ,
+        finished_at TIMESTAMPTZ
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_email_campaigns_created
+      ON ${SCHEMA}.email_campaigns (created_at DESC)
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA}.email_campaign_jobs (
+        id SERIAL PRIMARY KEY,
+        campaign_id INTEGER NOT NULL REFERENCES ${SCHEMA}.email_campaigns(id) ON DELETE CASCADE,
+        to_email VARCHAR(255) NOT NULL,
+        to_name VARCHAR(255),
+        status VARCHAR(20) NOT NULL DEFAULT 'pending'
+          CHECK (status IN ('pending', 'processing', 'sent', 'failed')),
+        attempts INTEGER NOT NULL DEFAULT 0,
+        max_attempts INTEGER NOT NULL DEFAULT 3,
+        last_error TEXT,
+        sent_at TIMESTAMPTZ,
+        available_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (campaign_id, to_email)
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_email_campaign_jobs_queue
+      ON ${SCHEMA}.email_campaign_jobs (status, available_at)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_email_campaign_jobs_campaign
+      ON ${SCHEMA}.email_campaign_jobs (campaign_id, status)
     `);
 
     console.log(`✅ Schema "${SCHEMA}" e tabelas/colunas verificadas`);

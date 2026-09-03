@@ -1029,5 +1029,58 @@ const DB = {
       this._throwHttpError(response, error, 'Erro ao alterar senha');
     }
     return response.json();
+  },
+
+  // === CAMPANHAS DE E-MAIL ===
+
+  async getEmailCampaigns(params = {}) {
+    const qs = new URLSearchParams();
+    if (params.limit) qs.set('limit', String(params.limit));
+    const query = qs.toString();
+    const response = await fetch(`${getApiBaseUrl()}/email-campaigns${query ? `?${query}` : ''}`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      this._throwHttpError(response, error, 'Erro ao listar campanhas');
+    }
+    return response.json();
+  },
+
+  async getEmailCampaign(id) {
+    const response = await fetch(`${getApiBaseUrl()}/email-campaigns/${id}`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      this._throwHttpError(response, error, 'Erro ao buscar campanha');
+    }
+    return response.json();
+  },
+
+  async previewEmailCampaignRecipients(payload) {
+    const response = await fetch(`${getApiBaseUrl()}/email-campaigns/preview-recipients`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      this._throwHttpError(response, error, 'Erro ao pré-visualizar destinatários');
+    }
+    return response.json();
+  },
+
+  async createEmailCampaign(payload) {
+    const response = await fetch(`${getApiBaseUrl()}/email-campaigns`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      this._throwHttpError(response, error, 'Erro ao criar campanha');
+    }
+    return response.json();
   }
 };

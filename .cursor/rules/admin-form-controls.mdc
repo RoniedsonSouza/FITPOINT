@@ -1,0 +1,37 @@
+---
+description: Padding e estilo padrão de inputs/selects/textareas no admin FitPoint
+alwaysApply: true
+---
+
+# Controles de formulário (FitPoint admin)
+
+O Tailwind CDN aplica preflight que **zera** padding de `input`/`select`/`textarea`. Neste projeto o padding é obrigatório.
+
+## Tokens (css/admin.css)
+
+- `--fp-control-padding-y: 0.75rem`
+- `--fp-control-padding-x: 1rem`
+- `--fp-control-min-height: 2.75rem`
+- `--fp-control-radius: 0.75rem`
+
+## Regras
+
+- Todo `input`/`select`/`textarea` novo no admin deve herdar o estilo global sob `.admin-page` (já em `css/admin.css`). Não recriar do zero.
+- **Nunca** use `padding: 0` (nem `!important`) em controles de formulário, salvo exceções: checkbox, radio, file, e inputs internos de composições (ex.: chip/tag field).
+- Controles compostos (tag input, combobox) devem ter o **container** com o mesmo padding/borda dos campos padrão (`var(--fp-control-padding-*)`).
+- Prefira `.form-group` + label; classe opcional `.form-control` se precisar reforçar o estilo.
+- Não dependa de estilo inline `style="padding:…"` para corrigir falta de padding — ajuste o CSS do projeto.
+
+## Exemplo
+
+```html
+<!-- ✅ -->
+<div class="form-group">
+  <label for="campo">Nome</label>
+  <input id="campo" type="text">
+</div>
+
+<!-- ❌ -->
+<input style="padding: 12px" type="text">
+<textarea style="padding:0"></textarea>
+```

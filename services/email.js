@@ -90,6 +90,43 @@ async function sendTicketEmail({ to, buyerName, event, lot, tickets, complimenta
   return result.data;
 }
 
+/**
+ * Converte texto plano do admin em HTML simples para campanha.
+ */
+function campaignBodyToHtml(body) {
+  const escaped = escapeHtml(body).replace(/\r\n|\r|\n/g, '<br>\n');
+  return `
+    <div style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:0 auto;color:#0E1F16;line-height:1.6;">
+      <div>${escaped}</div>
+      <p style="margin-top:24px;color:#1D6B3A;font-weight:600;">FitPoint Fitness</p>
+    </div>
+  `;
+}
+
+/**
+ * Envia e-mail de campanha (assunto + corpo definidos pelo admin).
+ */
+async function sendCampaignEmail({ to, subject, html, body }) {
+  const resend = getResendClient();
+  const finalHtml = html || campaignBodyToHtml(body || '');
+
+  const result = await resend.emails.send({
+    from: getFromAddress(),
+    to: [to],
+    subject: String(subject || '').trim() || '(sem assunto)',
+    html: finalHtml
+  });
+
+  if (result.error) {
+    throw new Error(result.error.message || 'Falha ao enviar e-mail via Resend');
+  }
+
+  return result.data;
+}
+
 module.exports = {
-  sendTicketEmail
+  sendTicketEmail,
+  sendCampaignEmail,
+  campaignBodyToHtml,
+  escapeHtml
 };

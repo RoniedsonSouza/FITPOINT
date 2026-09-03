@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { query, table, getClient } = require('../config/database');
-const { authenticateToken, requirePermission, requireAnyPermission } = require('../config/auth');
+const { authenticateToken, requirePermission, requireAnyPermission, isValidEmail } = require('../config/auth');
 const {
   DEFAULT_VISITS_PER_REWARD,
   DEFAULT_ACCESS_VALUE,
@@ -473,7 +473,7 @@ router.get('/customers/:id', authenticateToken, requirePermission('fidelidade'),
 router.post('/customers', authenticateToken, requireAnyPermission('fidelidade', 'vendas'), async (req, res) => {
   try {
     const visitsPerReward = await getVisitsPerReward();
-    const { name, phone, avatar, total_visits, total_rewards } = req.body;
+    const { name, phone, avatar, total_visits, total_rewards, email } = req.body;
     const trimmedName = String(name || '').trim();
     const normalizedPhone = normalizePhone(phone);
 
@@ -482,6 +482,14 @@ router.post('/customers', authenticateToken, requireAnyPermission('fidelidade', 
     }
     if (!normalizedPhone || normalizedPhone.length < 10 || normalizedPhone.length > 11) {
       return res.status(400).json({ error: 'Telefone inválido (10 ou 11 dígitos)' });
+    }
+
+    let normalizedEmail = null;
+    if (email != null && String(email).trim() !== '') {
+      normalizedEmail = String(email).trim().toLowerCase();
+      if (!isValidEmail(normalizedEmail)) {
+        return res.status(400).json({ error: 'E-mail inválido' });
+      }
     }
 
     const visitsParsed = parseNonNegativeInt(total_visits, 'total_visits');
@@ -499,11 +507,12 @@ router.post('/customers', authenticateToken, requireAnyPermission('fidelidade', 
 
     const result = await query(
       `INSERT INTO ${table('loyalty_customers')}
-       (name, phone, avatar, total_visits, total_rewards, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING *`,
+       (name, phone, email, avatar, total_visits, total_rewards, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) RETURNING *`,
       [
         trimmedName,
         normalizedPhone,
+        normalizedEmail,
         avatar || null,
         visitsParsed?.value ?? 0,
         rewardsParsed?.value ?? 0
@@ -521,7 +530,7 @@ router.post('/customers', authenticateToken, requireAnyPermission('fidelidade', 
 router.put('/customers/:id', authenticateToken, requirePermission('fidelidade'), async (req, res) => {
   try {
     const visitsPerReward = await getVisitsPerReward();
-    const { name, phone, active, avatar, total_visits, total_rewards } = req.body;
+    const { name, phone, active, avatar, total_visits, total_rewards, email } = req.body;
 
     const existing = await query(
       `SELECT * FROM ${table('loyalty_customers')} WHERE id = $1`,
@@ -557,6 +566,19 @@ router.put('/customers/:id', authenticateToken, requirePermission('fidelidade'),
       }
       updates.push(`phone = $${paramIndex++}`);
       values.push(normalizedPhone);
+    }
+    if (email !== undefined) {
+      if (email == null || String(email).trim() === '') {
+        updates.push(`email = $${paramIndex++}`);
+        values.push(null);
+      } else {
+        const normalizedEmail = String(email).trim().toLowerCase();
+        if (!isValidEmail(normalizedEmail)) {
+          return res.status(400).json({ error: 'E-mail inválido' });
+        }
+        updates.push(`email = $${paramIndex++}`);
+        values.push(normalizedEmail);
+      }
     }
     if (avatar !== undefined) {
       updates.push(`avatar = $${paramIndex++}`);

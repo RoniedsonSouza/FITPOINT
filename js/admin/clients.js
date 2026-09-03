@@ -153,6 +153,7 @@ function openClientsModal(customerId = null) {
       document.getElementById('clients-id-input').value = c.id;
       document.getElementById('clients-name').value = c.name || '';
       document.getElementById('clients-phone').value = formatPhoneDisplay(c.phone);
+      document.getElementById('clients-email').value = c.email || '';
       document.getElementById('clients-active').checked = c.active !== false;
       if (c.avatar) {
         document.getElementById('clients-avatar').value = c.avatar;
@@ -206,6 +207,7 @@ async function saveClient(event) {
       const payload = {
         name,
         phone: typeof normalizePhoneDigits === 'function' ? normalizePhoneDigits(phone) : phone,
+        email: document.getElementById('clients-email')?.value.trim() || null,
         avatar: avatar || undefined
       };
       if (editingClientId) {

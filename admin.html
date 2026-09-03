@@ -131,6 +131,9 @@
       <button type="button" class="admin-nav-item" data-admin-nav="eventos">
         <i data-lucide="ticket"></i> Eventos
       </button>
+      <button type="button" class="admin-nav-item" data-admin-nav="emails">
+        <i data-lucide="mail"></i> E-mails
+      </button>
       <button type="button" class="admin-nav-item" data-admin-nav="distribuidores">
         <i data-lucide="map-pin"></i> Distribuidores
       </button>
@@ -200,6 +203,12 @@
             <h2>Eventos</h2>
             <p>Ingressos, lotes, validação e vendas online.</p>
             <span class="module-card-stat" id="stat-events">—</span>
+          </button>
+          <button type="button" class="module-card" data-module-card="emails">
+            <span class="module-card-icon"><i data-lucide="mail"></i></span>
+            <h2>E-mails</h2>
+            <p>Campanhas e disparos em lote via Resend.</p>
+            <span class="module-card-stat" id="stat-email-campaigns">—</span>
           </button>
           <button type="button" class="module-card" data-module-card="distribuidores">
             <span class="module-card-icon"><i data-lucide="map-pin"></i></span>
@@ -733,6 +742,122 @@
       </section>
 
       <!-- Distribuidores -->
+      <!-- E-mails / campanhas -->
+      <section id="view-emails" class="admin-view">
+        <div class="admin-view-header">
+          <h1>Campanhas de e-mail</h1>
+          <p>Dispare mensagens por tema, com atalho de destinatários (ex.: lote de ingressos) ou lista manual.</p>
+        </div>
+
+        <div id="email-campaigns-list-panel">
+          <div class="module-toolbar">
+            <span></span>
+            <div class="module-toolbar-actions">
+              <button type="button" onclick="openEmailCampaignForm()" class="btn btn-primary btn-md">
+                <i data-lucide="plus"></i> Nova campanha
+              </button>
+            </div>
+          </div>
+          <div id="email-campaigns-list" class="grid gap-3">
+            <p class="text-black/60">Selecione este módulo para carregar.</p>
+          </div>
+        </div>
+
+        <div id="email-campaign-form-panel" class="hidden">
+          <div class="module-toolbar">
+            <button type="button" onclick="showEmailCampaignsList()" class="btn btn-outline btn-md">
+              <i data-lucide="arrow-left"></i> Voltar
+            </button>
+          </div>
+          <form id="email-campaign-form" class="card email-campaign-form" onsubmit="submitEmailCampaign(event)">
+            <div class="form-group">
+              <label for="email-campaign-theme">Tema</label>
+              <select id="email-campaign-theme" required>
+                <option value="evento">Evento</option>
+                <option value="cliente">Cliente</option>
+                <option value="produto">Produto</option>
+              </select>
+            </div>
+
+            <div id="email-campaign-evento-fields" class="grid gap-3 sm:grid-cols-2">
+              <div class="form-group">
+                <label for="email-campaign-event">Evento (atalho)</label>
+                <select id="email-campaign-event">
+                  <option value="">Selecione…</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="email-campaign-lot">Lote</label>
+                <select id="email-campaign-lot" disabled>
+                  <option value="">Todos os lotes do evento</option>
+                </select>
+              </div>
+            </div>
+            <p id="email-campaign-shortcut-hint" class="text-xs text-black/50 mb-3 hidden">
+              Temas Cliente e Produto ainda não têm atalho automático — use a lista manual.
+            </p>
+
+            <div class="form-group email-campaign-manual-section">
+              <button type="button" id="email-campaign-manual-toggle"
+                class="email-campaign-collapse-toggle" aria-expanded="false"
+                aria-controls="email-campaign-manual-panel"
+                onclick="toggleEmailCampaignManualPanel()">
+                <span class="email-campaign-collapse-toggle-label">
+                  <i data-lucide="chevron-right" class="email-campaign-collapse-chevron"></i>
+                  E-mails manuais
+                  <span id="email-campaign-manual-count" class="email-campaign-manual-count">0</span>
+                </span>
+                <span class="text-xs text-black/45">Opcional</span>
+              </button>
+              <div id="email-campaign-manual-panel" class="email-campaign-manual-panel is-collapsed" hidden>
+                <div class="email-tag-field" id="email-campaign-manual-field"
+                  onclick="document.getElementById('email-campaign-manual-input')?.focus()">
+                  <div id="email-campaign-manual-tags" class="email-tag-list" aria-live="polite"></div>
+                  <input type="text" id="email-campaign-manual-input" class="email-tag-input"
+                    autocomplete="off" inputmode="email"
+                    placeholder="Digite ou cole e-mails e pressione Enter">
+                </div>
+                <p class="text-xs text-black/45 mt-1">
+                  Enter, vírgula ou ponto e vírgula confirma o e-mail como tag. Backspace remove a última.
+                </p>
+                <input type="hidden" id="email-campaign-manual" value="">
+              </div>
+            </div>
+
+            <p id="email-campaign-preview-count" class="text-sm text-black/70 mb-3">Destinatários: —</p>
+
+            <div class="form-group">
+              <label for="email-campaign-subject">Assunto</label>
+              <input type="text" id="email-campaign-subject" required maxlength="500"
+                placeholder="Assunto do e-mail">
+            </div>
+            <div class="form-group">
+              <label for="email-campaign-body">Corpo</label>
+              <textarea id="email-campaign-body" rows="8" required
+                placeholder="Texto da mensagem…"></textarea>
+            </div>
+
+            <div class="modal-footer" style="padding:0;border:0;">
+              <button type="button" onclick="previewEmailCampaignRecipients()" class="btn btn-outline btn-md">
+                Pré-visualizar destinatários
+              </button>
+              <button type="submit" class="btn btn-primary btn-md">Enviar campanha</button>
+            </div>
+          </form>
+        </div>
+
+        <div id="email-campaign-detail-panel" class="hidden">
+          <div class="module-toolbar">
+            <button type="button" onclick="showEmailCampaignsList()" class="btn btn-outline btn-md">
+              <i data-lucide="arrow-left"></i> Voltar
+            </button>
+          </div>
+          <div id="email-campaign-detail" class="card">
+            <p class="text-black/60">Carregando…</p>
+          </div>
+        </div>
+      </section>
+
       <section id="view-distributors" class="admin-view">
         <div class="admin-view-header">
           <h1>Distribuidores</h1>
@@ -1199,6 +1324,10 @@
             placeholder="(00) 00000-0000" maxlength="15">
         </div>
         <div class="form-group">
+          <label for="loyalty-email">E-mail (opcional)</label>
+          <input type="email" id="loyalty-email" autocomplete="email" placeholder="cliente@email.com">
+        </div>
+        <div class="form-group">
           <label>Avatar (opcional)</label>
           <input type="file" id="loyalty-avatar-file" accept="image/jpeg,image/png,image/webp,image/gif">
           <p class="text-xs text-black/50 mt-1">JPG, PNG, WebP ou GIF · máx. 5 MB</p>
@@ -1310,6 +1439,10 @@
             placeholder="(00) 00000-0000" maxlength="15">
         </div>
         <div class="form-group">
+          <label for="clients-email">E-mail (opcional)</label>
+          <input type="email" id="clients-email" autocomplete="email" placeholder="cliente@email.com">
+        </div>
+        <div class="form-group">
           <label>Avatar (opcional)</label>
           <input type="file" id="clients-avatar-file" accept="image/jpeg,image/png,image/webp,image/gif">
           <p class="text-xs text-black/50 mt-1">JPG, PNG, WebP ou GIF · máx. 5 MB</p>
@@ -1418,6 +1551,9 @@
               <input type="checkbox" id="user-perm-distribuidores"> Distribuidores
             </label>
             <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="user-perm-emails"> E-mails
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" id="user-perm-eventos"> Eventos
             </label>
           </div>
@@ -1514,6 +1650,7 @@
   <script src="/js/admin/daily-sales.js"></script>
   <script src="/js/datetime.js"></script>
   <script src="/js/admin/events.js"></script>
+  <script src="/js/admin/email-campaigns.js"></script>
   <script src="/js/admin/distributors.js"></script>
   <script src="/js/admin/users.js"></script>
   <script src="/js/admin/router.js"></script>

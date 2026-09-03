@@ -596,6 +596,7 @@ function openLoyaltyModal(customerId = null) {
       document.getElementById('loyalty-id-input').value = c.id;
       document.getElementById('loyalty-name').value = c.name;
       document.getElementById('loyalty-phone').value = formatPhoneDisplay(c.phone);
+      document.getElementById('loyalty-email').value = c.email || '';
       document.getElementById('loyalty-total-visits').value = c.total_visits ?? 0;
       document.getElementById('loyalty-total-rewards').value = c.total_rewards ?? 0;
       document.getElementById('loyalty-active').checked = c.active !== false;
@@ -656,7 +657,14 @@ async function saveLoyaltyCustomer(event) {
       }
     }
 
-    const payload = { name, phone: normalizePhoneDigits(phone), avatar, total_visits, total_rewards };
+    const payload = {
+      name,
+      phone: normalizePhoneDigits(phone),
+      email: document.getElementById('loyalty-email')?.value.trim() || null,
+      avatar,
+      total_visits,
+      total_rewards
+    };
 
     try {
       if (editingLoyaltyId) {

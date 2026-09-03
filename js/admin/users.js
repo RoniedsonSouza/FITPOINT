@@ -10,6 +10,7 @@ function emptyPermissionsForm() {
     fidelidade: false,
     vendas: false,
     distribuidores: false,
+    emails: false,
     eventos: { enabled: false, lotes: false, validar: false }
   };
 }
@@ -22,6 +23,7 @@ function summarizePermissions(user) {
   if (p.fidelidade) parts.push('Fidelidade');
   if (p.vendas) parts.push('Vendas (Diário e Relatórios)');
   if (p.distribuidores) parts.push('Distribuidores');
+  if (p.emails) parts.push('E-mails');
   if (p.eventos?.enabled) {
     const sub = ['Ingressos'];
     if (p.eventos.lotes) sub.push('Lotes');
@@ -114,6 +116,7 @@ function readPermissionsFromForm() {
     fidelidade: !!document.getElementById('user-perm-fidelidade')?.checked,
     vendas: !!document.getElementById('user-perm-vendas')?.checked,
     distribuidores: !!document.getElementById('user-perm-distribuidores')?.checked,
+    emails: !!document.getElementById('user-perm-emails')?.checked,
     eventos: {
       enabled: !!eventosEnabled,
       lotes: !!eventosEnabled && !!document.getElementById('user-perm-eventos-lotes')?.checked,
@@ -132,6 +135,7 @@ function fillPermissionsForm(permissions) {
   set('user-perm-fidelidade', p.fidelidade);
   set('user-perm-vendas', p.vendas);
   set('user-perm-distribuidores', p.distribuidores);
+  set('user-perm-emails', p.emails);
   set('user-perm-eventos', p.eventos?.enabled);
   set('user-perm-eventos-lotes', p.eventos?.lotes);
   set('user-perm-eventos-validar', p.eventos?.validar);

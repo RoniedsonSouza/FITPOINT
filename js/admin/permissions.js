@@ -24,6 +24,7 @@ const AdminPermissions = {
       fidelidade: false,
       vendas: false,
       distribuidores: false,
+      emails: false,
       eventos: { enabled: false, lotes: false, validar: false }
     };
   },
@@ -44,6 +45,7 @@ const AdminPermissions = {
     if (module === 'fidelidade') return !!perms.fidelidade;
     if (module === 'vendas') return !!perms.vendas;
     if (module === 'distribuidores') return !!perms.distribuidores;
+    if (module === 'emails') return !!perms.emails;
     if (module === 'eventos') return !!(perms.eventos && perms.eventos.enabled);
     return false;
   },

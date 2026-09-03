@@ -10,6 +10,7 @@ const EMPTY_PERMISSIONS = {
   fidelidade: false,
   vendas: false,
   distribuidores: false,
+  emails: false,
   eventos: {
     enabled: false,
     lotes: false,
@@ -26,6 +27,7 @@ function normalizePermissions(raw) {
     fidelidade: !!src.fidelidade,
     vendas: !!src.vendas,
     distribuidores: !!src.distribuidores,
+    emails: !!src.emails,
     eventos: {
       enabled: !!enabled || !!eventosSrc.lotes || !!eventosSrc.validar,
       lotes: !!eventosSrc.lotes,
@@ -62,6 +64,7 @@ function userHasPermission(user, module, action) {
   if (module === 'fidelidade') return !!perms.fidelidade;
   if (module === 'vendas') return !!perms.vendas;
   if (module === 'distribuidores') return !!perms.distribuidores;
+  if (module === 'emails') return !!perms.emails;
 
   if (module === 'eventos') {
     if (!perms.eventos.enabled) return false;

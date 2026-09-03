@@ -13,6 +13,7 @@ const AdminRouter = {
     diario: { hash: '#/diario', viewId: 'view-daily-diario', label: 'Diário', loader: 'loadDailyDiario' },
     relatorios: { hash: '#/relatorios', viewId: 'view-daily-sales', label: 'Relatórios', loader: 'loadDailySales' },
     eventos: { hash: '#/eventos', viewId: 'view-events', label: 'Eventos', loader: 'loadEvents' },
+    emails: { hash: '#/emails', viewId: 'view-emails', label: 'E-mails', loader: 'loadEmailCampaigns' },
     distribuidores: { hash: '#/distribuidores', viewId: 'view-distributors', label: 'Distribuidores', loader: 'loadDistributors' },
     usuarios: { hash: '#/usuarios', viewId: 'view-users', label: 'Usuários', loader: 'loadUsers' }
   },
@@ -138,6 +139,8 @@ const AdminRouter = {
     if (hash.startsWith('#/relatorios')) return { module: 'relatorios' };
     if (hash.startsWith('#/vendas')) return { module: 'relatorios', redirectFromVendas: true };
     if (hash.startsWith('#/usuarios')) return { module: 'usuarios' };
+    if (hash.startsWith('#/emails')) return { module: 'emails' };
+    if (hash.startsWith('#/distribuidores')) return { module: 'distribuidores' };
     if (hash.startsWith('#/eventos')) {
       const match = hash.match(/^#\/eventos(?:\/(\d+)(?:\/(lotes|validar|ingressos))?)?\/?$/);
       if (match) {
@@ -245,7 +248,7 @@ const AdminRouter = {
 
     const loaderName = route.loader;
     if (loaderName && typeof window[loaderName] === 'function') {
-      const alwaysReload = module === 'relatorios' || module === 'diario' || module === 'fidelidade' || module === 'clientes' || module === 'eventos' || module === 'usuarios';
+      const alwaysReload = module === 'relatorios' || module === 'diario' || module === 'fidelidade' || module === 'clientes' || module === 'eventos' || module === 'usuarios' || module === 'emails';
       if (forceReload || alwaysReload || !this.loadedModules.has(module)) {
         window[loaderName]();
         this.loadedModules.add(module);
@@ -261,6 +264,7 @@ const AdminRouter = {
     const diarioEl = document.getElementById('stat-diario');
     const relatoriosEl = document.getElementById('stat-relatorios');
     const eventsEl = document.getElementById('stat-events');
+    const emailsEl = document.getElementById('stat-email-campaigns');
     const distEl = document.getElementById('stat-distributors');
     const dashItems = document.getElementById('dashboard-stat-items');
     const dashAccesses = document.getElementById('dashboard-stat-accesses');
@@ -278,6 +282,7 @@ const AdminRouter = {
     const canProd = this.canAccessModule('produtos');
     const canSales = this.canAccessModule('diario') || this.canAccessModule('relatorios');
     const canEvents = this.canAccessModule('eventos');
+    const canEmails = this.canAccessModule('emails');
     const canDist = this.canAccessModule('distribuidores');
 
     if (catEl && canCat) catEl.textContent = 'Carregando…';
@@ -287,18 +292,20 @@ const AdminRouter = {
     if (diarioEl && canSales) diarioEl.textContent = 'Carregando…';
     if (relatoriosEl && canSales) relatoriosEl.textContent = 'Carregando…';
     if (eventsEl && canEvents) eventsEl.textContent = 'Carregando…';
+    if (emailsEl && canEmails) emailsEl.textContent = 'Carregando…';
     if (distEl && canDist) distEl.textContent = 'Carregando…';
 
     const formatBRL = (value) =>
       new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value) || 0);
 
     try {
-      const [categories, products, loyaltyData, salesToday, events, distributors] = await Promise.all([
+      const [categories, products, loyaltyData, salesToday, events, emailCampaigns, distributors] = await Promise.all([
         canCat ? DB.getCategories().catch(() => []) : Promise.resolve([]),
         canProd ? DB.getProducts().catch(() => []) : Promise.resolve([]),
         (canLoy || canClients) ? DB.getLoyaltyCustomers({ page: 1, limit: 1 }).catch(() => ({ total: 0, items: [] })) : Promise.resolve({ total: 0, items: [] }),
         canSales ? DB.getTodaySalesSummary().catch(() => null) : Promise.resolve(null),
         canEvents ? DB.getEvents({ all: true }).catch(() => []) : Promise.resolve([]),
+        canEmails ? DB.getEmailCampaigns({ limit: 50 }).catch(() => []) : Promise.resolve([]),
         canDist ? DB.getDistributors({ all: true }).catch(() => []) : Promise.resolve([])
       ]);
 
@@ -362,6 +369,11 @@ const AdminRouter = {
         eventsEl.textContent = `${activeEvents} evento${activeEvents !== 1 ? 's' : ''} ativo${activeEvents !== 1 ? 's' : ''}`;
       }
 
+      if (canEmails && emailsEl) {
+        const total = (emailCampaigns || []).length;
+        emailsEl.textContent = `${total} campanha${total !== 1 ? 's' : ''}`;
+      }
+
       if (canDist && distEl) {
         const activeDist = (distributors || []).filter(d => d.active !== false).length;
         distEl.textContent = `${activeDist} distribuidor${activeDist !== 1 ? 'es' : ''} ativo${activeDist !== 1 ? 's' : ''}`;
@@ -375,6 +387,7 @@ const AdminRouter = {
       if (diarioEl) diarioEl.textContent = '—';
       if (relatoriosEl) relatoriosEl.textContent = '—';
       if (eventsEl) eventsEl.textContent = '—';
+      if (emailsEl) emailsEl.textContent = '—';
       if (distEl) distEl.textContent = '—';
       if (dashItems) dashItems.textContent = '—';
       if (dashAccesses) dashAccesses.textContent = '—';

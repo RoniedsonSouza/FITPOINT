@@ -122,6 +122,7 @@ function mapCustomerRow(row, { includePhone = false, visitsPerReward = DEFAULT_V
   if (includePhone) {
     out.phone = row.phone;
   }
+  out.email = row.email || null;
   return out;
 }
 

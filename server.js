@@ -18,6 +18,8 @@ const ticketsRoutes = require('./routes/tickets');
 const distributorsRoutes = require('./routes/distributors');
 const mediaRoutes = require('./routes/media');
 const authRoutes = require('./routes/auth');
+const emailCampaignsRoutes = require('./routes/emailCampaigns');
+const { startEmailCampaignWorker } = require('./services/emailCampaignWorker');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -52,6 +54,7 @@ app.use('/api/events', eventsRoutes);
 app.use('/api/tickets', ticketsRoutes);
 app.use('/api/distributors', distributorsRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/email-campaigns', emailCampaignsRoutes);
 
 // Rota de health check
 app.get('/api/health', (req, res) => {
@@ -114,6 +117,7 @@ const { ensureImagesMigrated } = require('./scripts/migrate-images-to-db');
 ensureDatabase()
   .then(() => ensureImagesMigrated())
   .then(() => {
+    startEmailCampaignWorker();
     app.listen(PORT, () => {
       console.log(`🚀 Servidor FitPoint rodando na porta ${PORT}`);
       console.log(`📱 Frontend: http://localhost:${PORT}`);

@@ -1,5 +1,6 @@
 const { getClient, table } = require('../config/database');
-const { sendCampaignEmail, campaignBodyToHtml } = require('./email');
+const { sendCampaignEmail } = require('./email');
+const { isEmailUnsubscribed } = require('./emailUnsubscribes');
 
 const POLL_INTERVAL_MS = 3000;
 const RATE_LIMIT_MS = 1000;
@@ -162,10 +163,31 @@ async function processOneJob() {
     await client.query('COMMIT');
 
     try {
+      if (await isEmailUnsubscribed(job.to_email)) {
+        const clientSkip = await getClient();
+        try {
+          await clientSkip.query('BEGIN');
+          await clientSkip.query(
+            `UPDATE ${table('email_campaign_jobs')}
+             SET status = 'failed', last_error = $2
+             WHERE id = $1`,
+            [job.id, 'Destinatário descadastrado']
+          );
+          await refreshCampaignCounters(clientSkip, campaign.id);
+          await clientSkip.query('COMMIT');
+        } catch (err) {
+          await clientSkip.query('ROLLBACK').catch(() => {});
+          throw err;
+        } finally {
+          clientSkip.release();
+        }
+        return true;
+      }
+
       await sendCampaignEmail({
         to: job.to_email,
         subject: campaign.subject,
-        html: campaignBodyToHtml(campaign.body)
+        body: campaign.body
       });
 
       const clientOk = await getClient();

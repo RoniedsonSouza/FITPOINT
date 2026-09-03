@@ -550,6 +550,14 @@ async function ensureDatabase() {
       ON ${SCHEMA}.email_campaign_jobs (campaign_id, status)
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA}.email_unsubscribes (
+        email VARCHAR(255) PRIMARY KEY,
+        source VARCHAR(40) NOT NULL DEFAULT 'link',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
     console.log(`✅ Schema "${SCHEMA}" e tabelas/colunas verificadas`);
   } catch (error) {
     if (error.code === '42P01') {

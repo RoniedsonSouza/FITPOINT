@@ -3,6 +3,7 @@
 let emailCampaignDetailPoll = null;
 let emailCampaignEventsCache = [];
 let emailCampaignManualEmails = [];
+let emailCampaignQuill = null;
 
 const EMAIL_CAMPAIGN_STATUS_LABELS = {
   queued: 'Na fila',
@@ -13,6 +14,84 @@ const EMAIL_CAMPAIGN_STATUS_LABELS = {
 };
 
 const EMAIL_TAG_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const EMAIL_CAMPAIGN_FONT_SIZES = ['10px', '12px', '14px', '16px', '18px', '24px', '32px'];
+
+function looksLikeEmailCampaignHtml(body) {
+  return /<[a-z][\s\S]*>/i.test(String(body || ''));
+}
+
+function isEmailCampaignBodyEmpty(html) {
+  const text = String(html || '')
+    .replace(/<br\s*\/?>/gi, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\s+/g, '')
+    .trim();
+  return !text;
+}
+
+function syncEmailCampaignBodyHidden() {
+  const hidden = document.getElementById('email-campaign-body');
+  if (!hidden || !emailCampaignQuill) return;
+  const html = emailCampaignQuill.root.innerHTML;
+  hidden.value = isEmailCampaignBodyEmpty(html) ? '' : html;
+}
+
+function getEmailCampaignBodyHtml() {
+  syncEmailCampaignBodyHidden();
+  return document.getElementById('email-campaign-body')?.value || '';
+}
+
+function clearEmailCampaignEditor() {
+  if (emailCampaignQuill) {
+    emailCampaignQuill.setText('');
+  }
+  const hidden = document.getElementById('email-campaign-body');
+  if (hidden) hidden.value = '';
+}
+
+function initEmailCampaignEditor() {
+  const container = document.getElementById('email-campaign-editor');
+  if (!container || emailCampaignQuill) return;
+  if (typeof Quill === 'undefined') {
+    console.error('Quill não carregado');
+    return;
+  }
+
+  const SizeStyle = Quill.import('attributors/style/size');
+  SizeStyle.whitelist = EMAIL_CAMPAIGN_FONT_SIZES;
+  Quill.register(SizeStyle, true);
+
+  const ColorStyle = Quill.import('attributors/style/color');
+  Quill.register(ColorStyle, true);
+
+  const BackgroundStyle = Quill.import('attributors/style/background');
+  Quill.register(BackgroundStyle, true);
+
+  const AlignStyle = Quill.import('attributors/style/align');
+  Quill.register(AlignStyle, true);
+
+  emailCampaignQuill = new Quill(container, {
+    theme: 'snow',
+    placeholder: 'Escreva a mensagem do e-mail…',
+    modules: {
+      toolbar: [
+        [{ header: [1, 2, 3, false] }],
+        [{ size: EMAIL_CAMPAIGN_FONT_SIZES }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ color: [] }, { background: [] }],
+        [{ align: [] }],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        ['link'],
+        ['clean']
+      ]
+    }
+  });
+
+  emailCampaignQuill.on('text-change', syncEmailCampaignBodyHidden);
+  syncEmailCampaignBodyHidden();
+}
 
 function stopEmailCampaignDetailPoll() {
   if (emailCampaignDetailPoll) {
@@ -37,6 +116,7 @@ function openEmailCampaignForm() {
 
   const form = document.getElementById('email-campaign-form');
   form?.reset();
+  clearEmailCampaignEditor();
   document.getElementById('email-campaign-theme').value = 'evento';
   document.getElementById('email-campaign-preview-count').textContent = 'Destinatários: —';
   resetEmailCampaignManualTags();
@@ -275,7 +355,7 @@ function readEmailCampaignFormPayload() {
   const payload = {
     theme,
     subject: document.getElementById('email-campaign-subject')?.value || '',
-    body: document.getElementById('email-campaign-body')?.value || '',
+    body: getEmailCampaignBodyHtml(),
     manualEmails: emailCampaignManualEmails.slice()
   };
 
@@ -400,6 +480,15 @@ function showEmailCampaignsListPanelsOnly() {
   document.getElementById('email-campaign-detail-panel')?.classList.add('hidden');
 }
 
+function renderEmailCampaignBodyPreview(body) {
+  const raw = String(body || '');
+  if (looksLikeEmailCampaignHtml(raw)) {
+    // Corpo já sanitizado no servidor no create; no detalhe só tags tipográficas do editor.
+    return `<div class="email-campaign-body-preview email-campaign-body-preview--html">${raw}</div>`;
+  }
+  return `<pre class="email-campaign-body-preview">${escapeHtml(raw)}</pre>`;
+}
+
 function renderEmailCampaignDetail(campaign) {
   const el = document.getElementById('email-campaign-detail');
   if (!el) return;
@@ -421,7 +510,7 @@ function renderEmailCampaignDetail(campaign) {
     </div>
     <div class="form-group">
       <label>Corpo</label>
-      <pre class="email-campaign-body-preview">${escapeHtml(campaign.body || '')}</pre>
+      ${renderEmailCampaignBodyPreview(campaign.body)}
     </div>
     ${failedJobs.length ? `
       <div class="mt-4">
@@ -483,6 +572,7 @@ async function openEmailCampaignDetail(id) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  initEmailCampaignEditor();
   document.getElementById('email-campaign-theme')?.addEventListener('change', onEmailCampaignThemeChange);
   document.getElementById('email-campaign-event')?.addEventListener('change', onEmailCampaignEventChange);
 

@@ -3489,6 +3489,87 @@ body.ticket-qr-open {
   overflow: auto;
 }
 
+.email-campaign-body-preview--html {
+  white-space: normal;
+  line-height: 1.6;
+}
+
+.email-campaign-body-preview--html p {
+  margin: 0 0 0.75em;
+}
+
+.email-campaign-body-preview--html p:last-child {
+  margin-bottom: 0;
+}
+
+.email-campaign-body-preview--html ul,
+.email-campaign-body-preview--html ol {
+  margin: 0 0 0.75em;
+  padding-left: 1.25rem;
+}
+
+.email-campaign-editor-wrap,
+.email-campaign-editor.ql-container {
+  border: 1px solid rgba(14, 31, 22, 0.15);
+  border-radius: var(--fp-control-radius, 0.75rem);
+  background: #fff;
+}
+
+.form-group .ql-toolbar.ql-snow {
+  border: 1px solid rgba(14, 31, 22, 0.15);
+  border-bottom: 0;
+  border-radius: var(--fp-control-radius, 0.75rem) var(--fp-control-radius, 0.75rem) 0 0;
+  background: rgba(14, 31, 22, 0.03);
+  padding: 0.5rem 0.65rem;
+}
+
+.form-group .ql-container.ql-snow {
+  border: 1px solid rgba(14, 31, 22, 0.15);
+  border-radius: 0 0 var(--fp-control-radius, 0.75rem) var(--fp-control-radius, 0.75rem);
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 0.9375rem;
+  min-height: 11.25rem;
+}
+
+.form-group .ql-editor {
+  min-height: 11.25rem;
+  padding: var(--fp-control-padding-y, 0.75rem) var(--fp-control-padding-x, 1rem);
+  line-height: 1.6;
+  color: #0E1F16;
+}
+
+.form-group .ql-editor.ql-blank::before {
+  color: rgba(14, 31, 22, 0.4);
+  font-style: normal;
+  left: var(--fp-control-padding-x, 1rem);
+  right: var(--fp-control-padding-x, 1rem);
+}
+
+.form-group .ql-snow .ql-stroke {
+  stroke: #0E1F16;
+}
+
+.form-group .ql-snow .ql-fill {
+  fill: #0E1F16;
+}
+
+.form-group .ql-snow.ql-toolbar button:hover,
+.form-group .ql-snow .ql-toolbar button:hover,
+.form-group .ql-snow.ql-toolbar button.ql-active,
+.form-group .ql-snow .ql-toolbar button.ql-active {
+  color: #1D6B3A;
+}
+
+.form-group .ql-snow.ql-toolbar button:hover .ql-stroke,
+.form-group .ql-snow.ql-toolbar button.ql-active .ql-stroke {
+  stroke: #1D6B3A;
+}
+
+.form-group .ql-snow.ql-toolbar button:hover .ql-fill,
+.form-group .ql-snow.ql-toolbar button.ql-active .ql-fill {
+  fill: #1D6B3A;
+}
+
 .email-campaign-jobs-list {
   max-height: 20rem;
   overflow: auto;

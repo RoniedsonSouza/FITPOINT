@@ -1,7 +1,86 @@
 const crypto = require('crypto');
+const sanitizeHtml = require('sanitize-html');
 const { Resend } = require('resend');
 const { generateTicketQrPng } = require('./qrcode');
 const { formatTimestampPtBR } = require('./datetime');
+
+const CAMPAIGN_HTML_ALLOWED_TAGS = [
+  'p',
+  'br',
+  'strong',
+  'b',
+  'em',
+  'i',
+  'u',
+  's',
+  'ul',
+  'ol',
+  'li',
+  'a',
+  'span',
+  'h1',
+  'h2',
+  'h3',
+  'blockquote'
+];
+
+const CAMPAIGN_HTML_ALLOWED_STYLES = {
+  color: [/^#[0-9a-fA-F]{3,8}$/, /^rgb\(/i, /^rgba\(/i, /^hsl\(/i, /^hsla\(/i, /^[a-z]+$/i],
+  'background-color': [/^#[0-9a-fA-F]{3,8}$/, /^rgb\(/i, /^rgba\(/i, /^hsl\(/i, /^hsla\(/i, /^[a-z]+$/i],
+  'font-size': [/^\d+(\.\d+)?(px|pt|em|rem|%)$/],
+  'text-align': [/^(left|right|center|justify)$/i]
+};
+
+/**
+ * Detecta se o corpo já é HTML (campanhas novas do editor) vs texto plano legado.
+ */
+function looksLikeCampaignHtml(body) {
+  return /<[a-z][\s\S]*>/i.test(String(body || ''));
+}
+
+/**
+ * Sanitiza HTML do corpo de campanha (allowlist para e-mail).
+ */
+function sanitizeCampaignHtml(html) {
+  return sanitizeHtml(String(html || ''), {
+    allowedTags: CAMPAIGN_HTML_ALLOWED_TAGS,
+    allowedAttributes: {
+      a: ['href', 'target', 'rel'],
+      span: ['style'],
+      p: ['style'],
+      h1: ['style'],
+      h2: ['style'],
+      h3: ['style'],
+      li: ['style'],
+      blockquote: ['style'],
+      strong: ['style'],
+      b: ['style'],
+      em: ['style'],
+      i: ['style'],
+      u: ['style'],
+      s: ['style']
+    },
+    allowedStyles: {
+      '*': CAMPAIGN_HTML_ALLOWED_STYLES
+    },
+    allowedSchemes: ['http', 'https', 'mailto'],
+    transformTags: {
+      a: sanitizeHtml.simpleTransform('a', { rel: 'noopener noreferrer' })
+    }
+  }).trim();
+}
+
+/**
+ * Normaliza o corpo para persistência: HTML sanitizado ou texto plano legado trimado.
+ */
+function normalizeCampaignBody(body) {
+  const raw = String(body || '').trim();
+  if (!raw) return '';
+  if (looksLikeCampaignHtml(raw)) {
+    return sanitizeCampaignHtml(raw);
+  }
+  return raw;
+}
 
 function getResendClient() {
   const apiKey = process.env.RESEND_API_KEY;
@@ -205,10 +284,17 @@ async function sendTicketEmail({ to, buyerName, event, lot, tickets, complimenta
 }
 
 /**
- * Converte texto plano do admin em HTML simples para campanha.
+ * Converte corpo da campanha (HTML sanitizado ou texto plano legado) em HTML de e-mail.
  */
 function campaignBodyToHtml(body, { unsubscribeUrl, replyTo } = {}) {
-  const escaped = escapeHtml(body).replace(/\r\n|\r|\n/g, '<br>\n');
+  const raw = String(body || '');
+  let contentHtml;
+  if (looksLikeCampaignHtml(raw)) {
+    contentHtml = sanitizeCampaignHtml(raw);
+  } else {
+    contentHtml = escapeHtml(raw).replace(/\r\n|\r|\n/g, '<br>\n');
+  }
+
   const unsubBlock = unsubscribeUrl
     ? `<p style="margin-top:28px;padding-top:16px;border-top:1px solid #e5e5e5;color:#888;font-size:12px;line-height:1.5;">
          Você recebeu este e-mail da FitPoint Fitness.
@@ -219,7 +305,7 @@ function campaignBodyToHtml(body, { unsubscribeUrl, replyTo } = {}) {
 
   return `
     <div style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:0 auto;color:#0E1F16;line-height:1.6;">
-      <div>${escaped}</div>
+      <div>${contentHtml}</div>
       <p style="margin-top:24px;color:#1D6B3A;font-weight:600;">FitPoint Fitness</p>
       ${unsubBlock}
     </div>
@@ -227,8 +313,10 @@ function campaignBodyToHtml(body, { unsubscribeUrl, replyTo } = {}) {
 }
 
 function campaignBodyToText(body, { unsubscribeUrl, replyTo } = {}) {
+  const raw = String(body || '').trim();
+  const plain = looksLikeCampaignHtml(raw) ? htmlToPlainText(raw) : raw;
   const lines = [
-    String(body || '').trim(),
+    plain,
     '',
     'FitPoint Fitness',
     unsubscribeUrl ? `Cancelar inscrição: ${unsubscribeUrl}` : '',
@@ -247,7 +335,7 @@ async function sendCampaignEmail({ to, subject, html, body }) {
   const finalHtml =
     html ||
     campaignBodyToHtml(body || '', { unsubscribeUrl, replyTo });
-  const text = campaignBodyToText(body || htmlToPlainText(finalHtml), {
+  const text = campaignBodyToText(body || '', {
     unsubscribeUrl,
     replyTo
   });
@@ -277,6 +365,9 @@ module.exports = {
   sendCampaignEmail,
   campaignBodyToHtml,
   campaignBodyToText,
+  sanitizeCampaignHtml,
+  normalizeCampaignBody,
+  looksLikeCampaignHtml,
   escapeHtml,
   extractEmailAddress,
   getReplyToAddress,

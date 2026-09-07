@@ -7,14 +7,24 @@ const {
   isValidEmailCampaignTheme
 } = require('../services/emailCampaignThemes');
 const { resolveCampaignRecipients, parseManualEmails } = require('../services/emailRecipients');
+const {
+  normalizeCampaignBody,
+  htmlToPlainText,
+  looksLikeCampaignHtml,
+  sanitizeCampaignHtml
+} = require('../services/email');
 
 function mapCampaignRow(row) {
+  const rawBody = row.body || '';
+  const body = looksLikeCampaignHtml(rawBody)
+    ? sanitizeCampaignHtml(rawBody)
+    : rawBody;
   return {
     id: row.id,
     theme: row.theme,
     theme_label: EMAIL_CAMPAIGN_THEME_LABELS[row.theme] || row.theme,
     subject: row.subject,
-    body: row.body,
+    body,
     event_id: row.event_id,
     lot_id: row.lot_id,
     manual_emails: row.manual_emails || [],
@@ -162,11 +172,11 @@ router.post('/', async (req, res) => {
     }
 
     const trimmedSubject = String(subject || '').trim();
-    const trimmedBody = String(body || '').trim();
+    const trimmedBody = normalizeCampaignBody(body);
     if (!trimmedSubject) {
       return res.status(400).json({ error: 'Assunto é obrigatório' });
     }
-    if (!trimmedBody) {
+    if (!trimmedBody || !htmlToPlainText(trimmedBody)) {
       return res.status(400).json({ error: 'Corpo do e-mail é obrigatório' });
     }
 

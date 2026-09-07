@@ -33,6 +33,7 @@
   </script>
   <link rel="stylesheet" href="/css/page-bg.css">
   <link rel="stylesheet" href="/css/admin.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css">
 </head>
 
 <body class="page-bg text-fp-ink font-sans admin-page overflow-x-hidden max-w-full">
@@ -832,9 +833,12 @@
                 placeholder="Assunto do e-mail">
             </div>
             <div class="form-group">
-              <label for="email-campaign-body">Corpo</label>
-              <textarea id="email-campaign-body" rows="8" required
-                placeholder="Texto da mensagem…"></textarea>
+              <label for="email-campaign-editor">Corpo</label>
+              <div id="email-campaign-editor" class="email-campaign-editor" aria-label="Corpo do e-mail"></div>
+              <input type="hidden" id="email-campaign-body" value="">
+              <p class="text-xs text-black/45 mt-1">
+                Use a barra de ferramentas para negrito, cor, tamanho e demais formatações.
+              </p>
             </div>
 
             <div class="modal-footer" style="padding:0;border:0;">
@@ -1635,6 +1639,7 @@
   </div>
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
   <script src="/js/config.js"></script>
   <script src="/js/auth.js"></script>
   <script src="/js/database.js"></script>

@@ -408,9 +408,10 @@ O **estorno do dinheiro é feito no Mercado Pago** (painel do MP ou app). O FitP
 - O ingresso **não é excluído**: continua na lista com badge **Reembolsado**, riscado e inativo. O filtro de status ganhou a opção **Reembolsado**.
 - **Desfazer reembolso** (também com modal de confirmação) devolve o status anterior (`valid` ou `used`). Se a vaga tinha sido devolvida ao lote, ela é ocupada de novo — e a ação falha com **409** se o lote estiver esgotado nesse meio-tempo.
 
-### Efeito na validação
+### Efeito na validação e nas campanhas
 
-`POST /api/tickets/validate` responde **409 “Ingresso reembolsado — não dá acesso ao evento”**, tanto no código manual quanto no scanner de QR.
+- `POST /api/tickets/validate` responde **409 “Ingresso reembolsado — não dá acesso ao evento”**, tanto no código manual quanto no scanner de QR.
+- Nos atalhos de destinatário das campanhas de e-mail (por evento ou por lote), quem ficou **sem nenhum ingresso válido** sai da lista. Quem foi reembolsado só em parte do pedido continua, porque ainda tem ingresso em pé.
 
 ### Reembolso feito direto no Mercado Pago
 

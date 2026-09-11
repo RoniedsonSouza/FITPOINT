@@ -394,6 +394,38 @@ RESEND_FROM=FitPoint <ingressos@seudominio.com>
 
 ---
 
+## 9. Reembolso de ingresso
+
+O **estorno do dinheiro é feito no Mercado Pago** (painel do MP ou app). O FitPoint não chama a API de refund: ele só registra que aquele ingresso não vale mais.
+
+### No admin
+
+- Admin → **Eventos** → evento → aba **Ingressos** → botão **Reembolsar** no ingresso (exige permissão de **Lotes**).
+- O modal de confirmação avisa que o estorno é no Mercado Pago e permite:
+  - **Reembolsar os N ingressos deste pedido** — aparece quando o pedido tem mais de um ingresso ainda válido (um pagamento no MP cobre o pedido inteiro).
+  - **Devolver a vaga ao estoque do lote** — marcado por padrão; desmarque para manter o lote com a vaga ocupada.
+  - **Motivo** (opcional, até 300 caracteres), exibido na lista.
+- O ingresso **não é excluído**: continua na lista com badge **Reembolsado**, riscado e inativo. O filtro de status ganhou a opção **Reembolsado**.
+- **Desfazer reembolso** (também com modal de confirmação) devolve o status anterior (`valid` ou `used`). Se a vaga tinha sido devolvida ao lote, ela é ocupada de novo — e a ação falha com **409** se o lote estiver esgotado nesse meio-tempo.
+
+### Efeito na validação e nas campanhas
+
+- `POST /api/tickets/validate` responde **409 “Ingresso reembolsado — não dá acesso ao evento”**, tanto no código manual quanto no scanner de QR.
+- Nos atalhos de destinatário das campanhas de e-mail (por evento ou por lote), quem ficou **sem nenhum ingresso válido** sai da lista. Quem foi reembolsado só em parte do pedido continua, porque ainda tem ingresso em pé.
+
+### Reembolso feito direto no Mercado Pago
+
+O webhook (`payment` com status `refunded` ou `charged_back`) invalida **todos** os ingressos do pedido automaticamente, devolve as vagas ao lote e marca o pedido como `refunded`. Ou seja: estornar no painel do MP já basta para o ingresso parar de valer aqui — desde que o webhook esteja configurado (seção 2.4).
+
+### Rotas
+
+| Método | Rota | Permissão |
+|--------|------|-----------|
+| POST | `/api/tickets/:id/refund` | `eventos.lotes` |
+| POST | `/api/tickets/:id/refund/revert` | `eventos.lotes` |
+
+---
+
 ## Links úteis
 
 | Serviço | Link |

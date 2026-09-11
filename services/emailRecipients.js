@@ -58,7 +58,7 @@ async function resolveEventShortcutEmails({ eventId, lotId }) {
          UNION
          SELECT LOWER(TRIM(buyer_email)) AS email
          FROM ${table('tickets')}
-         WHERE lot_id = $1 AND status <> 'cancelled'
+         WHERE lot_id = $1 AND status IN ('valid', 'used')
            AND buyer_email IS NOT NULL AND TRIM(buyer_email) <> ''
        ) e
        WHERE email <> ''
@@ -78,7 +78,7 @@ async function resolveEventShortcutEmails({ eventId, lotId }) {
          UNION
          SELECT LOWER(TRIM(buyer_email)) AS email
          FROM ${table('tickets')}
-         WHERE event_id = $1 AND status <> 'cancelled'
+         WHERE event_id = $1 AND status IN ('valid', 'used')
            AND buyer_email IS NOT NULL AND TRIM(buyer_email) <> ''
        ) e
        WHERE email <> ''

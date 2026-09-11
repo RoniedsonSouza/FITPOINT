@@ -7,6 +7,9 @@ let currentEventTab = 'lotes';
 let eventsCache = [];
 let eventLotsCache = [];
 let vipIssueAssignees = [];
+let ticketsAdminCache = [];
+let refundingTicketId = null;
+let revertingRefundTicketId = null;
 let savedEventLogoUrl = null;
 let savedEventCoverUrl = null;
 let ticketQrScanner = null;
@@ -883,6 +886,7 @@ async function deleteLot(id) {
 
 function ticketStatusInfo(status) {
   if (status === 'used') return { label: 'Usado', cls: 'tickets-admin-status--used' };
+  if (status === 'refunded') return { label: 'Reembolsado', cls: 'tickets-admin-status--refunded' };
   if (status === 'cancelled') return { label: 'Cancelado', cls: 'tickets-admin-status--cancelled' };
   return { label: 'Válido', cls: 'tickets-admin-status--valid' };
 }
@@ -900,6 +904,40 @@ function renderVipBadge(isVip) {
   return isVip ? '<span class="diario-option-badge">VIP</span>' : '';
 }
 
+/** Espelha REFUNDABLE_STATUSES de services/ticketRefunds.js. */
+function isTicketRefundable(ticket) {
+  return ticket ? ticket.status === 'valid' || ticket.status === 'used' : false;
+}
+
+function findTicketInCache(id) {
+  return ticketsAdminCache.find((t) => String(t.id) === String(id)) || null;
+}
+
+function renderTicketRefundInfo(ticket) {
+  if (ticket.status !== 'refunded') return '';
+  const parts = [];
+  if (ticket.refunded_at) parts.push(formatEventDate(ticket.refunded_at));
+  if (ticket.refund_source_label) parts.push(ticket.refund_source_label);
+  if (ticket.refund_reason) parts.push(ticket.refund_reason);
+  if (!parts.length) parts.push('Reembolsado');
+  return `<p class="tickets-admin-refund-info">${escapeHtml(parts.join(' · '))}</p>`;
+}
+
+function renderTicketRefundActions(ticket) {
+  if (typeof AdminPermissions !== 'undefined' && !AdminPermissions.canManageEventLots()) return '';
+  if (isTicketRefundable(ticket)) {
+    return `<button type="button" class="btn btn-outline btn-sm" onclick="openTicketRefundModal(${ticket.id})">
+      <i data-lucide="rotate-ccw"></i> Reembolsar
+    </button>`;
+  }
+  if (ticket.status === 'refunded') {
+    return `<button type="button" class="btn btn-outline btn-sm" onclick="openTicketRefundRevertModal(${ticket.id})">
+      <i data-lucide="undo-2"></i> Desfazer
+    </button>`;
+  }
+  return '';
+}
+
 async function loadTicketsAdmin() {
   const container = document.getElementById('tickets-admin-list');
   const statusFilter = document.getElementById('tickets-status-filter');
@@ -915,6 +953,7 @@ async function loadTicketsAdmin() {
       limit: 50
     });
     const items = data.items || [];
+    ticketsAdminCache = items;
     if (!items.length) {
       container.innerHTML = '<p class="text-black/60 text-sm">Nenhum ingresso encontrado.</p>';
       return;
@@ -924,7 +963,7 @@ async function loadTicketsAdmin() {
         ${items
           .map(
             (t) => `
-          <article class="tickets-admin-card">
+          <article class="tickets-admin-card${t.status === 'refunded' ? ' tickets-admin-card--refunded' : ''}">
             <div class="tickets-admin-card-head">
               <span class="tickets-admin-card-code" title="${escapeHtml(t.code)}">${escapeHtml(t.code)}</span>
               <span class="flex items-center gap-1.5">
@@ -936,6 +975,12 @@ async function loadTicketsAdmin() {
             <p class="tickets-admin-card-meta" title="${escapeHtml(t.buyer_email)} · ${escapeHtml(t.lot_name)}">
               ${escapeHtml(t.buyer_email)} · ${escapeHtml(t.lot_name)}
             </p>
+            ${renderTicketRefundInfo(t)}
+            ${
+              renderTicketRefundActions(t)
+                ? `<div class="tickets-admin-card-actions">${renderTicketRefundActions(t)}</div>`
+                : ''
+            }
           </article>`
           )
           .join('')}
@@ -947,14 +992,15 @@ async function loadTicketsAdmin() {
               <th class="py-2 pr-3">Código</th>
               <th class="py-2 pr-3">Comprador</th>
               <th class="py-2 pr-3">Lote</th>
-              <th class="py-2">Status</th>
+              <th class="py-2 pr-3">Status</th>
+              <th class="py-2"></th>
             </tr>
           </thead>
           <tbody>
             ${items
               .map(
                 (t) => `
-              <tr class="border-b border-black/5">
+              <tr class="border-b border-black/5${t.status === 'refunded' ? ' tickets-admin-row--refunded' : ''}">
                 <td class="py-2 pr-3 font-mono text-xs">${escapeHtml(t.code)}</td>
                 <td class="py-2 pr-3">${escapeHtml(t.buyer_name)}<br><span class="text-xs text-black/50">${escapeHtml(t.buyer_email)}</span></td>
                 <td class="py-2 pr-3">
@@ -963,7 +1009,11 @@ async function loadTicketsAdmin() {
                     ${renderVipBadge(t.is_vip)}
                   </span>
                 </td>
-                <td class="py-2">${renderTicketStatusText(t.status)}</td>
+                <td class="py-2 pr-3">
+                  ${renderTicketStatusText(t.status)}
+                  ${renderTicketRefundInfo(t)}
+                </td>
+                <td class="py-2 text-right">${renderTicketRefundActions(t)}</td>
               </tr>`
               )
               .join('')}
@@ -972,10 +1022,150 @@ async function loadTicketsAdmin() {
       </div>
       <p class="tickets-admin-total">${data.total} ingresso(s)</p>
     `;
+    refreshIcons();
   } catch (error) {
     if (handleAuthError(error)) return;
     container.innerHTML = '<p class="text-red-600 text-sm">Erro ao carregar ingressos.</p>';
   }
+}
+
+function renderTicketRefundSummary(ticket) {
+  const rows = [
+    ['Código', ticket.code],
+    ['Comprador', ticket.buyer_name],
+    ['E-mail', ticket.buyer_email],
+    ['Lote', ticket.lot_name]
+  ];
+  if (ticket.status === 'refunded' && ticket.refunded_at) {
+    rows.push(['Reembolsado em', formatEventDate(ticket.refunded_at)]);
+  }
+  if (ticket.status === 'refunded' && ticket.refund_reason) {
+    rows.push(['Motivo', ticket.refund_reason]);
+  }
+  return rows
+    .map(
+      ([label, value]) => `
+      <div class="ticket-refund-summary-row">
+        <span>${escapeHtml(label)}</span>
+        <strong>${escapeHtml(value || '—')}</strong>
+      </div>`
+    )
+    .join('');
+}
+
+function openTicketRefundModal(ticketId) {
+  const ticket = findTicketInCache(ticketId);
+  const modal = document.getElementById('ticket-refund-modal');
+  if (!ticket || !modal) return;
+  if (!isTicketRefundable(ticket)) {
+    showToast('Este ingresso não pode ser reembolsado.', 'error');
+    return;
+  }
+
+  refundingTicketId = ticket.id;
+  document.getElementById('ticket-refund-summary').innerHTML = renderTicketRefundSummary(ticket);
+  document
+    .getElementById('ticket-refund-used-warning')
+    .classList.toggle('hidden', ticket.status !== 'used');
+
+  const reason = document.getElementById('ticket-refund-reason');
+  if (reason) reason.value = '';
+  const releaseStock = document.getElementById('ticket-refund-release-stock');
+  if (releaseStock) releaseStock.checked = true;
+
+  // Pagamento no MP cobre o pedido inteiro: permite invalidar todos de uma vez
+  const others = Number(ticket.order_refundable_count || 1) - 1;
+  const scopeGroup = document.getElementById('ticket-refund-scope-group');
+  const scope = document.getElementById('ticket-refund-scope');
+  if (scope) scope.checked = false;
+  if (scopeGroup) {
+    scopeGroup.classList.toggle('hidden', others < 1);
+    const label = document.getElementById('ticket-refund-scope-label');
+    if (label && others >= 1) {
+      label.textContent = `Reembolsar os ${others + 1} ingressos deste pedido`;
+    }
+  }
+
+  modal.classList.add('active');
+  refreshIcons();
+}
+
+function closeTicketRefundModal() {
+  refundingTicketId = null;
+  document.getElementById('ticket-refund-modal')?.classList.remove('active');
+}
+
+async function submitTicketRefund(event) {
+  event.preventDefault();
+  if (!refundingTicketId) return;
+
+  const ticketId = refundingTicketId;
+  const scope = document.getElementById('ticket-refund-scope')?.checked ? 'order' : 'ticket';
+  const releaseStock = document.getElementById('ticket-refund-release-stock')?.checked === true;
+  const reason = document.getElementById('ticket-refund-reason')?.value || '';
+  const btn = document.querySelector('#ticket-refund-form button[type="submit"]');
+
+  await withButtonLoading(
+    btn,
+    async () => {
+      try {
+        const result = await DB.refundTicket(ticketId, {
+          scope,
+          release_stock: releaseStock,
+          reason
+        });
+        closeTicketRefundModal();
+        showToast(result.message || 'Ingresso reembolsado');
+        // Recarrega o detalhe: o estoque do lote pode ter mudado
+        await loadEventDetail(selectedEventId, 'ingressos');
+      } catch (error) {
+        if (!handleAuthError(error)) showToast('Erro: ' + error.message, 'error');
+      }
+    },
+    'Reembolsando…'
+  );
+}
+
+function openTicketRefundRevertModal(ticketId) {
+  const ticket = findTicketInCache(ticketId);
+  const modal = document.getElementById('ticket-refund-revert-modal');
+  if (!ticket || !modal) return;
+  if (ticket.status !== 'refunded') {
+    showToast('Este ingresso não está reembolsado.', 'error');
+    return;
+  }
+
+  revertingRefundTicketId = ticket.id;
+  document.getElementById('ticket-refund-revert-summary').innerHTML = renderTicketRefundSummary(ticket);
+  modal.classList.add('active');
+  refreshIcons();
+}
+
+function closeTicketRefundRevertModal() {
+  revertingRefundTicketId = null;
+  document.getElementById('ticket-refund-revert-modal')?.classList.remove('active');
+}
+
+async function confirmTicketRefundRevert() {
+  if (!revertingRefundTicketId) return;
+
+  const ticketId = revertingRefundTicketId;
+  const btn = document.getElementById('ticket-refund-revert-confirm');
+
+  await withButtonLoading(
+    btn,
+    async () => {
+      try {
+        const result = await DB.revertTicketRefund(ticketId);
+        closeTicketRefundRevertModal();
+        showToast(result.message || 'Reembolso desfeito');
+        await loadEventDetail(selectedEventId, 'ingressos');
+      } catch (error) {
+        if (!handleAuthError(error)) showToast('Erro: ' + error.message, 'error');
+      }
+    },
+    'Desfazendo…'
+  );
 }
 
 function getVipIssueQty() {
@@ -1185,7 +1375,7 @@ async function submitTicketValidation(code, options = {}) {
     } catch (error) {
       if (handleAuthError(error)) return false;
       const extra = error.data?.ticket
-        ? ` (${error.data.ticket.buyer_name || ''} · ${error.data.ticket.status || ''})`
+        ? ` (${error.data.ticket.buyer_name || ''} · ${renderTicketStatusText(error.data.ticket.status)})`
         : '';
       const errorText = error.message + extra;
       if (resultEl) {

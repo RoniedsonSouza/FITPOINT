@@ -938,6 +938,11 @@ function renderTicketRefundActions(ticket) {
   return '';
 }
 
+function renderTicketCardActions(ticket) {
+  const actions = renderTicketRefundActions(ticket);
+  return actions ? `<div class="tickets-admin-card-actions">${actions}</div>` : '';
+}
+
 async function loadTicketsAdmin() {
   const container = document.getElementById('tickets-admin-list');
   const statusFilter = document.getElementById('tickets-status-filter');
@@ -976,11 +981,7 @@ async function loadTicketsAdmin() {
               ${escapeHtml(t.buyer_email)} · ${escapeHtml(t.lot_name)}
             </p>
             ${renderTicketRefundInfo(t)}
-            ${
-              renderTicketRefundActions(t)
-                ? `<div class="tickets-admin-card-actions">${renderTicketRefundActions(t)}</div>`
-                : ''
-            }
+            ${renderTicketCardActions(t)}
           </article>`
           )
           .join('')}

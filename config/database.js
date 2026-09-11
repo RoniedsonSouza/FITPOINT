@@ -351,12 +351,13 @@ async function ensureDatabase() {
         quantity INTEGER NOT NULL CHECK (quantity > 0),
         amount DECIMAL(10,2) NOT NULL CHECK (amount >= 0),
         status VARCHAR(20) NOT NULL DEFAULT 'pending'
-          CHECK (status IN ('pending', 'paid', 'cancelled', 'expired')),
+          CHECK (status IN ('pending', 'paid', 'cancelled', 'expired', 'refunded')),
         mp_preference_id VARCHAR(255),
         mp_payment_id VARCHAR(255),
         source VARCHAR(20) NOT NULL DEFAULT 'checkout'
           CHECK (source IN ('checkout', 'vip')),
         assignees JSONB,
+        refunded_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       )
@@ -370,12 +371,25 @@ async function ensureDatabase() {
       ADD COLUMN IF NOT EXISTS assignees JSONB
     `);
     await client.query(`
+      ALTER TABLE ${SCHEMA}.ticket_orders
+      ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMP
+    `);
+    await client.query(`
       DO $$ BEGIN
         ALTER TABLE ${SCHEMA}.ticket_orders
           ADD CONSTRAINT ticket_orders_source_check
           CHECK (source IN ('checkout', 'vip'));
       EXCEPTION WHEN duplicate_object THEN NULL;
       END $$;
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.ticket_orders
+      DROP CONSTRAINT IF EXISTS ticket_orders_status_check
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.ticket_orders
+      ADD CONSTRAINT ticket_orders_status_check
+      CHECK (status IN ('pending', 'paid', 'cancelled', 'expired', 'refunded'))
     `);
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_ticket_orders_status ON ${SCHEMA}.ticket_orders(status)
@@ -391,11 +405,17 @@ async function ensureDatabase() {
         lot_id INTEGER NOT NULL REFERENCES ${SCHEMA}.ticket_lots(id) ON DELETE RESTRICT,
         code VARCHAR(64) NOT NULL UNIQUE,
         status VARCHAR(20) NOT NULL DEFAULT 'valid'
-          CHECK (status IN ('valid', 'used', 'cancelled')),
+          CHECK (status IN ('valid', 'used', 'cancelled', 'refunded')),
         used_at TIMESTAMP,
         buyer_name VARCHAR(255) NOT NULL,
         buyer_email VARCHAR(255) NOT NULL,
         buyer_phone VARCHAR(50),
+        refunded_at TIMESTAMP,
+        refund_reason TEXT,
+        refund_source VARCHAR(20),
+        refunded_by INTEGER,
+        refund_previous_status VARCHAR(20),
+        refund_stock_released BOOLEAN NOT NULL DEFAULT false,
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
@@ -403,11 +423,48 @@ async function ensureDatabase() {
       ALTER TABLE ${SCHEMA}.tickets
       ADD COLUMN IF NOT EXISTS buyer_phone VARCHAR(50)
     `);
+    // Reembolso: estorno do dinheiro fica no Mercado Pago, aqui só invalidamos
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.tickets
+      ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMP
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.tickets
+      ADD COLUMN IF NOT EXISTS refund_reason TEXT
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.tickets
+      ADD COLUMN IF NOT EXISTS refund_source VARCHAR(20)
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.tickets
+      ADD COLUMN IF NOT EXISTS refunded_by INTEGER
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.tickets
+      ADD COLUMN IF NOT EXISTS refund_previous_status VARCHAR(20)
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.tickets
+      ADD COLUMN IF NOT EXISTS refund_stock_released BOOLEAN NOT NULL DEFAULT false
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.tickets
+      DROP CONSTRAINT IF EXISTS tickets_status_check
+    `);
+    await client.query(`
+      ALTER TABLE ${SCHEMA}.tickets
+      ADD CONSTRAINT tickets_status_check
+      CHECK (status IN ('valid', 'used', 'cancelled', 'refunded'))
+    `);
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_tickets_code ON ${SCHEMA}.tickets(code)
     `);
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_tickets_event ON ${SCHEMA}.tickets(event_id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_tickets_order ON ${SCHEMA}.tickets(order_id)
     `);
 
     await client.query(`

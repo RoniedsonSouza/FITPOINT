@@ -934,6 +934,35 @@ const DB = {
     return response.json();
   },
 
+  async refundTicket(id, payload = {}) {
+    const response = await fetch(`${getApiBaseUrl()}/tickets/${id}/refund`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao reembolsar ingresso';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
+  async revertTicketRefund(id) {
+    const response = await fetch(`${getApiBaseUrl()}/tickets/${id}/refund/revert`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao desfazer reembolso';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
   // Remove um produto
   async deleteProduct(id) {
     try {

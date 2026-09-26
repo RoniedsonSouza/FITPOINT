@@ -253,7 +253,7 @@
               </div>
               <div class="card dashboard-daily-stat-card">
                 <p class="dashboard-daily-stat-label">Média de acessos</p>
-                <p class="dashboard-daily-stat-value" id="dashboard-stat-month-access-avg" title="Média do mês atual (hoje), com os dias que têm movimento no banco">—</p>
+                <p class="dashboard-daily-stat-value" id="dashboard-stat-month-access-avg" title="Média por dia do mês, sem domingos">—</p>
               </div>
               <div class="card dashboard-daily-stat-card">
                 <p class="dashboard-daily-stat-label">Faturamento no mês</p>
@@ -397,8 +397,8 @@
               <i data-lucide="chevron-left"></i>
             </button>
             <input type="date" id="daily-sales-date" class="daily-sales-date-input" aria-label="Data">
-            <button type="button" onclick="shiftDailySalesDate(1)" class="btn btn-outline btn-sm btn-icon"
-              title="Próximo dia" aria-label="Próximo dia">
+            <button type="button" id="daily-sales-date-next" onclick="shiftDailySalesDate(1)"
+              class="btn btn-outline btn-sm btn-icon" title="Próximo dia" aria-label="Próximo dia">
               <i data-lucide="chevron-right"></i>
             </button>
           </div>
@@ -430,7 +430,7 @@
           </div>
           <div class="card daily-sales-stat-card">
             <p class="daily-sales-stat-label">Média de acessos</p>
-            <p class="daily-sales-stat-value" id="daily-sales-stat-month-access-avg" title="Média do mês atual (hoje), com os dias que têm movimento no banco">—</p>
+            <p class="daily-sales-stat-value" id="daily-sales-stat-month-access-avg" title="Média por dia do mês, sem domingos">—</p>
           </div>
           <div class="card daily-sales-stat-card">
             <p class="daily-sales-stat-label">Faturamento no mês</p>
@@ -503,8 +503,8 @@
                   <i data-lucide="chevron-left"></i>
                 </button>
                 <input type="date" id="daily-diario-date" class="daily-diario-date-input" aria-label="Data do diário">
-                <button type="button" onclick="shiftDiarioDate(1)" class="btn btn-outline btn-sm btn-icon"
-                  title="Próximo dia" aria-label="Próximo dia">
+                <button type="button" id="daily-diario-date-next" onclick="shiftDiarioDate(1)"
+                  class="btn btn-outline btn-sm btn-icon" title="Próximo dia" aria-label="Próximo dia">
                   <i data-lucide="chevron-right"></i>
                 </button>
               </div>

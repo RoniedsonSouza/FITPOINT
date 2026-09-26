@@ -358,6 +358,9 @@ const AdminRouter = {
             minimumFractionDigits: 0,
             maximumFractionDigits: 1
           });
+          if (typeof formatMonthAccessAvgTitle === 'function') {
+            dashMonthAccessAvg.title = formatMonthAccessAvgTitle(salesToday);
+          }
         }
         if (dashMonthRevenue) dashMonthRevenue.textContent = formatBRL(monthRevenue);
       } else if (dashSummary) {

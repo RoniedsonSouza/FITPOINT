@@ -7,6 +7,8 @@ const { applyVisitDelta, insertVisitEvents, insertRewardEvents, countPendingRewa
 const { normalizeOptions } = require('./productHelpers');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const SUNDAY = 0;
 
 function todayYmdBrazil() {
   return new Intl.DateTimeFormat('en-CA', {
@@ -32,8 +34,36 @@ function parseSaleDate(value) {
   return { value: str };
 }
 
-function computeMonthAccessAverage(monthAccesses, daysWithData) {
-  const days = Number(daysWithData) || 0;
+function ymdToUtcTimestamp(ymd) {
+  const [year, month, day] = String(ymd).split('-').map(Number);
+  return Date.UTC(year, month - 1, day);
+}
+
+function utcTimestampToYmd(timestamp) {
+  return new Date(timestamp).toISOString().slice(0, 10);
+}
+
+/** Fim da janela da média: hoje quando `saleDate` é do mês corrente; senão o último dia do mês. */
+function resolveMonthAccessEnd(saleDate, today) {
+  const [year, month] = String(saleDate).split('-').map(Number);
+  return Math.min(Date.UTC(year, month, 0), ymdToUtcTimestamp(today));
+}
+
+/** Dias do 1º até o fim da janela, sem domingos (sem expediente). */
+function countMonthDaysExcludingSundays(saleDate, today) {
+  const [year, month] = String(saleDate).split('-').map(Number);
+  const start = Date.UTC(year, month - 1, 1);
+  const end = resolveMonthAccessEnd(saleDate, today);
+
+  let days = 0;
+  for (let ts = start; ts <= end; ts += MS_PER_DAY) {
+    if (new Date(ts).getUTCDay() !== SUNDAY) days += 1;
+  }
+  return days;
+}
+
+function computeMonthAccessAverage(monthAccesses, monthDays) {
+  const days = Number(monthDays) || 0;
   if (days <= 0) return 0;
   return Math.round((Number(monthAccesses) || 0) / days * 10) / 10;
 }
@@ -193,7 +223,7 @@ function mapSaleRow(row) {
 
 async function fetchDaySummary(saleDate) {
   const today = todayYmdBrazil();
-  const [dayResult, monthResult, topResult, avgResult] = await Promise.all([
+  const [dayResult, monthResult, topResult] = await Promise.all([
     query(
       `SELECT
          COALESCE(SUM(quantity), 0)::int AS total_items,
@@ -222,29 +252,23 @@ async function fetchDaySummary(saleDate) {
        ORDER BY qty DESC, p.name ASC
        LIMIT 1`,
       [saleDate]
-    ),
-    query(
-      `SELECT
-         COUNT(DISTINCT access_id)::int AS month_accesses,
-         COUNT(DISTINCT sale_date)::int AS month_days
-       FROM ${table('daily_sales')}
-       WHERE sale_date >= date_trunc('month', $1::date)
-         AND sale_date < date_trunc('month', $1::date) + interval '1 month'`,
-      [today]
     )
   ]);
 
   const day = dayResult.rows[0] || {};
   const month = monthResult.rows[0] || {};
-  const avgRow = avgResult.rows[0] || {};
+  const monthAccessDays = countMonthDaysExcludingSundays(saleDate, today);
+  const monthAccesses = Number(month.month_accesses) || 0;
   return {
     total_items: Number(day.total_items) || 0,
     total_accesses: Number(day.total_accesses) || 0,
     total_revenue: Number(day.total_revenue) || 0,
     top_product: topResult.rows[0]?.name || null,
     month_items: Number(month.month_items) || 0,
-    month_accesses: Number(month.month_accesses) || 0,
-    month_access_avg: computeMonthAccessAverage(avgRow.month_accesses, avgRow.month_days),
+    month_accesses: monthAccesses,
+    month_access_days: monthAccessDays,
+    month_access_until: monthAccessDays > 0 ? utcTimestampToYmd(resolveMonthAccessEnd(saleDate, today)) : null,
+    month_access_avg: computeMonthAccessAverage(monthAccesses, monthAccessDays),
     month_revenue: Number(month.month_revenue) || 0
   };
 }

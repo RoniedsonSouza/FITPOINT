@@ -32,36 +32,58 @@ function parseLocalDate(dateStr) {
   return new Date(y, m - 1, d);
 }
 
+function clampDailySalesDate(dateStr) {
+  const today = getLocalDateString();
+  return dateStr > today ? today : dateStr;
+}
+
 function shiftDailySalesDate(days) {
-  const current = parseLocalDate(dailySalesSelectedDate || getLocalDateString());
+  const current = parseLocalDate(ensureDailySalesSelectedDate());
   current.setDate(current.getDate() + days);
-  dailySalesSelectedDate = getLocalDateString(current);
-  const input = document.getElementById('daily-sales-date');
-  if (input) input.value = dailySalesSelectedDate;
-  const diarioInput = document.getElementById('daily-diario-date');
-  if (diarioInput) diarioInput.value = dailySalesSelectedDate;
+  const next = clampDailySalesDate(getLocalDateString(current));
+  if (next === dailySalesSelectedDate) return;
+  dailySalesSelectedDate = next;
+  syncSharedDateInputs();
   loadDailySales();
 }
 
 function ensureDailySalesSelectedDate() {
-  if (!dailySalesSelectedDate) {
-    dailySalesSelectedDate = getLocalDateString();
-  }
+  dailySalesSelectedDate = clampDailySalesDate(dailySalesSelectedDate || getLocalDateString());
   return dailySalesSelectedDate;
 }
 
 function syncSharedDateInputs() {
   const date = ensureDailySalesSelectedDate();
-  const salesInput = document.getElementById('daily-sales-date');
-  const diarioInput = document.getElementById('daily-diario-date');
-  if (salesInput && salesInput.value !== date) salesInput.value = date;
-  if (diarioInput && diarioInput.value !== date) diarioInput.value = date;
+  const today = getLocalDateString();
+
+  [
+    ['daily-sales-date', 'daily-sales-date-next'],
+    ['daily-diario-date', 'daily-diario-date-next']
+  ].forEach(([inputId, nextBtnId]) => {
+    const input = document.getElementById(inputId);
+    if (input) {
+      if (input.max !== today) input.max = today;
+      if (input.value !== date) input.value = date;
+    }
+    const nextBtn = document.getElementById(nextBtnId);
+    if (nextBtn) nextBtn.disabled = date >= today;
+  });
+}
+
+function readClampedDateInput(input) {
+  const picked = clampDailySalesDate(input.value);
+  if (picked !== input.value) {
+    showToast('Não é possível selecionar datas futuras.', 'error');
+  }
+  return picked;
 }
 
 function shiftDiarioDate(days) {
   const current = parseLocalDate(ensureDailySalesSelectedDate());
   current.setDate(current.getDate() + days);
-  dailySalesSelectedDate = getLocalDateString(current);
+  const next = clampDailySalesDate(getLocalDateString(current));
+  if (next === dailySalesSelectedDate) return;
+  dailySalesSelectedDate = next;
   syncSharedDateInputs();
   reloadDiarioForSelectedDate();
 }
@@ -69,7 +91,7 @@ function shiftDiarioDate(days) {
 function onDiarioDateChange() {
   const input = document.getElementById('daily-diario-date');
   if (!input?.value) return;
-  dailySalesSelectedDate = input.value;
+  dailySalesSelectedDate = readClampedDateInput(input);
   syncSharedDateInputs();
   reloadDiarioForSelectedDate();
 }
@@ -258,6 +280,16 @@ function normalizeSearchText(text) {
   return String(text || '').trim().toLowerCase();
 }
 
+const MONTH_ACCESS_AVG_BASE_TITLE = 'Média por dia do mês, sem domingos';
+
+function formatMonthAccessAvgTitle(summary) {
+  const days = Number(summary?.month_access_days) || 0;
+  const until = summary?.month_access_until;
+  if (!days || !until) return MONTH_ACCESS_AVG_BASE_TITLE;
+  const monthStart = `${until.slice(0, 8)}01`;
+  return `${MONTH_ACCESS_AVG_BASE_TITLE}: ${days} dia${days !== 1 ? 's' : ''} de ${formatChartDayLabel(monthStart)} a ${formatChartDayLabel(until)}`;
+}
+
 function updateDailySalesSummary(summary) {
   const itemsEl = document.getElementById('daily-sales-stat-items');
   const accessesEl = document.getElementById('daily-sales-stat-accesses');
@@ -277,6 +309,7 @@ function updateDailySalesSummary(summary) {
       minimumFractionDigits: 0,
       maximumFractionDigits: 1
     });
+    monthAccessAvgEl.title = formatMonthAccessAvgTitle(summary);
   }
   if (monthRevenueEl) monthRevenueEl.textContent = formatCurrency(summary?.month_revenue ?? 0);
   if (topEl) topEl.textContent = summary?.top_product || '—';
@@ -1601,10 +1634,6 @@ async function loadDailySales() {
   const viewEl = document.getElementById('view-daily-sales');
   if (!viewEl || typeof DB === 'undefined') return;
 
-  if (!dailySalesSelectedDate) {
-    dailySalesSelectedDate = getLocalDateString();
-  }
-
   syncSharedDateInputs();
   if (dateLabel) {
     dateLabel.textContent = formatDisplayDate(dailySalesSelectedDate);
@@ -1632,7 +1661,7 @@ async function loadDailySales() {
 function onDailySalesDateChange() {
   const input = document.getElementById('daily-sales-date');
   if (!input?.value) return;
-  dailySalesSelectedDate = input.value;
+  dailySalesSelectedDate = readClampedDateInput(input);
   syncSharedDateInputs();
   loadDailySales();
 }

@@ -13,6 +13,16 @@ const {
 const { sendTicketEmail } = require('../services/email');
 const { computeOrderTotal } = require('../services/ticketPricing');
 const { normalizeAssignees, resolveHolders } = require('../services/ticketAssignees');
+const {
+  canRefundTicket,
+  canRevertRefund,
+  statusAfterRevert,
+  normalizeRefundReason,
+  normalizeRefundSource,
+  normalizeRefundScope,
+  shouldReleaseStock,
+  describeRefundSource
+} = require('../services/ticketRefunds');
 const { parseTimestampInstant, serializeTimestampForApi } = require('../services/datetime');
 
 function generateTicketCode() {
@@ -228,6 +238,200 @@ async function releaseOrderStock(orderId) {
       [orderId]
     );
     await client.query('COMMIT');
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (_) {
+      /* ignore */
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Marca ingresso(s) como reembolsado(s): o estorno do dinheiro é feito no
+ * Mercado Pago, aqui o ingresso continua visível mas deixa de valer.
+ * Informe ticketId (scope 'order' alcança o pedido inteiro) ou orderId, que é
+ * idempotente e serve ao webhook do Mercado Pago.
+ */
+async function applyTicketRefund({
+  ticketId = null,
+  orderId = null,
+  scope = 'ticket',
+  reason = null,
+  releaseStock = false,
+  userId = null,
+  source = 'admin'
+}) {
+  const refundSource = normalizeRefundSource(source);
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+
+    let targetOrderId = orderId;
+    let targets = [];
+
+    if (ticketId != null) {
+      const ticketRes = await client.query(
+        `SELECT * FROM ${table('tickets')} WHERE id = $1 FOR UPDATE`,
+        [ticketId]
+      );
+      if (ticketRes.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return { ok: false, code: 404, error: 'Ingresso não encontrado' };
+      }
+
+      const ticket = ticketRes.rows[0];
+      const allowed = canRefundTicket(ticket);
+      if (!allowed.ok) {
+        await client.query('ROLLBACK');
+        return { ok: false, code: allowed.code, error: allowed.error };
+      }
+
+      targetOrderId = ticket.order_id;
+      targets = [ticket];
+      if (scope === 'order') {
+        const orderTicketsRes = await client.query(
+          `SELECT * FROM ${table('tickets')} WHERE order_id = $1 ORDER BY id FOR UPDATE`,
+          [ticket.order_id]
+        );
+        targets = orderTicketsRes.rows.filter((t) => canRefundTicket(t).ok);
+      }
+    } else {
+      const orderTicketsRes = await client.query(
+        `SELECT * FROM ${table('tickets')} WHERE order_id = $1 ORDER BY id FOR UPDATE`,
+        [targetOrderId]
+      );
+      targets = orderTicketsRes.rows.filter((t) => canRefundTicket(t).ok);
+    }
+
+    for (const target of targets) {
+      await client.query(
+        `UPDATE ${table('tickets')}
+         SET status = 'refunded',
+             refunded_at = NOW(),
+             refund_reason = $1,
+             refund_source = $2,
+             refunded_by = $3,
+             refund_previous_status = $4,
+             refund_stock_released = $5
+         WHERE id = $6`,
+        [reason, refundSource, userId, target.status, releaseStock, target.id]
+      );
+    }
+
+    if (releaseStock) {
+      const byLot = new Map();
+      for (const target of targets) {
+        byLot.set(target.lot_id, (byLot.get(target.lot_id) || 0) + 1);
+      }
+      for (const [lotId, count] of byLot) {
+        await client.query(
+          `UPDATE ${table('ticket_lots')}
+           SET quantity_sold = GREATEST(0, quantity_sold - $1), updated_at = NOW()
+           WHERE id = $2`,
+          [count, lotId]
+        );
+      }
+    }
+
+    // Pedido só vira reembolsado quando nenhum ingresso dele vale mais
+    const pendingRes = await client.query(
+      `SELECT COUNT(*)::int AS count
+       FROM ${table('tickets')}
+       WHERE order_id = $1 AND status <> 'refunded'`,
+      [targetOrderId]
+    );
+    if (pendingRes.rows[0].count === 0) {
+      await client.query(
+        `UPDATE ${table('ticket_orders')}
+         SET status = 'refunded', refunded_at = NOW(), updated_at = NOW()
+         WHERE id = $1 AND status = 'paid'`,
+        [targetOrderId]
+      );
+    }
+
+    await client.query('COMMIT');
+    return { ok: true, refunded: targets.length, order_id: targetOrderId };
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (_) {
+      /* ignore */
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/** Desfaz o reembolso de um ingresso, devolvendo o status anterior. */
+async function revertTicketRefund(ticketId) {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+
+    const ticketRes = await client.query(
+      `SELECT * FROM ${table('tickets')} WHERE id = $1 FOR UPDATE`,
+      [ticketId]
+    );
+    if (ticketRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return { ok: false, code: 404, error: 'Ingresso não encontrado' };
+    }
+
+    const ticket = ticketRes.rows[0];
+    const allowed = canRevertRefund(ticket);
+    if (!allowed.ok) {
+      await client.query('ROLLBACK');
+      return { ok: false, code: allowed.code, error: allowed.error };
+    }
+
+    if (ticket.refund_stock_released === true) {
+      const reserve = await client.query(
+        `UPDATE ${table('ticket_lots')}
+         SET quantity_sold = quantity_sold + 1, updated_at = NOW()
+         WHERE id = $1
+           AND quantity_sold + 1 <= quantity_total
+         RETURNING id`,
+        [ticket.lot_id]
+      );
+      if (reserve.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return {
+          ok: false,
+          code: 409,
+          error: 'O lote está esgotado: libere uma vaga antes de reativar este ingresso'
+        };
+      }
+    }
+
+    const restored = statusAfterRevert(ticket);
+    const updated = await client.query(
+      `UPDATE ${table('tickets')}
+       SET status = $1,
+           refunded_at = NULL,
+           refund_reason = NULL,
+           refund_source = NULL,
+           refunded_by = NULL,
+           refund_previous_status = NULL,
+           refund_stock_released = false
+       WHERE id = $2
+       RETURNING *`,
+      [restored, ticket.id]
+    );
+
+    await client.query(
+      `UPDATE ${table('ticket_orders')}
+       SET status = 'paid', refunded_at = NULL, updated_at = NOW()
+       WHERE id = $1 AND status = 'refunded'`,
+      [ticket.order_id]
+    );
+
+    await client.query('COMMIT');
+    return { ok: true, ticket: updated.rows[0] };
   } catch (error) {
     try {
       await client.query('ROLLBACK');
@@ -575,6 +779,18 @@ router.post('/webhooks/mercadopago', async (req, res) => {
       status === 'charged_back'
     ) {
       await releaseOrderStock(orderId);
+      // Pedido já pago: o estorno no MP precisa invalidar os ingressos aqui
+      if (status === 'refunded' || status === 'charged_back') {
+        await applyTicketRefund({
+          orderId,
+          reason:
+            status === 'charged_back'
+              ? 'Chargeback registrado no Mercado Pago'
+              : 'Reembolso realizado no Mercado Pago',
+          releaseStock: true,
+          source: 'mercadopago'
+        });
+      }
     }
   } catch (error) {
     console.error('Erro no webhook Mercado Pago:', error);
@@ -778,11 +994,18 @@ router.get('/', authenticateToken, requirePermission('eventos'), async (req, res
     params.push(limitNum, offset);
     const listRes = await query(
       `SELECT t.*, e.title AS event_title, l.name AS lot_name, l.is_vip AS lot_is_vip,
-              o.amount AS order_amount, o.source AS order_source
+              o.amount AS order_amount, o.source AS order_source, o.status AS order_status,
+              u.email AS refunded_by_email,
+              (SELECT COUNT(*)::int FROM ${table('tickets')} ot WHERE ot.order_id = t.order_id)
+                AS order_ticket_count,
+              (SELECT COUNT(*)::int FROM ${table('tickets')} ot
+                WHERE ot.order_id = t.order_id AND ot.status IN ('valid', 'used'))
+                AS order_refundable_count
        FROM ${table('tickets')} t
        JOIN ${table('events')} e ON e.id = t.event_id
        JOIN ${table('ticket_lots')} l ON l.id = t.lot_id
        JOIN ${table('ticket_orders')} o ON o.id = t.order_id
+       LEFT JOIN ${table('admin_users')} u ON u.id = t.refunded_by
        ${whereSql}
        ORDER BY t.created_at DESC
        LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -803,7 +1026,16 @@ router.get('/', authenticateToken, requirePermission('eventos'), async (req, res
         lot_name: row.lot_name,
         is_vip: row.lot_is_vip === true,
         order_source: row.order_source || null,
+        order_status: row.order_status || null,
         order_id: row.order_id,
+        order_ticket_count: row.order_ticket_count,
+        order_refundable_count: row.order_refundable_count,
+        refunded_at: serializeTimestampForApi(row.refunded_at),
+        refund_reason: row.refund_reason || null,
+        refund_source: row.refund_source || null,
+        refund_source_label: row.refund_source ? describeRefundSource(row.refund_source) : null,
+        refunded_by_email: row.refunded_by_email || null,
+        refund_stock_released: row.refund_stock_released === true,
         created_at: row.created_at
       })),
       total: countRes.rows[0].total,
@@ -854,6 +1086,22 @@ router.post('/validate', authenticateToken, requirePermission('eventos', 'valida
       });
     }
 
+    if (ticket.status === 'refunded') {
+      return res.status(409).json({
+        error: 'Ingresso reembolsado — não dá acesso ao evento',
+        valid: false,
+        ticket: {
+          code: ticket.code,
+          status: ticket.status,
+          refunded_at: serializeTimestampForApi(ticket.refunded_at),
+          refund_reason: ticket.refund_reason || null,
+          buyer_name: ticket.buyer_name,
+          event_title: ticket.event_title,
+          lot_name: ticket.lot_name
+        }
+      });
+    }
+
     if (ticket.status === 'cancelled') {
       return res.status(409).json({
         error: 'Ingresso cancelado',
@@ -893,6 +1141,71 @@ router.post('/validate', authenticateToken, requirePermission('eventos', 'valida
     res.status(500).json({ error: 'Erro ao validar ingresso' });
   }
 });
+
+// POST /api/tickets/:id/refund — admin (o estorno do valor é feito no Mercado Pago)
+router.post('/:id/refund', authenticateToken, requirePermission('eventos', 'lotes'), async (req, res) => {
+  try {
+    const ticketId = parseInt(req.params.id, 10);
+    if (!ticketId) {
+      return res.status(400).json({ error: 'Ingresso inválido' });
+    }
+
+    const scope = normalizeRefundScope(req.body?.scope);
+    const result = await applyTicketRefund({
+      ticketId,
+      scope,
+      reason: normalizeRefundReason(req.body?.reason),
+      releaseStock: shouldReleaseStock(req.body?.release_stock, 'admin'),
+      userId: req.user?.id || null,
+      source: 'admin'
+    });
+
+    if (!result.ok) {
+      return res.status(result.code || 400).json({ error: result.error });
+    }
+
+    res.json({
+      refunded: result.refunded,
+      scope,
+      order_id: result.order_id,
+      message:
+        result.refunded > 1
+          ? `${result.refunded} ingressos marcados como reembolsados`
+          : 'Ingresso marcado como reembolsado'
+    });
+  } catch (error) {
+    console.error('Erro ao reembolsar ingresso:', error);
+    res.status(500).json({ error: 'Erro ao reembolsar ingresso' });
+  }
+});
+
+// POST /api/tickets/:id/refund/revert — admin (desfaz reembolso lançado por engano)
+router.post(
+  '/:id/refund/revert',
+  authenticateToken,
+  requirePermission('eventos', 'lotes'),
+  async (req, res) => {
+    try {
+      const ticketId = parseInt(req.params.id, 10);
+      if (!ticketId) {
+        return res.status(400).json({ error: 'Ingresso inválido' });
+      }
+
+      const result = await revertTicketRefund(ticketId);
+      if (!result.ok) {
+        return res.status(result.code || 400).json({ error: result.error });
+      }
+
+      res.json({
+        status: result.ticket.status,
+        message: 'Reembolso desfeito — o ingresso voltou a valer'
+      });
+    } catch (error) {
+      console.error('Erro ao desfazer reembolso:', error);
+      res.status(500).json({ error: 'Erro ao desfazer reembolso' });
+    }
+  }
+);
 
 // GET /api/tickets/orders/:id — status público simples (retorno do checkout)
 router.get('/orders/:id', async (req, res) => {
@@ -971,3 +1284,5 @@ router.post('/orders/:id/sync', async (req, res) => {
 module.exports = router;
 module.exports.fulfillPaidOrder = fulfillPaidOrder;
 module.exports.shouldRefulfillPaidOrder = shouldRefulfillPaidOrder;
+module.exports.applyTicketRefund = applyTicketRefund;
+module.exports.revertTicketRefund = revertTicketRefund;

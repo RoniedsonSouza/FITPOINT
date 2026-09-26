@@ -1038,6 +1038,11 @@ body.ticket-qr-open {
   color: #b91c1c;
 }
 
+.tickets-admin-status--refunded {
+  background: rgba(180, 83, 9, 0.12);
+  color: #b45309;
+}
+
 .tickets-admin-card-buyer {
   margin: 0;
   font-size: 0.8125rem;
@@ -1057,6 +1062,45 @@ body.ticket-qr-open {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tickets-admin-refund-info {
+  margin: 0.1875rem 0 0;
+  font-size: 0.625rem;
+  line-height: 1.35;
+  color: #b45309;
+}
+
+.tickets-admin-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+}
+
+/* Ingresso reembolsado continua listado, mas visivelmente inativo */
+.tickets-admin-card--refunded {
+  background: rgba(14, 31, 22, 0.03);
+  border-style: dashed;
+}
+
+.tickets-admin-card--refunded .tickets-admin-card-code,
+.tickets-admin-card--refunded .tickets-admin-card-buyer {
+  text-decoration: line-through;
+  color: rgba(14, 31, 22, 0.45);
+}
+
+.tickets-admin-row--refunded>td {
+  color: rgba(14, 31, 22, 0.45);
+}
+
+.tickets-admin-row--refunded .tickets-admin-refund-info {
+  text-decoration: none;
+}
+
+.tickets-admin-row--refunded>td:first-child,
+.tickets-admin-row--refunded>td:nth-child(2) {
+  text-decoration: line-through;
 }
 
 .tickets-admin-total {
@@ -1098,6 +1142,69 @@ body.ticket-qr-open {
   #event-tab-ingressos .card>h2 {
     margin-bottom: 0.625rem;
   }
+}
+
+/* Modais de reembolso de ingresso */
+.ticket-refund-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.75rem 0.875rem;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(180, 83, 9, 0.25);
+  border-radius: 0.75rem;
+  background: rgba(180, 83, 9, 0.07);
+  color: #92400e;
+}
+
+.ticket-refund-callout p {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.ticket-refund-callout svg {
+  flex-shrink: 0;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-top: 0.0625rem;
+}
+
+.ticket-refund-summary {
+  display: grid;
+  gap: 0.375rem;
+  padding: 0.75rem 0.875rem;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(14, 31, 22, 0.08);
+  border-radius: 0.75rem;
+  background: rgba(14, 31, 22, 0.02);
+}
+
+.ticket-refund-summary-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.ticket-refund-summary-row span {
+  flex-shrink: 0;
+  color: rgba(14, 31, 22, 0.5);
+}
+
+.ticket-refund-summary-row strong {
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+  color: rgba(14, 31, 22, 0.9);
+}
+
+.ticket-refund-warning {
+  margin: -0.5rem 0 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #b45309;
 }
 
 .event-sponsors-list .event-sponsor-row {

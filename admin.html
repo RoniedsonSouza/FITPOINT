@@ -722,6 +722,7 @@
                     <option value="">Todos</option>
                     <option value="valid">Válido</option>
                     <option value="used">Usado</option>
+                    <option value="refunded">Reembolsado</option>
                     <option value="cancelled">Cancelado</option>
                   </select>
                 </div>
@@ -1306,6 +1307,73 @@
           <button type="submit" class="btn btn-primary btn-lg">Emitir VIP</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal Reembolsar ingresso -->
+  <div id="ticket-refund-modal" class="modal">
+    <div class="modal-content modal-content--sm">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-display text-xl font-bold">Reembolsar ingresso</h3>
+        <button type="button" onclick="closeTicketRefundModal()" class="modal-close"
+          aria-label="Fechar">&times;</button>
+      </div>
+      <form id="ticket-refund-form" onsubmit="submitTicketRefund(event)">
+        <div class="ticket-refund-callout">
+          <i data-lucide="alert-triangle"></i>
+          <p>
+            O estorno do valor é feito no <strong>Mercado Pago</strong>. Aqui o ingresso apenas deixa de
+            valer: ele continua na lista, inativo e marcado como reembolsado.
+          </p>
+        </div>
+        <div id="ticket-refund-summary" class="ticket-refund-summary"></div>
+        <p id="ticket-refund-used-warning" class="ticket-refund-warning hidden">
+          Atenção: este ingresso já teve check-in feito no evento.
+        </p>
+        <div class="form-group hidden" id="ticket-refund-scope-group">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="ticket-refund-scope">
+            <span id="ticket-refund-scope-label">Reembolsar todos os ingressos deste pedido</span>
+          </label>
+        </div>
+        <div class="form-group">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="ticket-refund-release-stock" checked>
+            <span>Devolver a vaga ao estoque do lote</span>
+          </label>
+        </div>
+        <div class="form-group">
+          <label for="ticket-refund-reason">Motivo (opcional)</label>
+          <textarea id="ticket-refund-reason" rows="2" maxlength="300"
+            placeholder="Ex.: desistência da compra"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" onclick="closeTicketRefundModal()" class="btn btn-secondary btn-md">Cancelar</button>
+          <button type="submit" class="btn btn-danger btn-lg">Confirmar reembolso</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Desfazer reembolso -->
+  <div id="ticket-refund-revert-modal" class="modal">
+    <div class="modal-content modal-content--sm">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-display text-xl font-bold">Desfazer reembolso</h3>
+        <button type="button" onclick="closeTicketRefundRevertModal()" class="modal-close"
+          aria-label="Fechar">&times;</button>
+      </div>
+      <div id="ticket-refund-revert-summary" class="ticket-refund-summary"></div>
+      <p class="text-sm text-black/60">
+        O ingresso volta a valer e a dar acesso ao evento. Se a vaga foi devolvida ao lote, ela será
+        ocupada de novo. O dinheiro estornado no Mercado Pago não é afetado.
+      </p>
+      <div class="modal-footer">
+        <button type="button" onclick="closeTicketRefundRevertModal()"
+          class="btn btn-secondary btn-md">Cancelar</button>
+        <button type="button" id="ticket-refund-revert-confirm" onclick="confirmTicketRefundRevert()"
+          class="btn btn-primary btn-lg">Desfazer reembolso</button>
+      </div>
     </div>
   </div>
 

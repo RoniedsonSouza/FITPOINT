@@ -1,5 +1,5 @@
 /**
- * Smoke E2E / regressão dos fluxos de ingressos (VIP + checkout).
+ * Smoke E2E / regressão dos fluxos de ingressos (VIP + checkout + reembolso).
  * Cria um evento temporário, valida APIs e limpa no final.
  *
  * Uso:
@@ -241,6 +241,60 @@ async function main() {
       true
     );
 
+    // --- Reembolso: invalida no app, estorno é no Mercado Pago ---
+    const toRefund = items.find((t) => t.status === 'valid');
+    if (!toRefund) {
+      fail('reembolso', 'nenhum ingresso válido para reembolsar');
+    } else {
+      const vipLotBefore = (await req('GET', `/api/events/${eventId}/lots`, { token })).data || [];
+      const soldBefore = Number(vipLotBefore.find((l) => l.id === vipLotId)?.quantity_sold);
+
+      const refund = await req('POST', `/api/tickets/${toRefund.id}/refund`, {
+        token,
+        body: { release_stock: true, reason: 'Smoke: reembolso de teste' }
+      });
+      eq('reembolsar ingresso', refund.status, 200);
+      eq('1 ingresso reembolsado', refund.data?.refunded, 1);
+
+      const repeat = await req('POST', `/api/tickets/${toRefund.id}/refund`, { token, body: {} });
+      eq('reembolso repetido → 409', repeat.status, 409);
+
+      const refundedList = await req(
+        `GET`,
+        `/api/tickets?event_id=${eventId}&status=refunded`,
+        { token }
+      );
+      const refundedItem = (refundedList.data?.items || []).find((t) => t.id === toRefund.id);
+      eq('ingresso segue listado como reembolsado', !!refundedItem, true);
+      eq('registra o motivo', refundedItem?.refund_reason, 'Smoke: reembolso de teste');
+      eq('registra quem reembolsou', !!refundedItem?.refunded_by_email, true);
+
+      const validate = await req('POST', '/api/tickets/validate', {
+        token,
+        body: { code: toRefund.code }
+      });
+      eq('validar reembolsado → 409', validate.status, 409);
+      eq('validação recusada', validate.data?.valid, false);
+
+      const vipLotAfter = (await req('GET', `/api/events/${eventId}/lots`, { token })).data || [];
+      const soldAfter = Number(vipLotAfter.find((l) => l.id === vipLotId)?.quantity_sold);
+      eq('vaga devolvida ao lote', soldAfter, soldBefore - 1);
+
+      const revert = await req('POST', `/api/tickets/${toRefund.id}/refund/revert`, { token });
+      eq('desfazer reembolso', revert.status, 200);
+      eq('ingresso volta a valer', revert.data?.status, 'valid');
+
+      const vipLotReverted = (await req('GET', `/api/events/${eventId}/lots`, { token })).data || [];
+      eq(
+        'vaga reocupada ao desfazer',
+        Number(vipLotReverted.find((l) => l.id === vipLotId)?.quantity_sold),
+        soldBefore
+      );
+
+      const revertAgain = await req('POST', `/api/tickets/${toRefund.id}/refund/revert`, { token });
+      eq('desfazer duas vezes → 409', revertAgain.status, 409);
+    }
+
     // --- Checkout pago: validação assignees + criação Pix pending (sem esperar pagamento) ---
     const checkoutBad = await req('POST', '/api/tickets/checkout', {
       body: {
@@ -293,7 +347,7 @@ async function main() {
     console.error(`${failures} falha(s)`);
     process.exit(1);
   }
-  console.log('SMOKE E2E OK — fluxos VIP e regressão de lotes/checkout validados');
+  console.log('SMOKE E2E OK — fluxos VIP, reembolso e regressão de lotes/checkout validados');
 }
 
 main().catch((e) => {

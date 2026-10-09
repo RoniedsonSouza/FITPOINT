@@ -42,6 +42,23 @@ function createImageUploadMiddleware(kind) {
   };
 }
 
+/**
+ * Upload multipart (campo "image") só em memória — não grava em media.
+ * Deixa req.file com buffer/mimetype/originalname.
+ */
+function memoryImageUpload(req, res, next) {
+  memoryUpload.single('image')(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ error: err.message || 'Erro no upload' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+    }
+    next();
+  });
+}
+
 module.exports = {
-  createImageUploadMiddleware
+  createImageUploadMiddleware,
+  memoryImageUpload
 };

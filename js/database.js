@@ -585,6 +585,24 @@ const DB = {
     return response.json();
   },
 
+  /** Analisa foto de lista manuscrita (Vision); não registra vendas. */
+  async parseDailySalesList(file) {
+    const formData = new FormData();
+    formData.append('image', file);
+    const response = await fetch(`${getApiBaseUrl()}/daily-sales/parse-list`, {
+      method: 'POST',
+      headers: getAuthHeadersMultipart(),
+      body: formData
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const errorMsg = error.error || 'Erro ao analisar a lista';
+      if (response.status === 401 || response.status === 403) throw new Error(`401: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
   async getDebtCustomers() {
     const response = await fetch(`${getApiBaseUrl()}/daily-sales/debts/customers`, {
       headers: getAuthHeaders()

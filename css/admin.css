@@ -2550,6 +2550,121 @@ body.ticket-qr-open {
   cursor: pointer;
 }
 
+.diario-list-review-modal-content {
+  max-width: 48rem;
+  width: calc(100% - 1.5rem);
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+}
+
+.diario-list-review-preview-wrap {
+  margin-bottom: 1rem;
+  border-radius: var(--fp-control-radius, 0.75rem);
+  overflow: hidden;
+  border: 1px solid rgba(14, 31, 22, 0.12);
+  background: rgba(14, 31, 22, 0.03);
+}
+
+.diario-list-review-preview {
+  display: block;
+  width: 100%;
+  max-height: 10rem;
+  object-fit: contain;
+  background: #fff;
+}
+
+.diario-list-review-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.diario-list-review-row {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr 1fr 6.5rem auto;
+  gap: 0.5rem 0.625rem;
+  align-items: end;
+  padding: 0.75rem;
+  border: 1px solid rgba(14, 31, 22, 0.1);
+  border-radius: var(--fp-control-radius, 0.75rem);
+  background: #fff;
+}
+
+.diario-list-review-row--invalid {
+  border-color: rgba(196, 92, 18, 0.45);
+  background: rgba(245, 124, 0, 0.04);
+}
+
+.diario-list-review-row .form-group {
+  margin-bottom: 0;
+  min-width: 0;
+}
+
+.diario-list-review-row .form-group label {
+  font-size: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.diario-list-review-meta {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 0.75rem;
+  align-items: center;
+  font-size: 0.75rem;
+  color: rgba(14, 31, 22, 0.55);
+}
+
+.diario-list-review-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.diario-list-review-badge--matched {
+  background: rgba(47, 157, 87, 0.14);
+  color: #1d6b3a;
+}
+
+.diario-list-review-badge--ambiguous {
+  background: rgba(245, 124, 0, 0.14);
+  color: #c45c12;
+}
+
+.diario-list-review-badge--missing,
+.diario-list-review-badge--empty {
+  background: rgba(14, 31, 22, 0.08);
+  color: rgba(14, 31, 22, 0.65);
+}
+
+.diario-list-review-remove {
+  align-self: end;
+  min-height: var(--fp-control-min-height, 2.75rem);
+}
+
+.diario-list-review-hint {
+  min-height: 1.25rem;
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  color: rgba(196, 92, 18, 0.95);
+}
+
+@media (max-width: 720px) {
+  .diario-list-review-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .diario-list-review-row .diario-list-review-remove {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
 .daily-diario-form {
   display: flex;
   flex-direction: column;

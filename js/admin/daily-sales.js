@@ -12,6 +12,9 @@ let diarioSearchTimers = { product: null, customer: null };
 let diarioOptionProduct = null;
 let diarioCustomerSearchSeq = 0;
 let diarioFiadoLineKey = null;
+let diarioListReviewLines = [];
+let diarioListReviewImageUrl = null;
+let diarioListReviewBound = false;
 let dailySalesChartInstances = {
   volume: null,
   revenue: null,
@@ -1811,6 +1814,379 @@ async function deleteDailySaleEntry(id) {
   }
 }
 
+function diarioListStatusLabel(status) {
+  switch (status) {
+    case 'matched': return 'Ok';
+    case 'ambiguous': return 'Revisar';
+    case 'missing': return 'Não encontrado';
+    case 'empty': return '—';
+    default: return status || '—';
+  }
+}
+
+function triggerDiarioListImport() {
+  const input = document.getElementById('daily-diario-list-file');
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
+
+async function onDiarioListFileChange(event) {
+  const file = event.target?.files?.[0];
+  if (!file) return;
+  const btn = document.getElementById('daily-diario-import-list-btn');
+  await withButtonLoading(btn, async () => {
+    try {
+      if (!dailySalesProductsCache.length) {
+        await fetchDailySalesCatalog();
+      }
+      const result = await DB.parseDailySalesList(file);
+      const lines = Array.isArray(result?.lines) ? result.lines : [];
+      if (!lines.length) {
+        showToast('Nenhuma linha encontrada na imagem.', 'error');
+        return;
+      }
+      openDiarioListReviewModal(lines, file);
+    } catch (error) {
+      if (handleAuthError(error)) return;
+      showToast(error.message || 'Erro ao analisar a lista.', 'error');
+    }
+  }, 'Analisando…');
+}
+
+function openDiarioListReviewModal(lines, file) {
+  if (diarioListReviewImageUrl) {
+    URL.revokeObjectURL(diarioListReviewImageUrl);
+    diarioListReviewImageUrl = null;
+  }
+  diarioListReviewLines = (Array.isArray(lines) ? lines : []).map((line, index) => ({
+    key: `lr-${Date.now()}-${index}`,
+    quantity: Math.max(1, parseInt(String(line.quantity), 10) || 1),
+    product_text: line.product_text || '',
+    customer_text: line.customer_text || '',
+    value: Number(line.value) || 0,
+    product_id: line.product_id || null,
+    product_name: line.product_name || null,
+    loyalty_customer_id: line.loyalty_customer_id != null ? Number(line.loyalty_customer_id) : null,
+    customer_name: line.customer_name || null,
+    unit_price: Number(line.unit_price) >= 0 ? Number(line.unit_price) : (Number(line.value) || 0),
+    product_status: line.product_status || 'missing',
+    customer_status: line.customer_status || 'empty',
+    product_candidates: Array.isArray(line.product_candidates) ? line.product_candidates : [],
+    customer_candidates: Array.isArray(line.customer_candidates) ? line.customer_candidates : []
+  }));
+
+  const previewWrap = document.getElementById('diario-list-review-preview-wrap');
+  const previewImg = document.getElementById('diario-list-review-preview');
+  if (file && previewImg && previewWrap) {
+    diarioListReviewImageUrl = URL.createObjectURL(file);
+    previewImg.src = diarioListReviewImageUrl;
+    previewWrap.classList.remove('hidden');
+  } else {
+    previewWrap?.classList.add('hidden');
+  }
+
+  renderDiarioListReviewLines();
+  document.getElementById('diario-list-review-modal')?.classList.add('active');
+  refreshIcons();
+}
+
+function closeDiarioListReviewModal() {
+  document.getElementById('diario-list-review-modal')?.classList.remove('active');
+  diarioListReviewLines = [];
+  if (diarioListReviewImageUrl) {
+    URL.revokeObjectURL(diarioListReviewImageUrl);
+    diarioListReviewImageUrl = null;
+  }
+  const previewImg = document.getElementById('diario-list-review-preview');
+  if (previewImg) previewImg.removeAttribute('src');
+  document.getElementById('diario-list-review-preview-wrap')?.classList.add('hidden');
+  const fileInput = document.getElementById('daily-diario-list-file');
+  if (fileInput) fileInput.value = '';
+}
+
+function buildDiarioListProductOptionsHtml(line) {
+  const seen = new Set();
+  const options = [];
+  const pushProduct = (id, name) => {
+    const key = String(id);
+    if (!id || seen.has(key)) return;
+    seen.add(key);
+    options.push({ id, name: name || id });
+  };
+  if (line.product_id) pushProduct(line.product_id, line.product_name);
+  (line.product_candidates || []).forEach((c) => pushProduct(c.id, c.name));
+  dailySalesProductsCache.forEach((p) => pushProduct(p.id, p.name));
+
+  const selected = line.product_id ? String(line.product_id) : '';
+  const opts = [
+    `<option value="">Selecione o produto…</option>`,
+    ...options.map((p) =>
+      `<option value="${escapeHtml(String(p.id))}"${String(p.id) === selected ? ' selected' : ''}>${escapeHtml(p.name)}</option>`
+    )
+  ];
+  return opts.join('');
+}
+
+function buildDiarioListCustomerOptionsHtml(line) {
+  const seen = new Set();
+  const options = [];
+  const pushCustomer = (id, name) => {
+    const key = String(id);
+    if (id == null || id === '' || seen.has(key)) return;
+    seen.add(key);
+    options.push({ id, name: name || String(id) });
+  };
+  if (line.loyalty_customer_id != null) {
+    pushCustomer(line.loyalty_customer_id, line.customer_name);
+  }
+  (line.customer_candidates || []).forEach((c) => pushCustomer(c.id, c.name));
+  dailySalesCustomersCache.forEach((c) => pushCustomer(c.id, c.name));
+
+  const selected = line.loyalty_customer_id != null ? String(line.loyalty_customer_id) : '';
+  const opts = [
+    `<option value="">Sem cliente</option>`,
+    ...options.map((c) =>
+      `<option value="${escapeHtml(String(c.id))}"${String(c.id) === selected ? ' selected' : ''}>${escapeHtml(c.name)}</option>`
+    )
+  ];
+  return opts.join('');
+}
+
+function renderDiarioListReviewLines() {
+  const container = document.getElementById('diario-list-review-lines');
+  const hint = document.getElementById('diario-list-review-hint');
+  const confirmBtn = document.getElementById('diario-list-review-confirm-btn');
+  if (!container) return;
+
+  if (!diarioListReviewLines.length) {
+    container.innerHTML = '<p class="daily-diario-list-empty">Nenhuma linha para revisar.</p>';
+    if (hint) hint.textContent = '';
+    if (confirmBtn) confirmBtn.disabled = true;
+    return;
+  }
+
+  container.innerHTML = diarioListReviewLines.map((line) => {
+    const invalid = !line.product_id;
+    return `
+      <div class="diario-list-review-row${invalid ? ' diario-list-review-row--invalid' : ''}" data-review-key="${escapeHtml(line.key)}">
+        <div class="form-group">
+          <label>Qtd</label>
+          <input type="number" min="1" step="1" inputmode="numeric" data-review-field="quantity"
+            value="${escapeHtml(String(line.quantity))}">
+        </div>
+        <div class="form-group">
+          <label>Produto</label>
+          <select data-review-field="product_id">${buildDiarioListProductOptionsHtml(line)}</select>
+        </div>
+        <div class="form-group">
+          <label>Cliente</label>
+          <select data-review-field="loyalty_customer_id">${buildDiarioListCustomerOptionsHtml(line)}</select>
+        </div>
+        <div class="form-group">
+          <label>Valor (R$)</label>
+          <input type="text" inputmode="decimal" data-review-field="unit_price"
+            value="${escapeHtml(formatDiarioMoneyMaskDisplay(line.unit_price))}">
+        </div>
+        <button type="button" class="btn btn-outline btn-sm diario-list-review-remove" data-review-remove
+          title="Remover linha" aria-label="Remover linha">
+          <i data-lucide="trash-2"></i>
+        </button>
+        <div class="diario-list-review-meta">
+          <span class="diario-list-review-badge diario-list-review-badge--${escapeHtml(line.product_status)}">
+            Produto: ${escapeHtml(diarioListStatusLabel(line.product_status))}
+          </span>
+          <span class="diario-list-review-badge diario-list-review-badge--${escapeHtml(line.customer_status)}">
+            Cliente: ${escapeHtml(diarioListStatusLabel(line.customer_status))}
+          </span>
+          ${line.product_text ? `<span>Lido: ${escapeHtml(line.product_text)}${line.customer_text ? ` · ${escapeHtml(line.customer_text)}` : ''}</span>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const missingProducts = diarioListReviewLines.filter((l) => !l.product_id).length;
+  if (hint) {
+    hint.textContent = missingProducts
+      ? `${missingProducts} linha(s) sem produto — selecione o produto para habilitar o registro.`
+      : '';
+  }
+  if (confirmBtn) confirmBtn.disabled = missingProducts > 0 || diarioListReviewLines.length === 0;
+  refreshIcons();
+}
+
+function findDiarioListReviewLine(key) {
+  return diarioListReviewLines.find((l) => l.key === key) || null;
+}
+
+function onDiarioListReviewChange(event) {
+  const row = event.target.closest('[data-review-key]');
+  if (!row) return;
+  const line = findDiarioListReviewLine(row.dataset.reviewKey);
+  if (!line) return;
+  const field = event.target.getAttribute('data-review-field');
+  if (!field) return;
+
+  if (field === 'quantity') {
+    const qty = parseInt(String(event.target.value), 10);
+    line.quantity = Number.isInteger(qty) && qty >= 1 ? qty : 1;
+    return;
+  }
+
+  if (field === 'unit_price') {
+    applyDiarioMoneyMask(event.target);
+    const parsed = parseLooseDecimal(event.target.value, MONEY_DECIMALS);
+    if (parsed != null && parsed >= 0) line.unit_price = parsed;
+    return;
+  }
+
+  if (field === 'product_id') {
+    const productId = String(event.target.value || '').trim();
+    line.product_id = productId || null;
+    const product = dailySalesProductsCache.find((p) => String(p.id) === String(productId));
+    line.product_name = product?.name || null;
+    line.product_status = productId ? 'matched' : (line.product_text ? 'missing' : 'empty');
+    // Mantém o valor lido da imagem (pode incluir adicionais acima do preço base)
+    renderDiarioListReviewLines();
+    return;
+  }
+
+  if (field === 'loyalty_customer_id') {
+    const raw = String(event.target.value || '').trim();
+    if (!raw) {
+      line.loyalty_customer_id = null;
+      line.customer_name = null;
+      line.customer_status = line.customer_text ? 'missing' : 'empty';
+    } else {
+      const id = parseInt(raw, 10);
+      line.loyalty_customer_id = Number.isInteger(id) ? id : null;
+      const customer = dailySalesCustomersCache.find((c) => String(c.id) === String(id))
+        || (line.customer_candidates || []).find((c) => String(c.id) === String(id));
+      line.customer_name = customer?.name || line.customer_name;
+      line.customer_status = line.loyalty_customer_id != null ? 'matched' : 'missing';
+    }
+    renderDiarioListReviewLines();
+  }
+}
+
+function onDiarioListReviewClick(event) {
+  const removeBtn = event.target.closest('[data-review-remove]');
+  if (!removeBtn) return;
+  const row = removeBtn.closest('[data-review-key]');
+  if (!row) return;
+  const key = row.dataset.reviewKey;
+  diarioListReviewLines = diarioListReviewLines.filter((l) => l.key !== key);
+  renderDiarioListReviewLines();
+}
+
+function groupDiarioListReviewByCustomer(lines) {
+  const groups = new Map();
+  for (const line of lines) {
+    const key = line.loyalty_customer_id != null ? String(line.loyalty_customer_id) : '__none__';
+    if (!groups.has(key)) {
+      groups.set(key, {
+        loyalty_customer_id: line.loyalty_customer_id != null ? line.loyalty_customer_id : null,
+        items: []
+      });
+    }
+    groups.get(key).items.push(line);
+  }
+  return Array.from(groups.values());
+}
+
+async function confirmDiarioListReview() {
+  const confirmBtn = document.getElementById('diario-list-review-confirm-btn');
+  if (!diarioListReviewLines.length) {
+    showToast('Nenhuma linha para registrar.', 'error');
+    return;
+  }
+
+  const prepared = [];
+  for (const line of diarioListReviewLines) {
+    if (!line.product_id) {
+      showToast('Selecione o produto em todas as linhas.', 'error');
+      return;
+    }
+    const product = dailySalesProductsCache.find((p) => String(p.id) === String(line.product_id));
+    if (!product) {
+      showToast(`Produto não encontrado no catálogo: ${line.product_name || line.product_id}`, 'error');
+      return;
+    }
+    const catalogPrice = getProductBasePrice(product);
+    let unitPrice = Number(line.unit_price);
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) unitPrice = catalogPrice;
+    prepared.push({
+      product_id: product.id,
+      quantity: Math.max(1, parseInt(String(line.quantity), 10) || 1),
+      unit_price: Math.round(unitPrice * 100) / 100,
+      loyalty_customer_id: line.loyalty_customer_id != null ? Number(line.loyalty_customer_id) : null
+    });
+  }
+
+  const groups = groupDiarioListReviewByCustomer(prepared);
+  const saleDate = ensureDailySalesSelectedDate();
+
+  await withButtonLoading(confirmBtn, async () => {
+    let okCount = 0;
+    let failCount = 0;
+    const errors = [];
+
+    for (const group of groups) {
+      try {
+        const payload = {
+          sale_date: saleDate,
+          // Importação: valor da imagem pode incluir adicionais acima do preço de tabela
+          allow_over_list_price: true,
+          items: group.items.map((item) => ({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            unit_price: item.unit_price
+          }))
+        };
+        if (group.loyalty_customer_id != null) {
+          payload.loyalty_customer_id = group.loyalty_customer_id;
+        }
+        await DB.addDailySalesBatch(payload);
+        okCount += group.items.length;
+      } catch (error) {
+        failCount += group.items.length;
+        errors.push(error.message || 'Erro ao registrar grupo');
+        if (handleAuthError(error)) return;
+      }
+    }
+
+    if (okCount > 0) {
+      await loadDailyDiarioList();
+      AdminRouter.loadDashboardStats?.();
+    }
+
+    if (failCount === 0) {
+      showToast(`${okCount} item(ns) registrados no diário.`, 'success');
+      closeDiarioListReviewModal();
+      return;
+    }
+
+    if (okCount > 0) {
+      showToast(`${okCount} ok, ${failCount} falharam: ${errors[0] || 'erro'}`, 'error');
+      closeDiarioListReviewModal();
+    } else {
+      showToast(errors[0] || 'Erro ao registrar a lista.', 'error');
+    }
+  }, 'Registrando…');
+}
+
+function bindDiarioListImportEvents() {
+  if (diarioListReviewBound) return;
+  const fileInput = document.getElementById('daily-diario-list-file');
+  const lines = document.getElementById('diario-list-review-lines');
+  if (!fileInput && !lines) return;
+  diarioListReviewBound = true;
+  fileInput?.addEventListener('change', onDiarioListFileChange);
+  lines?.addEventListener('input', onDiarioListReviewChange);
+  lines?.addEventListener('change', onDiarioListReviewChange);
+  lines?.addEventListener('click', onDiarioListReviewClick);
+}
+
 function bindDailySalesEvents() {
   const dateInput = document.getElementById('daily-sales-date');
   if (dateInput && !dateInput.dataset.bound) {
@@ -1822,6 +2198,7 @@ function bindDailySalesEvents() {
     diarioDateInput.dataset.bound = '1';
     diarioDateInput.addEventListener('change', onDiarioDateChange);
   }
+  bindDiarioListImportEvents();
 }
 
 document.addEventListener('DOMContentLoaded', bindDailySalesEvents);

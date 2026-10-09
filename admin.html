@@ -508,6 +508,12 @@
                   <i data-lucide="chevron-right"></i>
                 </button>
               </div>
+              <button type="button" id="daily-diario-import-list-btn" class="btn btn-outline btn-sm"
+                onclick="triggerDiarioListImport()">
+                <i data-lucide="camera"></i> Importar lista
+              </button>
+              <input type="file" id="daily-diario-list-file" class="hidden" accept="image/*"
+                capture="environment" aria-hidden="true">
               <label class="daily-diario-registered">
                 <input type="checkbox" id="daily-diario-registered" onchange="onDiarioRegisteredChange()">
                 <span>Vinculado ao HN Control</span>
@@ -1534,6 +1540,32 @@
           <button type="submit" class="btn btn-primary btn-lg">Salvar</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Revisão de lista importada (Vision / Diário) -->
+  <div id="diario-list-review-modal" class="modal">
+    <div class="modal-content diario-list-review-modal-content">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-display text-xl font-bold">Revisar lista importada</h3>
+        <button type="button" onclick="closeDiarioListReviewModal()" class="modal-close"
+          aria-label="Fechar">&times;</button>
+      </div>
+      <p class="text-sm text-black/60 mb-3">
+        Confira e edite cada linha antes de registrar no diário. Produto é obrigatório; cliente é opcional.
+      </p>
+      <div id="diario-list-review-preview-wrap" class="diario-list-review-preview-wrap hidden">
+        <img id="diario-list-review-preview" alt="Prévia da lista" class="diario-list-review-preview">
+      </div>
+      <div id="diario-list-review-lines" class="diario-list-review-lines"></div>
+      <p id="diario-list-review-hint" class="diario-list-review-hint"></p>
+      <div class="modal-footer">
+        <button type="button" onclick="closeDiarioListReviewModal()" class="btn btn-secondary btn-md">Cancelar</button>
+        <button type="button" id="diario-list-review-confirm-btn" class="btn btn-primary btn-lg"
+          onclick="confirmDiarioListReview()">
+          Confirmar registro
+        </button>
+      </div>
     </div>
   </div>
 

@@ -5,6 +5,9 @@ const { query, getClient, table } = require('../config/database');
 const { authenticateToken, requirePermission } = require('../config/auth');
 const { applyVisitDelta, insertVisitEvents, insertRewardEvents, countPendingRewards, computeLoyaltyVisitsFromAmount, DEFAULT_ACCESS_VALUE, DEFAULT_VISITS_PER_REWARD } = require('./loyaltyHelpers');
 const { normalizeOptions } = require('./productHelpers');
+const { memoryImageUpload } = require('../middleware/imageUpload');
+const { extractListFromImage, ListVisionError } = require('../services/listVisionParse');
+const { matchListLines } = require('../services/listMatch');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -568,11 +571,59 @@ router.get('/', authenticateToken, requirePermission('vendas'), async (req, res)
   }
 });
 
+// POST /api/daily-sales/parse-list — Vision (Gemini) + match catálogo (não registra vendas)
+router.post(
+  '/parse-list',
+  authenticateToken,
+  requirePermission('vendas'),
+  memoryImageUpload,
+  async (req, res) => {
+    try {
+      const [productsResult, customersResult] = await Promise.all([
+        query(
+          `SELECT id, name, price, promo_price, active
+           FROM ${table('products')}
+           WHERE active IS DISTINCT FROM false
+           ORDER BY name ASC`
+        ),
+        query(
+          `SELECT id, name, phone, active
+           FROM ${table('loyalty_customers')}
+           WHERE active IS DISTINCT FROM false
+           ORDER BY name ASC
+           LIMIT 5000`
+        )
+      ]);
+
+      const extracted = await extractListFromImage({
+        buffer: req.file.buffer,
+        mimeType: req.file.mimetype
+      });
+
+      const matched = matchListLines(extracted.lines, {
+        products: productsResult.rows,
+        customers: customersResult.rows
+      });
+
+      res.json({
+        lines: matched.lines,
+        model: extracted.model
+      });
+    } catch (error) {
+      if (error instanceof ListVisionError) {
+        return res.status(error.statusCode || 500).json({ error: error.message });
+      }
+      console.error('Erro ao analisar lista do diário:', error);
+      res.status(500).json({ error: 'Erro ao analisar a lista' });
+    }
+  }
+);
+
 // POST /api/daily-sales/batch — admin (vários itens, fidelidade proporcional ao total)
 router.post('/batch', authenticateToken, requirePermission('vendas'), async (req, res) => {
   const client = await getClient();
   try {
-    const { loyalty_customer_id, sale_date, items } = req.body || {};
+    const { loyalty_customer_id, sale_date, items, allow_over_list_price } = req.body || {};
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Informe ao menos um item' });
@@ -580,6 +631,8 @@ router.post('/batch', authenticateToken, requirePermission('vendas'), async (req
 
     const dateParsed = parseSaleDate(sale_date);
     if (dateParsed.error) return res.status(400).json({ error: dateParsed.error });
+
+    const allowOverListPrice = allow_over_list_price === true || allow_over_list_price === 'true' || allow_over_list_price === 1;
 
     let customerId = null;
     let customerName = null;
@@ -643,7 +696,7 @@ router.post('/batch', authenticateToken, requirePermission('vendas'), async (req
       if (!Number.isFinite(unitPrice) || unitPrice < 0) {
         return res.status(400).json({ error: `Item ${i + 1}: preço inválido` });
       }
-      if (unitPrice > maxPrice + 0.001) {
+      if (!allowOverListPrice && unitPrice > maxPrice + 0.001) {
         return res.status(400).json({ error: `Item ${i + 1}: preço não pode exceder o preço do item` });
       }
 

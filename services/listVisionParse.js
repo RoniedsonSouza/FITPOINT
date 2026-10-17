@@ -188,5 +188,6 @@ module.exports = {
   getGeminiConfig,
   parseMoneyValue,
   parseQuantity,
-  normalizeExtractedLines
+  normalizeExtractedLines,
+  extractJsonText
 };

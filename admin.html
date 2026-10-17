@@ -512,8 +512,14 @@
                 onclick="triggerDiarioListImport()">
                 <i data-lucide="camera"></i> Importar lista
               </button>
+              <button type="button" id="daily-diario-import-gallery-btn" class="btn btn-outline btn-sm"
+                onclick="triggerDiarioListImport('gallery')" title="Escolher imagem da galeria">
+                <i data-lucide="image"></i> Galeria
+              </button>
               <input type="file" id="daily-diario-list-file" class="hidden" accept="image/*"
                 capture="environment" aria-hidden="true">
+              <input type="file" id="daily-diario-list-gallery-file" class="hidden" accept="image/*"
+                aria-hidden="true">
               <label class="daily-diario-registered">
                 <input type="checkbox" id="daily-diario-registered" onchange="onDiarioRegisteredChange()">
                 <span>Vinculado ao HN Control</span>
@@ -587,6 +593,17 @@
         <div class="module-toolbar">
           <span></span>
           <div class="module-toolbar-actions">
+            <button type="button" id="clients-import-camera-btn" onclick="triggerClientImageImport('camera')"
+              class="btn btn-outline btn-md" title="Fotografar ficha do cliente">
+              <i data-lucide="camera"></i> Ficha
+            </button>
+            <button type="button" id="clients-import-gallery-btn" onclick="triggerClientImageImport('gallery')"
+              class="btn btn-outline btn-md" title="Escolher ficha da galeria">
+              <i data-lucide="image"></i> Galeria
+            </button>
+            <input type="file" id="clients-import-camera-file" class="hidden" accept="image/*"
+              capture="environment" aria-hidden="true">
+            <input type="file" id="clients-import-gallery-file" class="hidden" accept="image/*" aria-hidden="true">
             <button type="button" onclick="openClientsModal()" class="btn btn-primary btn-md">
               <i data-lucide="plus"></i> Novo cliente
             </button>
@@ -1095,11 +1112,11 @@
         <div class="form-group field-row">
           <div class="field">
             <label for="distributor-whatsapp">WhatsApp</label>
-            <input type="text" id="distributor-whatsapp" placeholder="27999999999" maxlength="30">
+            <input type="tel" id="distributor-whatsapp" inputmode="numeric" autocomplete="tel" placeholder="(27) 99999-9999" maxlength="15">
           </div>
           <div class="field">
             <label for="distributor-phone">Telefone (opcional)</label>
-            <input type="text" id="distributor-phone" placeholder="2733333333" maxlength="30">
+            <input type="tel" id="distributor-phone" inputmode="numeric" autocomplete="tel" placeholder="(27) 3333-3333" maxlength="15">
           </div>
         </div>
         <div class="form-group">
@@ -1301,7 +1318,7 @@
         </div>
         <div class="form-group">
           <label for="vip-issue-phone">Telefone</label>
-          <input type="tel" id="vip-issue-phone" required placeholder="Ex.: (27) 99999-9999" autocomplete="tel">
+          <input type="tel" id="vip-issue-phone" required placeholder="Ex.: (27) 99999-9999" autocomplete="tel" inputmode="numeric" maxlength="15">
         </div>
         <div class="form-group">
           <label>Destinatários</label>
@@ -1498,6 +1515,23 @@
     </div>
   </div>
 
+  <!-- Modal Confirmação de cliente importado -->
+  <div id="clients-confirm-modal" class="modal">
+    <div class="modal-content modal-content--sm">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-display text-xl font-bold" id="clients-confirm-title">Confirmar cadastro</h3>
+        <button type="button" onclick="closeClientsConfirmModal()" class="modal-close" aria-label="Fechar">&times;</button>
+      </div>
+      <img id="clients-confirm-preview" alt="Ficha importada"
+        class="w-full max-h-40 object-contain rounded border border-black/10 bg-black/5 mb-4">
+      <dl id="clients-confirm-summary" class="grid gap-2 text-sm"></dl>
+      <div class="modal-footer">
+        <button type="button" onclick="closeClientsConfirmModal()" class="btn btn-secondary btn-md">Voltar e editar</button>
+        <button type="button" id="clients-confirm-btn" onclick="confirmClientsImport()" class="btn btn-primary btn-lg">Confirmar e salvar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal Clientes -->
   <div id="clients-modal" class="modal">
     <div class="modal-content modal-content--sm">
@@ -1507,6 +1541,11 @@
       </div>
       <form id="clients-form" onsubmit="saveClient(event)">
         <input type="hidden" id="clients-id-input">
+        <div id="clients-import-review" class="hidden mb-4">
+          <p class="text-sm mb-2" id="clients-import-msg">Confira os dados lidos da ficha antes de salvar.</p>
+          <img id="clients-import-preview" alt="Ficha importada"
+            class="w-full max-h-48 object-contain rounded border border-black/10 bg-black/5">
+        </div>
         <div class="form-group">
           <label>Nome</label>
           <input type="text" id="clients-name" required placeholder="Ex.: Maria Silva">
@@ -1515,6 +1554,14 @@
           <label>Telefone</label>
           <input type="tel" id="clients-phone" required autocomplete="tel" inputmode="numeric"
             placeholder="(00) 00000-0000" maxlength="15">
+        </div>
+        <div class="form-group">
+          <label for="clients-instagram">Instagram (opcional)</label>
+          <input type="text" id="clients-instagram" autocomplete="off" autocapitalize="off" placeholder="@usuario">
+        </div>
+        <div class="form-group" id="clients-registered-group">
+          <label for="clients-registered-at">Data do cadastro</label>
+          <input type="date" id="clients-registered-at">
         </div>
         <div class="form-group">
           <label for="clients-email">E-mail (opcional)</label>

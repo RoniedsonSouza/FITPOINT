@@ -328,7 +328,7 @@
                 ? `<div class="checkout-assignee-fields">
                     <input type="text" class="checkout-slot-name" data-checkout-slot="${index}" value="${escapeHtml(assignee.name || '')}" placeholder="Nome do destinatário" autocomplete="name">
                     <input type="email" class="checkout-slot-email" data-checkout-slot="${index}" value="${escapeHtml(assignee.email || '')}" placeholder="E-mail do destinatário" autocomplete="email">
-                    <input type="tel" class="checkout-slot-phone" data-checkout-slot="${index}" value="${escapeHtml(assignee.phone || '')}" placeholder="Telefone" required autocomplete="tel">
+                    <input type="tel" class="checkout-slot-phone" data-checkout-slot="${index}" value="${escapeHtml(formatPhoneMask(assignee.phone || ''))}" placeholder="(00) 00000-0000" required autocomplete="tel" inputmode="numeric" maxlength="15">
                   </div>`
                 : ''
             }
@@ -735,10 +735,15 @@
   }
 
   function setupPhoneInputMask() {
-    const phoneEl = document.getElementById('checkout-phone');
-    phoneEl?.addEventListener('input', () => {
-      phoneEl.value = formatPhoneMask(phoneEl.value);
-    });
+    if (document.documentElement.dataset.phoneMaskGlobal === '1') return;
+    document.documentElement.dataset.phoneMaskGlobal = '1';
+    // Delegado + captura: cobre checkout-phone e os campos de participantes gerados dinamicamente
+    document.addEventListener('input', (e) => {
+      const el = e.target;
+      if (!(el instanceof HTMLInputElement) || el.type !== 'tel') return;
+      const formatted = formatPhoneMask(el.value);
+      if (formatted !== el.value) el.value = formatted;
+    }, true);
   }
 
   function setupCardInputMasks() {

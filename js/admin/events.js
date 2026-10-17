@@ -1212,7 +1212,7 @@ function renderVipAssigneeSlots() {
               ? `<div class="grid gap-2 mt-3">
                   <input type="text" class="vip-slot-name" data-vip-slot="${index}" value="${escapeHtml(assignee.name || '')}" placeholder="Nome" required oninput="updateVipAssigneeField(${index}, 'name', this.value)">
                   <input type="email" class="vip-slot-email" data-vip-slot="${index}" value="${escapeHtml(assignee.email || '')}" placeholder="E-mail" required oninput="updateVipAssigneeField(${index}, 'email', this.value)">
-                  <input type="tel" class="vip-slot-phone" data-vip-slot="${index}" value="${escapeHtml(assignee.phone || '')}" placeholder="Telefone" required oninput="updateVipAssigneeField(${index}, 'phone', this.value)">
+                  <input type="tel" class="vip-slot-phone" data-vip-slot="${index}" value="${escapeHtml(formatPhoneMask(assignee.phone || ''))}" placeholder="(00) 00000-0000" inputmode="numeric" maxlength="15" required oninput="updateVipAssigneeField(${index}, 'phone', this.value)">
                 </div>`
               : ''
           }
@@ -1314,7 +1314,7 @@ async function submitVipIssue(event) {
   const quantity = getVipIssueQty();
   const buyer_name = document.getElementById('vip-issue-name')?.value.trim() || '';
   const buyer_email = document.getElementById('vip-issue-email')?.value.trim() || '';
-  const buyer_phone = document.getElementById('vip-issue-phone')?.value.trim() || '';
+  const buyer_phone = normalizePhoneDigits(document.getElementById('vip-issue-phone')?.value || '');
   const assignees = buildVipAssigneesPayload(quantity);
 
   for (let i = 0; i < assignees.length; i++) {

@@ -9,6 +9,102 @@ let clientsLoading = false;
 let clientsPaginationMeta = null;
 let clientsActiveTab = 'all';
 let clientsEventsBound = false;
+let clientsImportPreviewUrl = null;
+let clientsImportConfirmed = false;
+
+function openClientsConfirmModal() {
+  const v = (id) => document.getElementById(id)?.value.trim() || '';
+  const rows = [
+    ['Nome', v('clients-name')],
+    ['Telefone', v('clients-phone')],
+    ['Instagram', v('clients-instagram')],
+    ['E-mail', v('clients-email')]
+  ];
+  if (!editingClientId) {
+    const d = v('clients-registered-at');
+    rows.push(['Data do cadastro', d ? d.split('-').reverse().join('/') : 'Hoje']);
+  }
+  document.getElementById('clients-confirm-summary').innerHTML = rows
+    .map(([k, val]) => `<div class="flex justify-between gap-3 border-b border-black/5 pb-1">
+        <dt class="text-black/60">${k}</dt><dd class="font-semibold text-right">${escapeHtml(val || '—')}</dd></div>`)
+    .join('');
+  document.getElementById('clients-confirm-title').textContent = editingClientId
+    ? 'Confirmar atualização' : 'Confirmar cadastro';
+  const img = document.getElementById('clients-confirm-preview');
+  if (img) img.src = clientsImportPreviewUrl || '';
+  document.getElementById('clients-confirm-modal')?.classList.add('active');
+}
+
+function closeClientsConfirmModal() {
+  document.getElementById('clients-confirm-modal')?.classList.remove('active');
+}
+
+function confirmClientsImport() {
+  closeClientsConfirmModal();
+  clientsImportConfirmed = true;
+  document.getElementById('clients-form')?.requestSubmit();
+}
+
+function todayYmdLocal() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function resetClientsImportReview() {
+  if (clientsImportPreviewUrl) {
+    URL.revokeObjectURL(clientsImportPreviewUrl);
+    clientsImportPreviewUrl = null;
+  }
+  document.getElementById('clients-import-preview')?.removeAttribute('src');
+  document.getElementById('clients-import-review')?.classList.add('hidden');
+  ['clients-import-camera-file', 'clients-import-gallery-file'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+}
+
+function triggerClientImageImport(source) {
+  const input = document.getElementById(
+    source === 'gallery' ? 'clients-import-gallery-file' : 'clients-import-camera-file'
+  );
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
+
+async function onClientImageFileChange(event) {
+  const file = event.target?.files?.[0];
+  if (!file) return;
+  const btnId = event.target.id === 'clients-import-gallery-file'
+    ? 'clients-import-gallery-btn' : 'clients-import-camera-btn';
+  await withButtonLoading(document.getElementById(btnId), async () => {
+    try {
+      const { client = {}, existing = null } = await DB.parseClientImage(file);
+      if (existing) {
+        await openClientsModal(existing.id);
+        if (client.instagram && !existing.instagram) {
+          document.getElementById('clients-instagram').value = '@' + client.instagram;
+        }
+      } else {
+        await openClientsModal();
+        document.getElementById('clients-name').value = client.name || '';
+        document.getElementById('clients-phone').value = client.phone
+          ? formatPhoneDisplay(client.phone) : '';
+        document.getElementById('clients-instagram').value = client.instagram ? '@' + client.instagram : '';
+        document.getElementById('clients-registered-at').value = client.date || todayYmdLocal();
+      }
+      clientsImportPreviewUrl = URL.createObjectURL(file);
+      document.getElementById('clients-import-preview').src = clientsImportPreviewUrl;
+      document.getElementById('clients-import-msg').textContent = existing
+        ? `Telefone já cadastrado para "${existing.name}". Revise e salve para atualizar.`
+        : 'Confira os dados lidos da ficha antes de salvar.';
+      document.getElementById('clients-import-review').classList.remove('hidden');
+    } catch (error) {
+      if (handleAuthError(error)) return;
+      showToast(error.message || 'Erro ao analisar a ficha.', 'error');
+    }
+  }, 'Lendo ficha…');
+}
 
 function clientsAvatarHtml(c, sizeClass = 'loyalty-card-avatar') {
   const initial = escapeAttr((c.name || '?').charAt(0).toUpperCase());
@@ -110,6 +206,9 @@ function bindClientsEvents() {
     setupPhoneInputMask('clients-phone');
   }
 
+  document.getElementById('clients-import-camera-file')?.addEventListener('change', onClientImageFileChange);
+  document.getElementById('clients-import-gallery-file')?.addEventListener('change', onClientImageFileChange);
+
   const avatarFile = document.getElementById('clients-avatar-file');
   if (avatarFile) {
     avatarFile.addEventListener('change', () => {
@@ -143,17 +242,23 @@ function openClientsModal(customerId = null) {
   const activeGroup = document.getElementById('clients-active-group');
   document.getElementById('clients-form')?.reset();
   resetClientsAvatarPreview();
+  resetClientsImportReview();
   document.getElementById('clients-id-input').value = '';
+  const registeredGroup = document.getElementById('clients-registered-group');
+  if (registeredGroup) registeredGroup.style.display = customerId ? 'none' : '';
+  if (!customerId) document.getElementById('clients-registered-at').value = todayYmdLocal();
   document.getElementById('clients-active').checked = true;
   if (activeGroup) activeGroup.style.display = customerId ? '' : 'none';
 
   if (customerId) {
     if (title) title.textContent = 'Editar cliente';
-    DB.getLoyaltyCustomer(customerId).then((c) => {
+    modal?.classList.add('active');
+    return DB.getLoyaltyCustomer(customerId).then((c) => {
       document.getElementById('clients-id-input').value = c.id;
       document.getElementById('clients-name').value = c.name || '';
       document.getElementById('clients-phone').value = formatPhoneDisplay(c.phone);
       document.getElementById('clients-email').value = c.email || '';
+      document.getElementById('clients-instagram').value = c.instagram ? '@' + c.instagram : '';
       document.getElementById('clients-active').checked = c.active !== false;
       if (c.avatar) {
         document.getElementById('clients-avatar').value = c.avatar;
@@ -177,6 +282,7 @@ function closeClientsModal() {
   document.getElementById('clients-modal')?.classList.remove('active');
   editingClientId = null;
   resetClientsAvatarPreview();
+  resetClientsImportReview();
 }
 
 async function saveClient(event) {
@@ -195,6 +301,13 @@ async function saveClient(event) {
     return;
   }
 
+  // Fluxo de importação por foto: exige confirmação explícita antes de gravar
+  if (clientsImportPreviewUrl && !clientsImportConfirmed) {
+    openClientsConfirmModal();
+    return;
+  }
+  clientsImportConfirmed = false;
+
   await withButtonLoading(btn, async () => {
     try {
       let avatar = document.getElementById('clients-avatar')?.value || null;
@@ -208,8 +321,12 @@ async function saveClient(event) {
         name,
         phone: typeof normalizePhoneDigits === 'function' ? normalizePhoneDigits(phone) : phone,
         email: document.getElementById('clients-email')?.value.trim() || null,
+        instagram: document.getElementById('clients-instagram')?.value.trim() || null,
         avatar: avatar || undefined
       };
+      if (!editingClientId) {
+        payload.registered_at = document.getElementById('clients-registered-at')?.value || null;
+      }
       if (editingClientId) {
         payload.active = document.getElementById('clients-active')?.checked !== false;
         await DB.updateLoyaltyCustomer(editingClientId, payload);

@@ -45,6 +45,22 @@ function setupPhoneInputMask(inputId) {
   });
 }
 
+// Máscara automática em todo input[type="tel"] ou [data-phone-mask] — inclusive os criados dinamicamente.
+// Fase de captura: o valor já chega formatado aos handlers inline (oninput) do próprio campo.
+function bindGlobalPhoneMask() {
+  if (document.documentElement.dataset.phoneMaskGlobal === '1') return;
+  document.documentElement.dataset.phoneMaskGlobal = '1';
+  document.addEventListener('input', (e) => {
+    const el = e.target;
+    if (!(el instanceof HTMLInputElement)) return;
+    if (el.type !== 'tel' && !el.hasAttribute('data-phone-mask')) return;
+    if (el.dataset.phoneMaskBound === '1') return;
+    const formatted = formatPhoneMask(el.value);
+    if (formatted !== el.value) el.value = formatted;
+  }, true);
+}
+bindGlobalPhoneMask();
+
 function escapeAttr(str) {
   return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }

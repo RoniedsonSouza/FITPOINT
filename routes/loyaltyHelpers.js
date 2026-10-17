@@ -106,6 +106,8 @@ function mapCustomerRow(row, { includePhone = false, visitsPerReward = DEFAULT_V
     name: row.name,
     display_name: row.name,
     avatar: row.avatar || null,
+    instagram: row.instagram || null,
+    created_at: row.created_at ? new Date(row.created_at).toISOString() : null,
     total_visits: totalVisits,
     total_rewards: totalRewards,
     rewards_pending: row.rewards_pending != null ? Number(row.rewards_pending) : 0,

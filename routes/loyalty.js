@@ -28,7 +28,9 @@ const {
   participantOrderSql,
   computeTotalPages
 } = require('./loyaltyHelpers');
-const { createImageUploadMiddleware } = require('../middleware/imageUpload');
+const { createImageUploadMiddleware, memoryImageUpload } = require('../middleware/imageUpload');
+const { ListVisionError } = require('../services/listVisionParse');
+const { extractClientFromImage, normalizeInstagram, normalizeDate } = require('../services/clientVisionParse');
 const {
   isWhatsAppConfigured,
   getWhatsAppConfig,
@@ -470,10 +472,36 @@ router.get('/customers/:id', authenticateToken, requirePermission('fidelidade'),
 });
 
 // POST /api/loyalty/customers — admin (fidelidade ou cadastro rápido no diário)
+// POST /api/loyalty/customers/parse-image — lê ficha (Nome/Telefone/Instagram/Data) via visão; não grava
+router.post('/customers/parse-image', authenticateToken, requireAnyPermission('fidelidade', 'vendas'), memoryImageUpload, async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Envie uma imagem.' });
+    const { client, model } = await extractClientFromImage({ buffer: req.file.buffer, mimeType: req.file.mimetype });
+    let existing = null;
+    const phone = normalizePhone(client.phone);
+    if (phone && phone.length >= 10) {
+      const found = await query(
+        `SELECT id, name, phone, instagram FROM ${table('loyalty_customers')} WHERE phone = $1`,
+        [phone]
+      );
+      existing = found.rows[0] || null;
+    }
+    res.json({ client, existing, model });
+  } catch (error) {
+    if (error instanceof ListVisionError) {
+      return res.status(error.statusCode || 500).json({ error: error.message });
+    }
+    console.error('Erro ao analisar ficha de cliente:', error);
+    res.status(500).json({ error: 'Erro ao analisar a ficha' });
+  }
+});
+
 router.post('/customers', authenticateToken, requireAnyPermission('fidelidade', 'vendas'), async (req, res) => {
   try {
     const visitsPerReward = await getVisitsPerReward();
-    const { name, phone, avatar, total_visits, total_rewards, email } = req.body;
+    const { name, phone, avatar, total_visits, total_rewards, email, instagram, registered_at } = req.body;
+    const normalizedInstagram = normalizeInstagram(instagram) || null;
+    const registeredDate = normalizeDate(registered_at);
     const trimmedName = String(name || '').trim();
     const normalizedPhone = normalizePhone(phone);
 
@@ -507,15 +535,17 @@ router.post('/customers', authenticateToken, requireAnyPermission('fidelidade', 
 
     const result = await query(
       `INSERT INTO ${table('loyalty_customers')}
-       (name, phone, email, avatar, total_visits, total_rewards, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) RETURNING *`,
+       (name, phone, email, avatar, total_visits, total_rewards, instagram, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8::timestamp, NOW()), NOW()) RETURNING *`,
       [
         trimmedName,
         normalizedPhone,
         normalizedEmail,
         avatar || null,
         visitsParsed?.value ?? 0,
-        rewardsParsed?.value ?? 0
+        rewardsParsed?.value ?? 0,
+        normalizedInstagram,
+        registeredDate ? `${registeredDate} 12:00:00` : null
       ]
     );
 
@@ -530,7 +560,7 @@ router.post('/customers', authenticateToken, requireAnyPermission('fidelidade', 
 router.put('/customers/:id', authenticateToken, requirePermission('fidelidade'), async (req, res) => {
   try {
     const visitsPerReward = await getVisitsPerReward();
-    const { name, phone, active, avatar, total_visits, total_rewards, email } = req.body;
+    const { name, phone, active, avatar, total_visits, total_rewards, email, instagram } = req.body;
 
     const existing = await query(
       `SELECT * FROM ${table('loyalty_customers')} WHERE id = $1`,
@@ -579,6 +609,10 @@ router.put('/customers/:id', authenticateToken, requirePermission('fidelidade'),
         updates.push(`email = $${paramIndex++}`);
         values.push(normalizedEmail);
       }
+    }
+    if (instagram !== undefined) {
+      updates.push(`instagram = $${paramIndex++}`);
+      values.push(normalizeInstagram(instagram) || null);
     }
     if (avatar !== undefined) {
       updates.push(`avatar = $${paramIndex++}`);

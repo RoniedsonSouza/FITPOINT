@@ -91,6 +91,10 @@ async function ensureDatabase() {
       ADD COLUMN IF NOT EXISTS email VARCHAR(255)
     `);
     await client.query(`
+      ALTER TABLE ${SCHEMA}.loyalty_customers
+      ADD COLUMN IF NOT EXISTS instagram VARCHAR(100)
+    `);
+    await client.query(`
       CREATE INDEX IF NOT EXISTS idx_loyalty_customers_email
       ON ${SCHEMA}.loyalty_customers (LOWER(email))
       WHERE email IS NOT NULL AND email <> ''

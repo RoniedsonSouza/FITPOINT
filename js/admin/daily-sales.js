@@ -1824,8 +1824,10 @@ function diarioListStatusLabel(status) {
   }
 }
 
-function triggerDiarioListImport() {
-  const input = document.getElementById('daily-diario-list-file');
+function triggerDiarioListImport(source) {
+  const input = document.getElementById(
+    source === 'gallery' ? 'daily-diario-list-gallery-file' : 'daily-diario-list-file'
+  );
   if (!input) return;
   input.value = '';
   input.click();
@@ -1901,8 +1903,10 @@ function closeDiarioListReviewModal() {
   const previewImg = document.getElementById('diario-list-review-preview');
   if (previewImg) previewImg.removeAttribute('src');
   document.getElementById('diario-list-review-preview-wrap')?.classList.add('hidden');
-  const fileInput = document.getElementById('daily-diario-list-file');
-  if (fileInput) fileInput.value = '';
+  ['daily-diario-list-file', 'daily-diario-list-gallery-file'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
 }
 
 function buildDiarioListProductOptionsHtml(line) {
@@ -2182,6 +2186,8 @@ function bindDiarioListImportEvents() {
   if (!fileInput && !lines) return;
   diarioListReviewBound = true;
   fileInput?.addEventListener('change', onDiarioListFileChange);
+  document.getElementById('daily-diario-list-gallery-file')
+    ?.addEventListener('change', onDiarioListFileChange);
   lines?.addEventListener('input', onDiarioListReviewChange);
   lines?.addEventListener('change', onDiarioListReviewChange);
   lines?.addEventListener('click', onDiarioListReviewClick);

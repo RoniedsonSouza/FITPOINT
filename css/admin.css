@@ -3821,7 +3821,7 @@ body.ticket-qr-open {
     font-size: 1.5rem;
   }
 }
-/* Câmera de captura (OCR ficha / lista) — Foto + Escolher da galeria */
+/* Câmera de captura (OCR ficha / lista) — toggle Foto / Galeria */
 .photo-capture-overlay {
   position: fixed;
   inset: 0;
@@ -3830,10 +3830,16 @@ body.ticket-qr-open {
   flex-direction: column;
   background: #000;
   color: #fff;
+  animation: pc-fade-in 0.2s ease-out;
 }
 
 .photo-capture-overlay.hidden {
   display: none;
+}
+
+@keyframes pc-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 body.photo-capture-open {
@@ -3845,6 +3851,9 @@ body.photo-capture-open {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
+  margin: max(0.5rem, env(safe-area-inset-top)) 0.5rem 0;
+  border-radius: 1.5rem;
+  background: #111;
 }
 
 .photo-capture-body video {
@@ -3853,7 +3862,70 @@ body.photo-capture-open {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  background: #000;
+}
+
+/* Guia de enquadramento (cantos) */
+.photo-capture-frame {
+  position: absolute;
+  inset: 12% 8%;
+  pointer-events: none;
+}
+
+.photo-capture-frame span {
+  position: absolute;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.4));
+}
+
+.photo-capture-frame span:nth-child(1) { top: 0; left: 0; border-right: 0; border-bottom: 0; border-top-left-radius: 1rem; }
+.photo-capture-frame span:nth-child(2) { top: 0; right: 0; border-left: 0; border-bottom: 0; border-top-right-radius: 1rem; }
+.photo-capture-frame span:nth-child(3) { bottom: 0; left: 0; border-right: 0; border-top: 0; border-bottom-left-radius: 1rem; }
+.photo-capture-frame span:nth-child(4) { bottom: 0; right: 0; border-left: 0; border-top: 0; border-bottom-right-radius: 1rem; }
+
+.photo-capture-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.photo-capture-flash.is-on {
+  animation: pc-flash 0.35s ease-out;
+}
+
+@keyframes pc-flash {
+  0% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+
+.photo-capture-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #111;
+  z-index: 2;
+}
+
+.photo-capture-loading.hidden {
+  display: none;
+}
+
+.photo-capture-spinner {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #fff;
+  animation: pc-spin 0.8s linear infinite;
+}
+
+@keyframes pc-spin {
+  to { transform: rotate(360deg); }
 }
 
 .photo-capture-error {
@@ -3864,83 +3936,142 @@ body.photo-capture-open {
   transform: translateY(-50%);
   margin: 0;
   padding: 0.875rem 1rem;
-  border-radius: 0.75rem;
-  background: rgba(0, 0, 0, 0.7);
+  border-radius: 1rem;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   text-align: center;
-  font-size: 0.9rem;
-  line-height: 1.4;
-  z-index: 2;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  z-index: 3;
 }
 
 .photo-capture-error.hidden {
   display: none;
 }
 
-.photo-capture-footer {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1rem 1rem max(1.25rem, env(safe-area-inset-bottom));
-  background: #000;
-}
-
-.photo-capture-gallery-btn {
-  justify-self: start;
+.photo-capture-close {
+  position: absolute;
+  top: calc(max(0.5rem, env(safe-area-inset-top)) + 0.75rem);
+  left: 1.25rem;
+  z-index: 4;
   display: inline-flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.5rem 0.625rem;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
   border: none;
-  border-radius: 0.75rem;
-  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   color: #fff;
-  font-size: 0.75rem;
-  font-weight: 600;
   cursor: pointer;
 }
 
-.photo-capture-gallery-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+.photo-capture-close svg {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
-.photo-capture-gallery-btn svg {
-  width: 1.375rem;
-  height: 1.375rem;
+.photo-capture-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1.25rem 1rem max(1.5rem, env(safe-area-inset-bottom));
+}
+
+/* Toggle segmentado Foto / Galeria */
+.photo-capture-modes {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 15rem;
+  max-width: 100%;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.photo-capture-modes-indicator {
+  position: absolute;
+  top: 0.25rem;
+  bottom: 0.25rem;
+  left: 0.25rem;
+  width: calc(50% - 0.25rem);
+  border-radius: 999px;
+  background: var(--fp-green2);
+  box-shadow: 0 4px 14px rgba(47, 157, 87, 0.45);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.photo-capture-modes[data-mode="gallery"] .photo-capture-modes-indicator {
+  transform: translateX(100%);
+}
+
+.photo-capture-mode {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 2.5rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.photo-capture-mode svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.photo-capture-mode.is-active {
+  color: #fff;
 }
 
 .photo-capture-shutter {
   display: inline-flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0.375rem;
-  border: none;
-  background: transparent;
-  color: #fff;
-  cursor: pointer;
+  justify-content: center;
+  width: 4.75rem;
+  height: 4.75rem;
   padding: 0;
+  border: 4px solid #fff;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 0.2s ease;
 }
 
 .photo-capture-shutter-inner {
   display: block;
-  width: 4.25rem;
-  height: 4.25rem;
+  width: 3.6rem;
+  height: 3.6rem;
   border-radius: 999px;
   background: #fff;
-  box-shadow: 0 0 0 4px #000, 0 0 0 7px #fff;
-  transition: transform 0.1s ease;
+  transition: transform 0.12s ease, background 0.12s ease;
 }
 
 .photo-capture-shutter:active .photo-capture-shutter-inner {
-  transform: scale(0.92);
+  transform: scale(0.88);
+  background: #e8e8e8;
 }
 
-.photo-capture-shutter-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.photo-capture-overlay[data-mode="gallery"] .photo-capture-shutter {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
 /* Diário: sem zoom automático no celular.
    iOS dá zoom ao focar campos com fonte < 16px — força 16px em todos os campos do Diário
    e dos seus modais em telas de toque; touch-action evita zoom por toque duplo. */

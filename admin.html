@@ -1779,27 +1779,31 @@
 
   <div id="photo-capture-overlay" class="photo-capture-overlay hidden" role="dialog" aria-modal="true"
     aria-label="Câmera" aria-hidden="true">
-    <div class="ticket-qr-overlay-top">
-      <p id="photo-capture-title" class="ticket-qr-overlay-title">Tirar foto</p>
-      <button type="button" class="ticket-qr-close-btn" onclick="PhotoCapture.close()" aria-label="Fechar câmera">
-        <i data-lucide="x"></i>
-      </button>
-    </div>
     <div class="photo-capture-body">
       <video id="photo-capture-video" autoplay playsinline muted></video>
-      <p id="photo-capture-loading" class="ticket-qr-loading hidden">Abrindo câmera…</p>
+      <div class="photo-capture-frame" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+      <div id="photo-capture-flash" class="photo-capture-flash" aria-hidden="true"></div>
+      <div id="photo-capture-loading" class="photo-capture-loading hidden"><span class="photo-capture-spinner"></span></div>
       <p id="photo-capture-error" class="photo-capture-error hidden" role="alert"></p>
     </div>
+    <button type="button" class="photo-capture-close" onclick="PhotoCapture.close()" aria-label="Fechar câmera">
+      <i data-lucide="x"></i>
+    </button>
     <div class="photo-capture-footer">
-      <button type="button" class="photo-capture-gallery-btn" onclick="PhotoCapture.pickFromGallery()">
-        <i data-lucide="image"></i>
-        <span>Escolher da galeria</span>
-      </button>
+      <div class="photo-capture-modes" role="tablist" aria-label="Origem da imagem">
+        <span class="photo-capture-modes-indicator" aria-hidden="true"></span>
+        <button type="button" role="tab" class="photo-capture-mode is-active" data-mode="camera" aria-selected="true"
+          onclick="PhotoCapture.setMode('camera')">
+          <i data-lucide="camera"></i><span>Foto</span>
+        </button>
+        <button type="button" role="tab" class="photo-capture-mode" data-mode="gallery" aria-selected="false"
+          onclick="PhotoCapture.setMode('gallery')">
+          <i data-lucide="image"></i><span>Galeria</span>
+        </button>
+      </div>
       <button type="button" class="photo-capture-shutter" onclick="PhotoCapture.shoot()" aria-label="Tirar foto">
         <span class="photo-capture-shutter-inner"></span>
-        <span class="photo-capture-shutter-label">Foto</span>
       </button>
-      <span class="photo-capture-spacer" aria-hidden="true"></span>
     </div>
   </div>
 

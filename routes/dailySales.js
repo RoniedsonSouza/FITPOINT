@@ -5,7 +5,7 @@ const { query, getClient, table } = require('../config/database');
 const { authenticateToken, requirePermission } = require('../config/auth');
 const { applyVisitDelta, insertVisitEvents, insertRewardEvents, countPendingRewards, computeLoyaltyVisitsFromAmount, DEFAULT_ACCESS_VALUE, DEFAULT_VISITS_PER_REWARD } = require('./loyaltyHelpers');
 const { normalizeOptions } = require('./productHelpers');
-const { memoryImageUpload } = require('../middleware/imageUpload');
+const { ocrImageUpload } = require('../middleware/imageUpload');
 const { extractListFromImage, ListVisionError } = require('../services/listVisionParse');
 const { matchListLines } = require('../services/listMatch');
 
@@ -576,8 +576,9 @@ router.post(
   '/parse-list',
   authenticateToken,
   requirePermission('vendas'),
-  memoryImageUpload,
+  ocrImageUpload('diario'),
   async (req, res) => {
+    const log = req.ocrLog;
     try {
       const [productsResult, customersResult] = await Promise.all([
         query(
@@ -595,10 +596,13 @@ router.post(
         )
       ]);
 
+      log.info('catalog.loaded', { products: productsResult.rows.length, customers: customersResult.rows.length });
+
       const extracted = await extractListFromImage({
         buffer: req.file.buffer,
         mimeType: req.file.mimetype,
-        today: todayYmdBrazil()
+        today: todayYmdBrazil(),
+        log
       });
 
       const catalog = {
@@ -613,17 +617,30 @@ router.post(
         lines: matchListLines(section.lines, catalog).lines
       }));
 
+      const allLines = sections.flatMap((section) => section.lines);
+      const countBy = (field) => allLines.reduce((acc, l) => {
+        acc[l[field]] = (acc[l[field]] || 0) + 1;
+        return acc;
+      }, {});
+      log.info('match.done', {
+        sections: sections.map((s) => ({ date: s.date, status: s.date_status, lines: s.lines.length })),
+        products: countBy('product_status'),
+        customers: countBy('customer_status')
+      });
+
       res.json({
         sections,
         // Compatibilidade: todas as linhas sem agrupamento
-        lines: sections.flatMap((section) => section.lines),
+        lines: allLines,
         model: extracted.model
       });
+      log.info('request.done', { status: 200, lines: allLines.length });
     } catch (error) {
       if (error instanceof ListVisionError) {
+        log.warn('request.failed', { status: error.statusCode || 500, message: error.message });
         return res.status(error.statusCode || 500).json({ error: error.message });
       }
-      console.error('Erro ao analisar lista do diário:', error);
+      log.error('request.error', error);
       res.status(500).json({ error: 'Erro ao analisar a lista' });
     }
   }

@@ -2068,7 +2068,7 @@ function renderDiarioListReviewSteps() {
     else if (i < diarioListReviewStep || i <= diarioListReviewMaxStep) classes.push('is-visited');
     if (status === 'complete') classes.push('is-complete');
     if (status === 'partial') classes.push('is-partial');
-    const sub = status === 'complete' ? 'Já registrado'
+    const sub = status === 'complete' ? 'Registrado'
       : status === 'partial' ? 'Parcial'
         : `${sec.lines.length} ${sec.lines.length === 1 ? 'item' : 'itens'}`;
     const clickable = i <= diarioListReviewMaxStep && i !== diarioListReviewStep;
@@ -2118,7 +2118,7 @@ function renderDiarioListReviewAlert(section) {
     const status = DiarioListDedupe.sectionStatus(section.lines);
     const dup = section.lines.filter((l) => l.duplicate_of != null).length;
     if (status === 'complete') {
-      html = `<i data-lucide="check-circle-2"></i><span><strong>Dia ${escapeHtml(fmtDiarioDdMm(section.date))} já registrado.</strong> ${dup === 1 ? 'O item já existe' : `Todos os ${dup} itens já existem`} no Diário e não será${dup === 1 ? '' : 'ão'} lançado${dup === 1 ? '' : 's'} novamente.</span>`;
+      html = `<i data-lucide="check-circle-2"></i><span><strong>Dia ${escapeHtml(fmtDiarioDdMm(section.date))} já registrado.</strong> ${dup === 1 ? 'O item já existe' : `Todos os ${dup} itens já existem`} no Diário e ${dup === 1 ? 'não será lançado' : 'não serão lançados'} novamente.</span>`;
       cls = 'is-complete';
     } else if (status === 'partial') {
       html = `<i data-lucide="alert-circle"></i><span><strong>Dia parcialmente registrado.</strong> ${dup} de ${section.lines.length} itens já existem e estão em cinza — não serão lançados.</span>`;
@@ -2172,7 +2172,7 @@ function renderDiarioListReviewLines() {
     return;
   }
 
-  container.innerHTML = section.lines.map((line) => {
+  container.innerHTML = section.lines.map((line, index) => {
     const isDup = line.duplicate_of != null;
     const locked = isDup && !line.force;
     const invalid = !locked && !line.product_id;
@@ -2181,15 +2181,34 @@ function renderDiarioListReviewLines() {
     if (invalid) classes.push('diario-list-review-row--invalid');
     if (locked) classes.push('diario-list-review-row--duplicate');
     if (isDup && line.force) classes.push('diario-list-review-row--forced');
-    const dupBadge = isDup
+    const badges = isDup
       ? (line.force
-        ? `<span class="diario-list-review-badge diario-list-review-badge--forced">Será registrado novamente</span>
-           <button type="button" class="diario-review-force-btn" data-review-force="0">Desfazer</button>`
-        : `<span class="diario-list-review-badge diario-list-review-badge--duplicate"><i data-lucide="check"></i> Já registrado</span>
-           <button type="button" class="diario-review-force-btn" data-review-force="1">Registrar mesmo assim</button>`)
+        ? '<span class="diario-list-review-badge diario-list-review-badge--forced">Será registrado novamente</span>'
+        : '<span class="diario-list-review-badge diario-list-review-badge--duplicate"><i data-lucide="check"></i> Já registrado</span>')
+      : `<span class="diario-list-review-badge diario-list-review-badge--${escapeHtml(line.product_status)}">
+          Produto: ${escapeHtml(diarioListStatusLabel(line.product_status))}
+        </span>
+        <span class="diario-list-review-badge diario-list-review-badge--${escapeHtml(line.customer_status)}">
+          Cliente: ${escapeHtml(diarioListStatusLabel(line.customer_status))}
+        </span>`;
+    const forceAction = isDup
+      ? (line.force
+        ? '<button type="button" class="diario-review-force-btn is-undo" data-review-force="0"><i data-lucide="undo-2"></i> Desfazer</button>'
+        : '<button type="button" class="diario-review-force-btn" data-review-force="1"><i data-lucide="plus"></i> Registrar mesmo assim</button>')
+      : '';
+    const readText = line.product_text
+      ? `<span class="diario-list-review-read">Lido: ${escapeHtml(line.product_text)}${line.customer_text ? ` · ${escapeHtml(line.customer_text)}` : ''}</span>`
       : '';
     return `
       <div class="${classes.join(' ')}" data-review-key="${escapeHtml(line.key)}">
+        <div class="diario-list-review-head">
+          <span class="diario-list-review-index">Item ${index + 1}</span>
+          ${badges}
+          <button type="button" class="diario-list-review-remove" data-review-remove
+            title="Remover linha" aria-label="Remover linha">
+            <i data-lucide="trash-2"></i>
+          </button>
+        </div>
         <div class="form-group">
           <label>Qtd</label>
           <input type="number" min="1" step="1" inputmode="numeric" data-review-field="quantity"
@@ -2208,20 +2227,7 @@ function renderDiarioListReviewLines() {
           <input type="text" inputmode="decimal" data-review-field="unit_price"
             value="${escapeHtml(formatDiarioMoneyMaskDisplay(line.unit_price))}"${dis}>
         </div>
-        <button type="button" class="btn btn-outline btn-sm diario-list-review-remove" data-review-remove
-          title="Remover linha" aria-label="Remover linha">
-          <i data-lucide="trash-2"></i>
-        </button>
-        <div class="diario-list-review-meta">
-          ${dupBadge}
-          ${isDup ? '' : `<span class="diario-list-review-badge diario-list-review-badge--${escapeHtml(line.product_status)}">
-            Produto: ${escapeHtml(diarioListStatusLabel(line.product_status))}
-          </span>
-          <span class="diario-list-review-badge diario-list-review-badge--${escapeHtml(line.customer_status)}">
-            Cliente: ${escapeHtml(diarioListStatusLabel(line.customer_status))}
-          </span>`}
-          ${line.product_text ? `<span>Lido: ${escapeHtml(line.product_text)}${line.customer_text ? ` · ${escapeHtml(line.customer_text)}` : ''}</span>` : ''}
-        </div>
+        ${readText || forceAction ? `<div class="diario-list-review-meta">${readText}${forceAction}</div>` : ''}
       </div>
     `;
   }).join('');

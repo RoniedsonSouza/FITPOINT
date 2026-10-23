@@ -63,21 +63,23 @@ function resetClientsImportReview() {
   });
 }
 
-function triggerClientImageImport(source) {
-  const input = document.getElementById(
-    source === 'gallery' ? 'clients-import-gallery-file' : 'clients-import-camera-file'
-  );
-  if (!input) return;
-  input.value = '';
-  input.click();
+function triggerClientImageImport() {
+  PhotoCapture.open({
+    title: 'Fotografar ficha',
+    onFile: processClientImageFile,
+    galleryInputId: 'clients-import-gallery-file',
+    fallbackInputId: 'clients-import-camera-file'
+  });
 }
 
-async function onClientImageFileChange(event) {
+function onClientImageFileChange(event) {
   const file = event.target?.files?.[0];
+  if (file) processClientImageFile(file);
+}
+
+async function processClientImageFile(file) {
   if (!file) return;
-  const btnId = event.target.id === 'clients-import-gallery-file'
-    ? 'clients-import-gallery-btn' : 'clients-import-camera-btn';
-  await withButtonLoading(document.getElementById(btnId), async () => {
+  await withButtonLoading(document.getElementById('clients-import-camera-btn'), async () => {
     try {
       const { client = {}, existing = null } = await DB.parseClientImage(file);
       if (existing) {

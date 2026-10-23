@@ -11,6 +11,7 @@ let clientsActiveTab = 'all';
 let clientsEventsBound = false;
 let clientsImportPreviewUrl = null;
 let clientsImportConfirmed = false;
+let clientsImportDate = '';
 
 function openClientsConfirmModal() {
   const v = (id) => document.getElementById(id)?.value.trim() || '';
@@ -20,9 +21,8 @@ function openClientsConfirmModal() {
     ['Instagram', v('clients-instagram')],
     ['E-mail', v('clients-email')]
   ];
-  if (!editingClientId) {
-    const d = v('clients-registered-at');
-    rows.push(['Data do cadastro', d ? d.split('-').reverse().join('/') : 'Hoje']);
+  if (!editingClientId && clientsImportDate) {
+    rows.push(['Data na ficha', clientsImportDate.split('-').reverse().join('/')]);
   }
   document.getElementById('clients-confirm-summary').innerHTML = rows
     .map(([k, val]) => `<div class="flex justify-between gap-3 border-b border-black/5 pb-1">
@@ -57,6 +57,8 @@ function resetClientsImportReview() {
   }
   document.getElementById('clients-import-preview')?.removeAttribute('src');
   document.getElementById('clients-import-review')?.classList.add('hidden');
+  clientsImportDate = '';
+  document.getElementById('clients-import-date')?.classList.add('hidden');
   ['clients-import-camera-file', 'clients-import-gallery-file'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.value = '';
@@ -93,7 +95,12 @@ async function processClientImageFile(file) {
         document.getElementById('clients-phone').value = client.phone
           ? formatPhoneDisplay(client.phone) : '';
         document.getElementById('clients-instagram').value = client.instagram ? '@' + client.instagram : '';
-        document.getElementById('clients-registered-at').value = client.date || todayYmdLocal();
+        clientsImportDate = client.date || '';
+        const dateEl = document.getElementById('clients-import-date');
+        if (dateEl) {
+          dateEl.textContent = client.date ? `Data na ficha: ${client.date.split('-').reverse().join('/')}` : '';
+          dateEl.classList.toggle('hidden', !client.date);
+        }
       }
       clientsImportPreviewUrl = URL.createObjectURL(prepared.meta.action === 'converted' ? prepared.file : file);
       document.getElementById('clients-import-preview').src = clientsImportPreviewUrl;
@@ -246,9 +253,6 @@ function openClientsModal(customerId = null) {
   resetClientsAvatarPreview();
   resetClientsImportReview();
   document.getElementById('clients-id-input').value = '';
-  const registeredGroup = document.getElementById('clients-registered-group');
-  if (registeredGroup) registeredGroup.style.display = customerId ? 'none' : '';
-  if (!customerId) document.getElementById('clients-registered-at').value = todayYmdLocal();
   document.getElementById('clients-active').checked = true;
   if (activeGroup) activeGroup.style.display = customerId ? '' : 'none';
 
@@ -326,9 +330,6 @@ async function saveClient(event) {
         instagram: document.getElementById('clients-instagram')?.value.trim() || null,
         avatar: avatar || undefined
       };
-      if (!editingClientId) {
-        payload.registered_at = document.getElementById('clients-registered-at')?.value || null;
-      }
       if (editingClientId) {
         payload.active = document.getElementById('clients-active')?.checked !== false;
         await DB.updateLoyaltyCustomer(editingClientId, payload);

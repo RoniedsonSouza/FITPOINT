@@ -1588,6 +1588,7 @@ body.ticket-qr-open {
   .modal-content {
     padding: 1rem;
     max-height: 92vh;
+    max-height: 92dvh; /* iOS: não passa por baixo da barra do Safari */
     width: 100%;
     max-width: 100%;
     border-bottom-left-radius: 0;
@@ -4482,5 +4483,24 @@ body.photo-capture-open {
   [id^="diario-"][id$="-modal"] select,
   [id^="diario-"][id$="-modal"] textarea {
     font-size: 16px !important;
+  }
+}
+
+/* Modal com rodapé sempre visível (ex.: cadastro de cliente pela ficha) */
+.modal-content--sticky-footer .modal-footer {
+  position: sticky;
+  bottom: -1rem;
+  z-index: 2;
+  margin: 1rem -1rem -1rem;
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+  background: #fff;
+  box-shadow: 0 -6px 16px rgba(14, 31, 22, 0.06);
+}
+
+@media (min-width: 769px) {
+  .modal-content--sticky-footer .modal-footer {
+    bottom: -1.75rem;
+    margin: 1.5rem -1.75rem -1.75rem;
+    padding: 1rem 1.75rem;
   }
 }

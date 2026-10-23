@@ -4504,3 +4504,122 @@ body.photo-capture-open {
     padding: 1rem 1.75rem;
   }
 }
+
+/* Cadastro pela ficha: cadastros parecidos (collapse) */
+.clients-similar {
+  margin-top: 0.75rem;
+  border: 1px solid rgba(14, 31, 22, 0.12);
+  border-radius: 0.75rem;
+  background: var(--fp-fog, #F5F3EE);
+  overflow: hidden;
+}
+
+.clients-similar.hidden {
+  display: none;
+}
+
+.clients-similar.is-strong {
+  border-color: rgba(245, 124, 0, 0.45);
+  background: rgba(245, 124, 0, 0.07);
+}
+
+.clients-similar-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.clients-similar-summary::-webkit-details-marker {
+  display: none;
+}
+
+.clients-similar.is-strong .clients-similar-summary {
+  color: #9a4a0e;
+}
+
+.clients-similar-summary svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: 0 0 auto;
+}
+
+.clients-similar-chevron {
+  margin-left: auto;
+  transition: transform 0.2s ease;
+}
+
+.clients-similar[open] .clients-similar-chevron {
+  transform: rotate(180deg);
+}
+
+.clients-similar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0 0.5rem 0.5rem;
+  list-style: none;
+}
+
+.clients-similar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.625rem;
+  background: #fff;
+}
+
+.clients-similar-avatar {
+  flex: 0 0 auto;
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.clients-similar-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 0.8125rem;
+}
+
+.clients-similar-info strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.875rem;
+}
+
+.clients-similar-info > span {
+  color: rgba(14, 31, 22, 0.6);
+}
+
+.clients-similar-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.125rem;
+}
+
+.clients-similar-badge {
+  padding: 0.0625rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  background: rgba(14, 31, 22, 0.08);
+  color: rgba(14, 31, 22, 0.7);
+}
+
+.clients-similar-badge--phone,
+.clients-similar-badge--instagram {
+  background: rgba(245, 124, 0, 0.14);
+  color: #c45c12;
+}

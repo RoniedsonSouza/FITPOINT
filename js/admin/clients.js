@@ -12,6 +12,7 @@ let clientsEventsBound = false;
 let clientsImportPreviewUrl = null;
 let clientsImportConfirmed = false;
 let clientsImportDate = '';
+let clientsImportSimilar = [];
 
 function openClientsConfirmModal() {
   const v = (id) => document.getElementById(id)?.value.trim() || '';
@@ -21,6 +22,9 @@ function openClientsConfirmModal() {
     ['Instagram', v('clients-instagram')],
     ['E-mail', v('clients-email')]
   ];
+  if (clientsImportSimilar.length) {
+    rows.push(['Atenção', `${clientsImportSimilar.length} cadastro(s) parecido(s)`]);
+  }
   if (!editingClientId && clientsImportDate) {
     rows.push(['Data na ficha', clientsImportDate.split('-').reverse().join('/')]);
   }
@@ -58,7 +62,10 @@ function resetClientsImportReview() {
   document.getElementById('clients-import-preview')?.removeAttribute('src');
   document.getElementById('clients-import-review')?.classList.add('hidden');
   clientsImportDate = '';
+  clientsImportSimilar = [];
   document.getElementById('clients-import-date')?.classList.add('hidden');
+  const similarEl = document.getElementById('clients-import-similar');
+  if (similarEl) { similarEl.classList.add('hidden'); similarEl.open = false; }
   ['clients-import-camera-file', 'clients-import-gallery-file'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.value = '';
@@ -83,7 +90,7 @@ async function processClientImageFile(file) {
   await withButtonLoading(document.getElementById('clients-import-camera-btn'), async () => {
     try {
       const prepared = await OcrImagePrep.prepare(file);
-      const { client = {}, existing = null } = await DB.parseClientImage(prepared.file, prepared.meta);
+      const { client = {}, existing = null, similar = [] } = await DB.parseClientImage(prepared.file, prepared.meta);
       if (existing) {
         await openClientsModal(existing.id);
         if (client.instagram && !existing.instagram) {
@@ -108,11 +115,61 @@ async function processClientImageFile(file) {
         ? `Telefone já cadastrado para "${existing.name}". Revise e salve para atualizar.`
         : 'Confira os dados lidos da ficha antes de salvar.';
       document.getElementById('clients-import-review').classList.remove('hidden');
+      renderClientsSimilar(similar);
     } catch (error) {
       if (handleAuthError(error)) return;
       showToast(error.message || 'Erro ao analisar a ficha.', 'error');
     }
   }, 'Lendo ficha…');
+}
+
+const CLIENT_SIMILAR_REASON = {
+  phone: 'Mesmo telefone',
+  instagram: 'Mesmo Instagram',
+  name: 'Nome parecido'
+};
+
+function renderClientsSimilar(list) {
+  clientsImportSimilar = Array.isArray(list) ? list : [];
+  const wrap = document.getElementById('clients-import-similar');
+  const ul = document.getElementById('clients-import-similar-list');
+  const title = document.getElementById('clients-import-similar-title');
+  if (!wrap || !ul) return;
+  if (!clientsImportSimilar.length) {
+    wrap.classList.add('hidden');
+    wrap.open = false;
+    return;
+  }
+  const strong = clientsImportSimilar.some((r) => r.reasons.includes('phone') || r.reasons.includes('instagram'));
+  const n = clientsImportSimilar.length;
+  title.textContent = `${n} ${n === 1 ? 'cadastro parecido encontrado' : 'cadastros parecidos encontrados'}`;
+  wrap.classList.remove('hidden');
+  wrap.classList.toggle('is-strong', strong);
+  wrap.open = strong; // telefone/Instagram iguais: já abre a lista
+  ul.innerHTML = clientsImportSimilar.map((r) => {
+    const badges = r.reasons.map((reason) => {
+      const label = reason === 'name' && r.score < 1
+        ? `${CLIENT_SIMILAR_REASON.name} · ${Math.round(r.score * 100)}%`
+        : CLIENT_SIMILAR_REASON[reason];
+      return `<span class="clients-similar-badge clients-similar-badge--${reason}">${escapeHtml(label)}</span>`;
+    }).join('');
+    return `
+      <li class="clients-similar-item">
+        <span class="loyalty-card-avatar loyalty-card-avatar--initial clients-similar-avatar">${escapeHtml((r.name || '?').charAt(0).toUpperCase())}</span>
+        <div class="clients-similar-info">
+          <strong>${escapeHtml(r.name || '—')}${r.active ? '' : ' <small>(inativo)</small>'}</strong>
+          <span>${escapeHtml(formatPhoneDisplay(r.phone))}${r.instagram ? ` · @${escapeHtml(r.instagram)}` : ''}</span>
+          <div class="clients-similar-badges">${badges}</div>
+        </div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="openSimilarClient(${Number(r.id)})">Abrir</button>
+      </li>`;
+  }).join('');
+  if (typeof refreshIcons === 'function') refreshIcons();
+}
+
+function openSimilarClient(id) {
+  if (!confirm('Abrir este cadastro? Os dados lidos da ficha serão descartados.')) return;
+  openClientsModal(id);
 }
 
 function clientsAvatarHtml(c, sizeClass = 'loyalty-card-avatar') {

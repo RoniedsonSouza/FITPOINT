@@ -31,6 +31,7 @@ const {
 const { createImageUploadMiddleware, ocrImageUpload } = require('../middleware/imageUpload');
 const { ListVisionError } = require('../services/listVisionParse');
 const { extractClientFromImage, normalizeInstagram, normalizeDate } = require('../services/clientVisionParse');
+const { findSimilarCustomers } = require('../services/customerSimilarity');
 const {
   isWhatsAppConfigured,
   getWhatsAppConfig,
@@ -477,18 +478,27 @@ router.post('/customers/parse-image', authenticateToken, requireAnyPermission('f
   const log = req.ocrLog;
   try {
     if (!req.file) return res.status(400).json({ error: 'Envie uma imagem.' });
+    // Cadastros carregados em paralelo com o Gemini (para checar duplicados)
+    const customersPromise = query(
+      `SELECT id, name, phone, instagram, active FROM ${table('loyalty_customers')} ORDER BY name ASC LIMIT 10000`
+    );
+    customersPromise.catch(() => {});
     const { client, model } = await extractClientFromImage({ buffer: req.file.buffer, mimeType: req.file.mimetype, log });
-    let existing = null;
+    const customers = (await customersPromise).rows;
+
     const phone = normalizePhone(client.phone);
-    if (phone && phone.length >= 10) {
-      const found = await query(
-        `SELECT id, name, phone, instagram FROM ${table('loyalty_customers')} WHERE phone = $1`,
-        [phone]
-      );
-      existing = found.rows[0] || null;
-    }
-    res.json({ client, existing, model });
-    log.info('request.done', { status: 200, existingCustomer: Boolean(existing) });
+    const existing = phone && phone.length >= 10
+      ? customers.find((c) => normalizePhone(c.phone) === phone) || null
+      : null;
+    const similar = findSimilarCustomers({ ...client, phone }, customers, { excludeId: existing?.id });
+
+    res.json({ client, existing, similar, model });
+    log.info('request.done', {
+      status: 200,
+      existingCustomer: Boolean(existing),
+      similar: similar.length,
+      similarReasons: similar.map((r) => r.reasons.join('+'))
+    });
   } catch (error) {
     if (error instanceof ListVisionError) {
       log.warn('request.failed', { status: error.statusCode || 500, message: error.message });

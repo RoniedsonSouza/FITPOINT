@@ -1826,7 +1826,6 @@ function diarioListStatusLabel(status) {
 
 function triggerDiarioListImport() {
   PhotoCapture.open({
-    title: 'Fotografar lista',
     onFile: processDiarioListFile,
     galleryInputId: 'daily-diario-list-gallery-file',
     fallbackInputId: 'daily-diario-list-file'

@@ -65,7 +65,6 @@ function resetClientsImportReview() {
 
 function triggerClientImageImport() {
   PhotoCapture.open({
-    title: 'Fotografar ficha',
     onFile: processClientImageFile,
     galleryInputId: 'clients-import-gallery-file',
     fallbackInputId: 'clients-import-camera-file'

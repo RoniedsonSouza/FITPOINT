@@ -1585,21 +1585,38 @@
   <!-- Revisão de lista importada (Vision / Diário) -->
   <div id="diario-list-review-modal" class="modal">
     <div class="modal-content diario-list-review-modal-content">
-      <div class="flex justify-between items-center mb-4">
+      <div class="flex justify-between items-center mb-3">
         <h3 class="font-display text-xl font-bold">Revisar lista importada</h3>
         <button type="button" onclick="closeDiarioListReviewModal()" class="modal-close"
           aria-label="Fechar">&times;</button>
       </div>
-      <p class="text-sm text-black/60 mb-3">
-        Confira e edite cada linha antes de registrar no diário. Produto é obrigatório; cliente é opcional.
-      </p>
+      <nav id="diario-list-review-steps" class="diario-review-steps hidden" aria-label="Datas da lista"></nav>
       <div id="diario-list-review-preview-wrap" class="diario-list-review-preview-wrap hidden">
         <img id="diario-list-review-preview" alt="Prévia da lista" class="diario-list-review-preview">
       </div>
+      <div class="diario-review-date">
+        <label for="diario-list-review-date" class="diario-review-date-label">
+          <i data-lucide="calendar-days"></i> Data dos lançamentos
+        </label>
+        <input type="date" id="diario-list-review-date" class="diario-review-date-input">
+        <p id="diario-list-review-date-info" class="diario-review-date-info"></p>
+      </div>
+      <div id="diario-list-review-alert" class="diario-review-alert hidden" role="status" aria-live="polite"></div>
+      <p class="text-sm text-black/60 mb-3">
+        Confira e edite cada linha. Produto é obrigatório; cliente é opcional.
+      </p>
       <div id="diario-list-review-lines" class="diario-list-review-lines"></div>
       <p id="diario-list-review-hint" class="diario-list-review-hint"></p>
-      <div class="modal-footer">
+      <div class="modal-footer diario-review-footer">
         <button type="button" onclick="closeDiarioListReviewModal()" class="btn btn-secondary btn-md">Cancelar</button>
+        <button type="button" id="diario-list-review-back-btn" class="btn btn-outline btn-md hidden"
+          onclick="prevDiarioListReviewStep()">
+          <i data-lucide="chevron-left"></i> Voltar
+        </button>
+        <button type="button" id="diario-list-review-next-btn" class="btn btn-primary btn-lg hidden"
+          onclick="nextDiarioListReviewStep()">
+          Próxima <i data-lucide="chevron-right"></i>
+        </button>
         <button type="button" id="diario-list-review-confirm-btn" class="btn btn-primary btn-lg"
           onclick="confirmDiarioListReview()">
           Confirmar registro
@@ -1822,6 +1839,7 @@
   <script src="/js/admin/clients.js"></script>
   <script src="/js/admin/customer-debts.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="/js/admin/list-review-dedupe.js"></script>
   <script src="/js/admin/daily-sales.js"></script>
   <script src="/js/datetime.js"></script>
   <script src="/js/admin/events.js"></script>

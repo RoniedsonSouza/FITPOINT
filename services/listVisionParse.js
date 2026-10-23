@@ -2,26 +2,99 @@ const DEFAULT_MODEL = 'gemini-2.0-flash';
 
 const EXTRACTION_PROMPT = `Você analisa a foto de uma lista manuscrita de vendas (português do Brasil).
 A lista tem colunas tipicamente: quantidade, produto, nome (cliente) e valor (R$).
+Geralmente há uma data (dia/mês, ex.: "21/10", "Seg 21/10", "21 de outubro") escrita ACIMA de um bloco de itens.
+Uma mesma foto pode ter mais de uma data, cada uma seguida dos seus itens.
 
-Extraia TODAS as linhas de itens. Responda APENAS com JSON válido neste formato:
+Extraia TODAS as linhas de itens, agrupadas pela data escrita acima delas.
+Responda APENAS com JSON válido neste formato:
 {
-  "lines": [
+  "sections": [
     {
-      "quantity": 1,
-      "product": "nome do produto",
-      "customer_name": "nome do cliente",
-      "value": 18.5
+      "date_text": "21/10",
+      "day": 21,
+      "month": 10,
+      "year": null,
+      "lines": [
+        {
+          "quantity": 1,
+          "product": "nome do produto",
+          "customer_name": "nome do cliente",
+          "value": 18.5
+        }
+      ]
     }
   ]
 }
 
 Regras:
+- Datas no formato brasileiro: dia antes do mês (21/10 = dia 21 de outubro)
+- date_text: a data exatamente como escrita; day e month: inteiros; year: inteiro só se estiver escrito, senão null
+- Itens sem nenhuma data acima: uma seção com date_text "", day null e month null
+- Não crie seções sem itens; não repita itens em mais de uma seção
 - quantity: inteiro >= 1 (se ilegível, use 1)
 - product: texto do produto como aparece
 - customer_name: nome do cliente; string vazia se ausente
 - value: número em reais (aceite vírgula como decimal na leitura e converta para ponto)
 - Ignore cabeçalhos, totais e anotações que não sejam linhas de item
 - Não invente linhas que não existam na imagem`;
+
+const MONTHS_PT = {
+  jan: 1, janeiro: 1, fev: 2, fevereiro: 2, mar: 3, marco: 3, abr: 4, abril: 4,
+  mai: 5, maio: 5, jun: 6, junho: 6, jul: 7, julho: 7, ago: 8, agosto: 8,
+  set: 9, setembro: 9, out: 10, outubro: 10, nov: 11, novembro: 11, dez: 12, dezembro: 12
+};
+
+function todayYmdBrazil() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date());
+}
+
+function toInt(raw) {
+  if (raw === undefined || raw === null || raw === '') return null;
+  const n = parseInt(String(raw).replace(/[^\d]/g, ''), 10);
+  return Number.isInteger(n) ? n : null;
+}
+
+/** Lê dia/mês/ano de um texto como "21/10", "Seg 21-10-26" ou "21 de outubro". */
+function parseDateText(text) {
+  const raw = String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (!raw.trim()) return null;
+  let m = raw.match(/(\d{1,2})\s*[\/\-.]\s*(\d{1,2})(?:\s*[\/\-.]\s*(\d{2,4}))?/);
+  if (m) return { day: toInt(m[1]), month: toInt(m[2]), year: m[3] ? toInt(m[3]) : null };
+  m = raw.match(/(\d{1,2})\s*(?:de\s+)?([a-z]{3,9})\.?(?:\s*(?:de\s+)?(\d{2,4}))?/);
+  if (m && MONTHS_PT[m[2]]) return { day: toInt(m[1]), month: MONTHS_PT[m[2]], year: m[3] ? toInt(m[3]) : null };
+  return null;
+}
+
+/**
+ * Converte dia/mês (ano opcional) em YYYY-MM-DD.
+ * Sem ano: usa o ano de `today`; se a data cair no futuro, usa o ano anterior.
+ */
+function resolveListDate(day, month, year, today = todayYmdBrazil()) {
+  const d = toInt(day);
+  const mo = toInt(month);
+  if (!d || !mo || d < 1 || d > 31 || mo < 1 || mo > 12) return null;
+  const todayYear = Number(String(today).slice(0, 4));
+  let y = toInt(year);
+  if (y != null && y < 100) y += 2000;
+  const explicitYear = y != null && y >= 2000 && y <= todayYear + 1;
+  if (!explicitYear) y = todayYear;
+
+  const build = (yy) => {
+    const dt = new Date(Date.UTC(yy, mo - 1, d));
+    if (dt.getUTCFullYear() !== yy || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return null;
+    return `${yy}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  };
+
+  let ymd = build(y);
+  if (!ymd) return null;
+  if (!explicitYear && ymd > today) ymd = build(y - 1);
+  return ymd;
+}
 
 class ListVisionError extends Error {
   constructor(message, statusCode = 500) {
@@ -98,7 +171,40 @@ function normalizeExtractedLines(payload) {
   return lines;
 }
 
-async function extractListFromImage({ buffer, mimeType }) {
+/**
+ * Normaliza o JSON da visão em seções por data. Aceita o formato antigo ({ lines }).
+ * Seções com a mesma data (ou sem data) são unidas, mantendo a ordem de aparição.
+ */
+function normalizeExtractedSections(payload, { today = todayYmdBrazil() } = {}) {
+  const rawSections = Array.isArray(payload?.sections)
+    ? payload.sections
+    : [{ date_text: '', day: null, month: null, year: null, lines: payload?.lines }];
+
+  const byKey = new Map();
+  for (const section of rawSections) {
+    if (!section || typeof section !== 'object') continue;
+    const lines = normalizeExtractedLines({ lines: section.lines });
+    if (!lines.length) continue;
+
+    const dateText = String(section.date_text ?? section.date ?? '').trim();
+    let date = resolveListDate(section.day, section.month, section.year, today);
+    if (!date && dateText) {
+      const parsed = parseDateText(dateText);
+      if (parsed) date = resolveListDate(parsed.day, parsed.month, parsed.year, today);
+    }
+
+    const key = date || '__sem_data__';
+    if (!byKey.has(key)) {
+      byKey.set(key, { date, date_text: dateText, lines: [] });
+    }
+    const target = byKey.get(key);
+    if (!target.date_text && dateText) target.date_text = dateText;
+    target.lines.push(...lines);
+  }
+  return Array.from(byKey.values());
+}
+
+async function extractListFromImage({ buffer, mimeType, today }) {
   const { apiKey, model } = getGeminiConfig();
   if (!apiKey) {
     throw new ListVisionError(
@@ -173,12 +279,13 @@ async function extractListFromImage({ buffer, mimeType }) {
     throw new ListVisionError('Não foi possível interpretar o resultado da visão.', 422);
   }
 
-  const lines = normalizeExtractedLines(parsed);
+  const sections = normalizeExtractedSections(parsed, { today: today || todayYmdBrazil() });
+  const lines = sections.flatMap((section) => section.lines);
   if (lines.length === 0) {
     throw new ListVisionError('Nenhuma linha de item encontrada na imagem.', 422);
   }
 
-  return { lines, model };
+  return { sections, lines, model };
 }
 
 module.exports = {
@@ -189,5 +296,8 @@ module.exports = {
   parseMoneyValue,
   parseQuantity,
   normalizeExtractedLines,
+  normalizeExtractedSections,
+  resolveListDate,
+  parseDateText,
   extractJsonText
 };

@@ -597,16 +597,26 @@ router.post(
 
       const extracted = await extractListFromImage({
         buffer: req.file.buffer,
-        mimeType: req.file.mimetype
+        mimeType: req.file.mimetype,
+        today: todayYmdBrazil()
       });
 
-      const matched = matchListLines(extracted.lines, {
+      const catalog = {
         products: productsResult.rows,
         customers: customersResult.rows
-      });
+      };
+      // Uma seção por data lida na imagem (date = null quando não identificada)
+      const sections = extracted.sections.map((section) => ({
+        date: section.date || null,
+        date_text: section.date_text || '',
+        date_status: section.date ? 'read' : 'missing',
+        lines: matchListLines(section.lines, catalog).lines
+      }));
 
       res.json({
-        lines: matched.lines,
+        sections,
+        // Compatibilidade: todas as linhas sem agrupamento
+        lines: sections.flatMap((section) => section.lines),
         model: extracted.model
       });
     } catch (error) {

@@ -2665,6 +2665,302 @@ body.ticket-qr-open {
   }
 }
 
+/* Revisão da lista: etapas por data */
+.diario-review-steps {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0 0 1rem;
+  padding: 0.5rem;
+  overflow-x: auto;
+  border-radius: 1rem;
+  background: var(--fp-fog, #F5F3EE);
+  scrollbar-width: none;
+}
+
+.diario-review-steps::-webkit-scrollbar {
+  display: none;
+}
+
+.diario-review-steps.hidden {
+  display: none;
+}
+
+.diario-review-step {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem 0.375rem 0.375rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(14, 31, 22, 0.55);
+  font: inherit;
+  text-align: left;
+  cursor: default;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.diario-review-step.is-visited {
+  cursor: pointer;
+  color: var(--fp-ink, #0E1F16);
+}
+
+.diario-review-step.is-visited:hover {
+  background: rgba(14, 31, 22, 0.05);
+}
+
+.diario-review-step.is-current {
+  background: #fff;
+  border-color: rgba(47, 157, 87, 0.35);
+  color: var(--fp-ink, #0E1F16);
+  box-shadow: 0 2px 10px rgba(14, 31, 22, 0.08);
+}
+
+.diario-review-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  background: rgba(14, 31, 22, 0.1);
+  color: rgba(14, 31, 22, 0.7);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.diario-review-step.is-visited .diario-review-step-num {
+  background: rgba(47, 157, 87, 0.16);
+  color: var(--fp-green, #1D6B3A);
+}
+
+.diario-review-step.is-current .diario-review-step-num {
+  background: var(--fp-green2, #2F9D57);
+  color: #fff;
+}
+
+.diario-review-step-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.diario-review-step-text strong {
+  font-size: 0.875rem;
+}
+
+.diario-review-step-text small {
+  font-size: 0.6875rem;
+  opacity: 0.75;
+}
+
+.diario-review-step.is-partial .diario-review-step-text small {
+  color: #c45c12;
+  opacity: 1;
+}
+
+.diario-review-step.is-complete {
+  opacity: 0.6;
+}
+
+.diario-review-step.is-complete .diario-review-step-num {
+  background: rgba(14, 31, 22, 0.18);
+  color: #fff;
+}
+
+.diario-review-step.is-complete.is-current {
+  opacity: 1;
+  border-color: rgba(14, 31, 22, 0.2);
+}
+
+.diario-review-step-line {
+  flex: 0 0 1rem;
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(14, 31, 22, 0.12);
+}
+
+/* Data da etapa */
+.diario-review-date {
+  display: grid;
+  grid-template-columns: auto minmax(9rem, 12rem) 1fr;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.diario-review-date-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.diario-review-date-label svg,
+.diario-review-date-info svg {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+}
+
+.diario-review-date-input {
+  font-weight: 600;
+}
+
+.diario-review-date-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0;
+  font-size: 0.8125rem;
+  color: rgba(14, 31, 22, 0.6);
+}
+
+.diario-review-date-info.is-warning {
+  color: #c45c12;
+}
+
+/* Alerta de dia já registrado */
+.diario-review-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  padding: 0.75rem 0.875rem;
+  border-radius: 0.75rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.diario-review-alert.hidden {
+  display: none;
+}
+
+.diario-review-alert svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex: 0 0 auto;
+  margin-top: 0.05rem;
+}
+
+.diario-review-alert.is-info {
+  align-items: center;
+  background: rgba(14, 31, 22, 0.04);
+  color: rgba(14, 31, 22, 0.65);
+}
+
+.diario-review-alert.is-warning {
+  background: rgba(245, 124, 0, 0.1);
+  color: #9a4a0e;
+}
+
+.diario-review-alert.is-complete {
+  background: rgba(14, 31, 22, 0.07);
+  color: rgba(14, 31, 22, 0.75);
+}
+
+.diario-review-spinner {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 2px solid rgba(14, 31, 22, 0.15);
+  border-top-color: var(--fp-green2, #2F9D57);
+  animation: pc-spin 0.8s linear infinite;
+}
+
+/* Linha já registrada (cinza) */
+.diario-list-review-row--duplicate {
+  background: rgba(14, 31, 22, 0.04);
+  border-color: rgba(14, 31, 22, 0.08);
+}
+
+.diario-list-review-row--duplicate .form-group,
+.diario-list-review-row--duplicate .diario-list-review-remove {
+  opacity: 0.5;
+  filter: grayscale(1);
+}
+
+.diario-list-review-row--duplicate input,
+.diario-list-review-row--duplicate select {
+  background: transparent;
+  cursor: not-allowed;
+}
+
+.diario-list-review-row--forced {
+  border-color: rgba(245, 124, 0, 0.45);
+}
+
+.diario-list-review-badge--duplicate {
+  gap: 0.25rem;
+  background: rgba(14, 31, 22, 0.12);
+  color: rgba(14, 31, 22, 0.75);
+}
+
+.diario-list-review-badge--duplicate svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.diario-list-review-badge--forced {
+  background: rgba(245, 124, 0, 0.14);
+  color: #c45c12;
+}
+
+.diario-review-force-btn {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(14, 31, 22, 0.18);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--fp-ink, #0E1F16);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.diario-review-force-btn:hover {
+  border-color: var(--fp-green2, #2F9D57);
+  color: var(--fp-green, #1D6B3A);
+}
+
+.diario-list-review-hint.is-info {
+  color: rgba(14, 31, 22, 0.6);
+}
+
+.diario-review-footer .btn.hidden {
+  display: none !important;
+}
+
+.diario-review-footer .btn svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+@media (max-width: 720px) {
+  .diario-review-date {
+    grid-template-columns: 1fr;
+  }
+
+  .diario-review-footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .diario-review-footer #diario-list-review-next-btn,
+  .diario-review-footer #diario-list-review-confirm-btn {
+    grid-column: 1 / -1;
+    order: -1;
+  }
+
+  .diario-review-footer:has(#diario-list-review-back-btn.hidden) > .btn-secondary {
+    grid-column: 1 / -1;
+  }
+}
+
 .daily-diario-form {
   display: flex;
   flex-direction: column;

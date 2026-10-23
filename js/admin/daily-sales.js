@@ -12,7 +12,10 @@ let diarioSearchTimers = { product: null, customer: null };
 let diarioOptionProduct = null;
 let diarioCustomerSearchSeq = 0;
 let diarioFiadoLineKey = null;
-let diarioListReviewLines = [];
+let diarioListReviewSections = [];
+let diarioListReviewStep = 0;
+let diarioListReviewMaxStep = 0;
+let diarioListExistingCache = new Map();
 let diarioListReviewImageUrl = null;
 let diarioListReviewBound = false;
 let dailySalesChartInstances = {
@@ -1851,7 +1854,7 @@ async function processDiarioListFile(file) {
         showToast('Nenhuma linha encontrada na imagem.', 'error');
         return;
       }
-      openDiarioListReviewModal(lines, file);
+      openDiarioListReviewModal(result, file);
     } catch (error) {
       if (handleAuthError(error)) return;
       showToast(error.message || 'Erro ao analisar a lista.', 'error');
@@ -1859,13 +1862,25 @@ async function processDiarioListFile(file) {
   }, 'Analisando…');
 }
 
-function openDiarioListReviewModal(lines, file) {
-  if (diarioListReviewImageUrl) {
-    URL.revokeObjectURL(diarioListReviewImageUrl);
-    diarioListReviewImageUrl = null;
-  }
-  diarioListReviewLines = (Array.isArray(lines) ? lines : []).map((line, index) => ({
-    key: `lr-${Date.now()}-${index}`,
+// ===== Revisão da lista importada: etapas por data + duplicados =====
+
+function fmtDiarioDdMm(ymd) {
+  if (!ymd) return '—';
+  const [, m, d] = String(ymd).split('-');
+  return `${d}/${m}`;
+}
+
+function getDiarioReviewSection() {
+  return diarioListReviewSections[diarioListReviewStep] || null;
+}
+
+function diarioReviewLinesToSave(section) {
+  return (section?.lines || []).filter((l) => l.duplicate_of == null || l.force);
+}
+
+function mapDiarioReviewLine(line, index) {
+  return {
+    key: `lr-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`,
     quantity: Math.max(1, parseInt(String(line.quantity), 10) || 1),
     product_text: line.product_text || '',
     customer_text: line.customer_text || '',
@@ -1878,8 +1893,78 @@ function openDiarioListReviewModal(lines, file) {
     product_status: line.product_status || 'missing',
     customer_status: line.customer_status || 'empty',
     product_candidates: Array.isArray(line.product_candidates) ? line.product_candidates : [],
-    customer_candidates: Array.isArray(line.customer_candidates) ? line.customer_candidates : []
-  }));
+    customer_candidates: Array.isArray(line.customer_candidates) ? line.customer_candidates : [],
+    duplicate_of: null,
+    force: false
+  };
+}
+
+async function fetchDiarioExistingSales(date, { fresh = false } = {}) {
+  if (!date) return [];
+  if (!fresh && diarioListExistingCache.has(date)) return diarioListExistingCache.get(date);
+  const data = await DB.getDailySales(date);
+  const items = Array.isArray(data?.items) ? data.items : [];
+  diarioListExistingCache.set(date, items);
+  return items;
+}
+
+function recomputeDiarioSectionDuplicates(section) {
+  if (!section) return;
+  const dupes = DiarioListDedupe.findDuplicates(section.lines, section.existing || []);
+  section.lines.forEach((line, i) => {
+    line.duplicate_of = dupes[i];
+    if (line.duplicate_of == null) line.force = false;
+  });
+}
+
+async function loadDiarioSectionExisting(section, opts = {}) {
+  if (!section) return;
+  const date = section.date;
+  section.existingState = 'loading';
+  try {
+    const items = await fetchDiarioExistingSales(date, opts);
+    if (section.date !== date) return; // data mudou enquanto carregava
+    section.existing = items;
+    section.existingState = 'ok';
+  } catch (error) {
+    if (handleAuthError(error)) return;
+    section.existing = [];
+    section.existingState = 'error';
+  }
+  recomputeDiarioSectionDuplicates(section);
+}
+
+function openDiarioListReviewModal(result, file) {
+  if (diarioListReviewImageUrl) {
+    URL.revokeObjectURL(diarioListReviewImageUrl);
+    diarioListReviewImageUrl = null;
+  }
+  diarioListExistingCache = new Map();
+  const fallbackDate = ensureDailySalesSelectedDate();
+  const today = getLocalDateString();
+
+  const rawSections = Array.isArray(result?.sections) && result.sections.length
+    ? result.sections
+    : [{ date: null, date_text: '', date_status: 'missing', lines: result?.lines || [] }];
+
+  let lineIndex = 0;
+  diarioListReviewSections = rawSections
+    .map((sec, i) => {
+      const readDate = sec.date && sec.date <= today ? sec.date : null;
+      return {
+        key: `ls-${i}`,
+        date: readDate || fallbackDate,
+        date_text: sec.date_text || '',
+        date_status: readDate ? 'read' : 'missing',
+        lines: (sec.lines || []).map((l) => mapDiarioReviewLine(l, lineIndex++)),
+        existing: [],
+        existingState: 'idle'
+      };
+    })
+    .filter((sec) => sec.lines.length);
+
+  diarioListReviewStep = 0;
+  diarioListReviewMaxStep = 0;
 
   const previewWrap = document.getElementById('diario-list-review-preview-wrap');
   const previewImg = document.getElementById('diario-list-review-preview');
@@ -1891,14 +1976,21 @@ function openDiarioListReviewModal(lines, file) {
     previewWrap?.classList.add('hidden');
   }
 
-  renderDiarioListReviewLines();
+  renderDiarioListReview();
   document.getElementById('diario-list-review-modal')?.classList.add('active');
   refreshIcons();
+
+  // Verifica duplicados de todas as datas (para os status das etapas)
+  Promise.all(diarioListReviewSections.map((sec) => loadDiarioSectionExisting(sec)))
+    .then(() => renderDiarioListReview());
 }
 
 function closeDiarioListReviewModal() {
   document.getElementById('diario-list-review-modal')?.classList.remove('active');
-  diarioListReviewLines = [];
+  diarioListReviewSections = [];
+  diarioListReviewStep = 0;
+  diarioListReviewMaxStep = 0;
+  diarioListExistingCache = new Map();
   if (diarioListReviewImageUrl) {
     URL.revokeObjectURL(diarioListReviewImageUrl);
     diarioListReviewImageUrl = null;
@@ -1960,70 +2052,245 @@ function buildDiarioListCustomerOptionsHtml(line) {
   return opts.join('');
 }
 
+function renderDiarioListReviewSteps() {
+  const wrap = document.getElementById('diario-list-review-steps');
+  if (!wrap) return;
+  if (diarioListReviewSections.length <= 1) {
+    wrap.classList.add('hidden');
+    wrap.innerHTML = '';
+    return;
+  }
+  wrap.classList.remove('hidden');
+  wrap.innerHTML = diarioListReviewSections.map((sec, i) => {
+    const status = sec.existingState === 'ok' ? DiarioListDedupe.sectionStatus(sec.lines) : 'new';
+    const classes = ['diario-review-step'];
+    if (i === diarioListReviewStep) classes.push('is-current');
+    else if (i < diarioListReviewStep || i <= diarioListReviewMaxStep) classes.push('is-visited');
+    if (status === 'complete') classes.push('is-complete');
+    if (status === 'partial') classes.push('is-partial');
+    const sub = status === 'complete' ? 'Já registrado'
+      : status === 'partial' ? 'Parcial'
+        : `${sec.lines.length} ${sec.lines.length === 1 ? 'item' : 'itens'}`;
+    const clickable = i <= diarioListReviewMaxStep && i !== diarioListReviewStep;
+    return `
+      <button type="button" class="${classes.join(' ')}" data-review-step="${i}"
+        ${clickable ? '' : 'tabindex="-1"'} aria-current="${i === diarioListReviewStep ? 'step' : 'false'}">
+        <span class="diario-review-step-num">${i < diarioListReviewStep && status !== 'complete' ? '✓' : i + 1}</span>
+        <span class="diario-review-step-text">
+          <strong>${escapeHtml(fmtDiarioDdMm(sec.date))}</strong>
+          <small>${escapeHtml(sub)}</small>
+        </span>
+      </button>
+      ${i < diarioListReviewSections.length - 1 ? '<span class="diario-review-step-line" aria-hidden="true"></span>' : ''}`;
+  }).join('');
+}
+
+function renderDiarioListReviewDate(section) {
+  const input = document.getElementById('diario-list-review-date');
+  const info = document.getElementById('diario-list-review-date-info');
+  if (input) {
+    input.max = getLocalDateString();
+    if (input.value !== section.date) input.value = section.date || '';
+  }
+  if (info) {
+    if (section.date_status === 'read') {
+      info.innerHTML = `<i data-lucide="scan-text"></i> Lido na imagem: <strong>${escapeHtml(section.date_text || fmtDiarioDdMm(section.date))}</strong>`;
+      info.className = 'diario-review-date-info';
+    } else {
+      info.innerHTML = '<i data-lucide="alert-triangle"></i> Data não identificada na imagem — confira';
+      info.className = 'diario-review-date-info is-warning';
+    }
+  }
+}
+
+function renderDiarioListReviewAlert(section) {
+  const el = document.getElementById('diario-list-review-alert');
+  if (!el) return;
+  let html = '';
+  let cls = '';
+  if (section.existingState === 'loading' || section.existingState === 'idle') {
+    html = '<span class="diario-review-spinner"></span> Verificando lançamentos já registrados…';
+    cls = 'is-info';
+  } else if (section.existingState === 'error') {
+    html = '<i data-lucide="wifi-off"></i> Não foi possível verificar lançamentos existentes nesta data.';
+    cls = 'is-warning';
+  } else {
+    const status = DiarioListDedupe.sectionStatus(section.lines);
+    const dup = section.lines.filter((l) => l.duplicate_of != null).length;
+    if (status === 'complete') {
+      html = `<i data-lucide="check-circle-2"></i><span><strong>Dia ${escapeHtml(fmtDiarioDdMm(section.date))} já registrado.</strong> ${dup === 1 ? 'O item já existe' : `Todos os ${dup} itens já existem`} no Diário e não será${dup === 1 ? '' : 'ão'} lançado${dup === 1 ? '' : 's'} novamente.</span>`;
+      cls = 'is-complete';
+    } else if (status === 'partial') {
+      html = `<i data-lucide="alert-circle"></i><span><strong>Dia parcialmente registrado.</strong> ${dup} de ${section.lines.length} itens já existem e estão em cinza — não serão lançados.</span>`;
+      cls = 'is-warning';
+    }
+  }
+  el.innerHTML = html;
+  el.className = `diario-review-alert ${cls}${html ? '' : ' hidden'}`;
+}
+
+function renderDiarioListReviewFooter(section) {
+  const isLast = diarioListReviewStep >= diarioListReviewSections.length - 1;
+  const backBtn = document.getElementById('diario-list-review-back-btn');
+  const nextBtn = document.getElementById('diario-list-review-next-btn');
+  const confirmBtn = document.getElementById('diario-list-review-confirm-btn');
+  const hint = document.getElementById('diario-list-review-hint');
+
+  const toSave = diarioReviewLinesToSave(section);
+  const missingProducts = toSave.filter((l) => !l.product_id).length;
+  const loading = section.existingState === 'loading' || section.existingState === 'idle';
+  const stepBlocked = missingProducts > 0 || !section.date || loading;
+
+  backBtn?.classList.toggle('hidden', diarioListReviewStep === 0);
+  nextBtn?.classList.toggle('hidden', isLast);
+  confirmBtn?.classList.toggle('hidden', !isLast);
+  if (nextBtn) nextBtn.disabled = stepBlocked;
+
+  const totalToSave = diarioListReviewSections.reduce((n, sec) => n + diarioReviewLinesToSave(sec).length, 0);
+  if (confirmBtn) confirmBtn.disabled = stepBlocked;
+
+  if (hint) {
+    if (!section.date) hint.textContent = 'Informe a data destes lançamentos.';
+    else if (missingProducts) hint.textContent = `${missingProducts} linha(s) sem produto — selecione o produto para continuar.`;
+    else if (isLast && diarioListReviewSections.length > 1) {
+      const dates = diarioListReviewSections.filter((sec) => diarioReviewLinesToSave(sec).length).length;
+      hint.textContent = totalToSave
+        ? `Serão registrados ${totalToSave} item(ns) em ${dates} data(s).`
+        : 'Nenhum item novo para registrar.';
+    } else hint.textContent = '';
+    hint.classList.toggle('is-info', !missingProducts && Boolean(section.date));
+  }
+}
+
 function renderDiarioListReviewLines() {
   const container = document.getElementById('diario-list-review-lines');
-  const hint = document.getElementById('diario-list-review-hint');
-  const confirmBtn = document.getElementById('diario-list-review-confirm-btn');
+  const section = getDiarioReviewSection();
   if (!container) return;
 
-  if (!diarioListReviewLines.length) {
+  if (!section || !section.lines.length) {
     container.innerHTML = '<p class="daily-diario-list-empty">Nenhuma linha para revisar.</p>';
-    if (hint) hint.textContent = '';
-    if (confirmBtn) confirmBtn.disabled = true;
     return;
   }
 
-  container.innerHTML = diarioListReviewLines.map((line) => {
-    const invalid = !line.product_id;
+  container.innerHTML = section.lines.map((line) => {
+    const isDup = line.duplicate_of != null;
+    const locked = isDup && !line.force;
+    const invalid = !locked && !line.product_id;
+    const dis = locked ? ' disabled' : '';
+    const classes = ['diario-list-review-row'];
+    if (invalid) classes.push('diario-list-review-row--invalid');
+    if (locked) classes.push('diario-list-review-row--duplicate');
+    if (isDup && line.force) classes.push('diario-list-review-row--forced');
+    const dupBadge = isDup
+      ? (line.force
+        ? `<span class="diario-list-review-badge diario-list-review-badge--forced">Será registrado novamente</span>
+           <button type="button" class="diario-review-force-btn" data-review-force="0">Desfazer</button>`
+        : `<span class="diario-list-review-badge diario-list-review-badge--duplicate"><i data-lucide="check"></i> Já registrado</span>
+           <button type="button" class="diario-review-force-btn" data-review-force="1">Registrar mesmo assim</button>`)
+      : '';
     return `
-      <div class="diario-list-review-row${invalid ? ' diario-list-review-row--invalid' : ''}" data-review-key="${escapeHtml(line.key)}">
+      <div class="${classes.join(' ')}" data-review-key="${escapeHtml(line.key)}">
         <div class="form-group">
           <label>Qtd</label>
           <input type="number" min="1" step="1" inputmode="numeric" data-review-field="quantity"
-            value="${escapeHtml(String(line.quantity))}">
+            value="${escapeHtml(String(line.quantity))}"${dis}>
         </div>
         <div class="form-group">
           <label>Produto</label>
-          <select data-review-field="product_id">${buildDiarioListProductOptionsHtml(line)}</select>
+          <select data-review-field="product_id"${dis}>${buildDiarioListProductOptionsHtml(line)}</select>
         </div>
         <div class="form-group">
           <label>Cliente</label>
-          <select data-review-field="loyalty_customer_id">${buildDiarioListCustomerOptionsHtml(line)}</select>
+          <select data-review-field="loyalty_customer_id"${dis}>${buildDiarioListCustomerOptionsHtml(line)}</select>
         </div>
         <div class="form-group">
           <label>Valor (R$)</label>
           <input type="text" inputmode="decimal" data-review-field="unit_price"
-            value="${escapeHtml(formatDiarioMoneyMaskDisplay(line.unit_price))}">
+            value="${escapeHtml(formatDiarioMoneyMaskDisplay(line.unit_price))}"${dis}>
         </div>
         <button type="button" class="btn btn-outline btn-sm diario-list-review-remove" data-review-remove
           title="Remover linha" aria-label="Remover linha">
           <i data-lucide="trash-2"></i>
         </button>
         <div class="diario-list-review-meta">
-          <span class="diario-list-review-badge diario-list-review-badge--${escapeHtml(line.product_status)}">
+          ${dupBadge}
+          ${isDup ? '' : `<span class="diario-list-review-badge diario-list-review-badge--${escapeHtml(line.product_status)}">
             Produto: ${escapeHtml(diarioListStatusLabel(line.product_status))}
           </span>
           <span class="diario-list-review-badge diario-list-review-badge--${escapeHtml(line.customer_status)}">
             Cliente: ${escapeHtml(diarioListStatusLabel(line.customer_status))}
-          </span>
+          </span>`}
           ${line.product_text ? `<span>Lido: ${escapeHtml(line.product_text)}${line.customer_text ? ` · ${escapeHtml(line.customer_text)}` : ''}</span>` : ''}
         </div>
       </div>
     `;
   }).join('');
+}
 
-  const missingProducts = diarioListReviewLines.filter((l) => !l.product_id).length;
-  if (hint) {
-    hint.textContent = missingProducts
-      ? `${missingProducts} linha(s) sem produto — selecione o produto para habilitar o registro.`
-      : '';
+function renderDiarioListReview() {
+  const section = getDiarioReviewSection();
+  if (!section) {
+    renderDiarioListReviewLines();
+    return;
   }
-  if (confirmBtn) confirmBtn.disabled = missingProducts > 0 || diarioListReviewLines.length === 0;
+  renderDiarioListReviewSteps();
+  renderDiarioListReviewDate(section);
+  renderDiarioListReviewAlert(section);
+  renderDiarioListReviewLines();
+  renderDiarioListReviewFooter(section);
   refreshIcons();
 }
 
+function goToDiarioListReviewStep(index) {
+  if (index < 0 || index >= diarioListReviewSections.length) return;
+  diarioListReviewStep = index;
+  diarioListReviewMaxStep = Math.max(diarioListReviewMaxStep, index);
+  renderDiarioListReview();
+  document.querySelector('#diario-list-review-modal .diario-list-review-modal-content')
+    ?.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function nextDiarioListReviewStep() {
+  const section = getDiarioReviewSection();
+  if (!section) return;
+  if (diarioReviewLinesToSave(section).some((l) => !l.product_id)) {
+    showToast('Selecione o produto em todas as linhas desta data.', 'error');
+    return;
+  }
+  goToDiarioListReviewStep(diarioListReviewStep + 1);
+}
+
+function prevDiarioListReviewStep() {
+  goToDiarioListReviewStep(diarioListReviewStep - 1);
+}
+
+async function onDiarioListReviewDateChange(event) {
+  const section = getDiarioReviewSection();
+  if (!section) return;
+  const value = String(event.target.value || '').trim();
+  const today = getLocalDateString();
+  if (!value) {
+    section.date = '';
+    renderDiarioListReview();
+    return;
+  }
+  section.date = value > today ? today : value;
+  if (event.target.value !== section.date) event.target.value = section.date;
+  section.existingState = 'loading';
+  renderDiarioListReview(); // mostra "verificando…"
+  await loadDiarioSectionExisting(section);
+  if (getDiarioReviewSection() === section) renderDiarioListReview();
+  else renderDiarioListReviewSteps();
+}
+
 function findDiarioListReviewLine(key) {
-  return diarioListReviewLines.find((l) => l.key === key) || null;
+  const section = getDiarioReviewSection();
+  return section?.lines.find((l) => l.key === key) || null;
+}
+
+function refreshDiarioReviewAfterLineEdit() {
+  recomputeDiarioSectionDuplicates(getDiarioReviewSection());
+  renderDiarioListReview();
 }
 
 function onDiarioListReviewChange(event) {
@@ -2033,32 +2300,37 @@ function onDiarioListReviewChange(event) {
   if (!line) return;
   const field = event.target.getAttribute('data-review-field');
   if (!field) return;
+  const committed = event.type === 'change';
 
   if (field === 'quantity') {
     const qty = parseInt(String(event.target.value), 10);
     line.quantity = Number.isInteger(qty) && qty >= 1 ? qty : 1;
+    if (committed) refreshDiarioReviewAfterLineEdit();
     return;
   }
 
   if (field === 'unit_price') {
-    applyDiarioMoneyMask(event.target);
+    if (!committed) applyDiarioMoneyMask(event.target);
     const parsed = parseLooseDecimal(event.target.value, MONEY_DECIMALS);
     if (parsed != null && parsed >= 0) line.unit_price = parsed;
+    if (committed) refreshDiarioReviewAfterLineEdit();
     return;
   }
 
   if (field === 'product_id') {
+    if (!committed) return;
     const productId = String(event.target.value || '').trim();
     line.product_id = productId || null;
     const product = dailySalesProductsCache.find((p) => String(p.id) === String(productId));
     line.product_name = product?.name || null;
     line.product_status = productId ? 'matched' : (line.product_text ? 'missing' : 'empty');
     // Mantém o valor lido da imagem (pode incluir adicionais acima do preço base)
-    renderDiarioListReviewLines();
+    refreshDiarioReviewAfterLineEdit();
     return;
   }
 
   if (field === 'loyalty_customer_id') {
+    if (!committed) return;
     const raw = String(event.target.value || '').trim();
     if (!raw) {
       line.loyalty_customer_id = null;
@@ -2072,18 +2344,37 @@ function onDiarioListReviewChange(event) {
       line.customer_name = customer?.name || line.customer_name;
       line.customer_status = line.loyalty_customer_id != null ? 'matched' : 'missing';
     }
-    renderDiarioListReviewLines();
+    refreshDiarioReviewAfterLineEdit();
   }
 }
 
 function onDiarioListReviewClick(event) {
+  const forceBtn = event.target.closest('[data-review-force]');
+  if (forceBtn) {
+    const row = forceBtn.closest('[data-review-key]');
+    const line = row ? findDiarioListReviewLine(row.dataset.reviewKey) : null;
+    if (line) {
+      line.force = forceBtn.dataset.reviewForce === '1';
+      renderDiarioListReview();
+    }
+    return;
+  }
   const removeBtn = event.target.closest('[data-review-remove]');
   if (!removeBtn) return;
   const row = removeBtn.closest('[data-review-key]');
-  if (!row) return;
+  const section = getDiarioReviewSection();
+  if (!row || !section) return;
   const key = row.dataset.reviewKey;
-  diarioListReviewLines = diarioListReviewLines.filter((l) => l.key !== key);
-  renderDiarioListReviewLines();
+  section.lines = section.lines.filter((l) => l.key !== key);
+  refreshDiarioReviewAfterLineEdit();
+}
+
+function onDiarioListReviewStepClick(event) {
+  const btn = event.target.closest('[data-review-step]');
+  if (!btn) return;
+  const index = parseInt(btn.dataset.reviewStep, 10);
+  if (!Number.isInteger(index) || index > diarioListReviewMaxStep) return;
+  goToDiarioListReviewStep(index);
 }
 
 function groupDiarioListReviewByCustomer(lines) {
@@ -2101,23 +2392,12 @@ function groupDiarioListReviewByCustomer(lines) {
   return Array.from(groups.values());
 }
 
-async function confirmDiarioListReview() {
-  const confirmBtn = document.getElementById('diario-list-review-confirm-btn');
-  if (!diarioListReviewLines.length) {
-    showToast('Nenhuma linha para registrar.', 'error');
-    return;
-  }
-
+function prepareDiarioReviewItems(lines) {
   const prepared = [];
-  for (const line of diarioListReviewLines) {
-    if (!line.product_id) {
-      showToast('Selecione o produto em todas as linhas.', 'error');
-      return;
-    }
+  for (const line of lines) {
     const product = dailySalesProductsCache.find((p) => String(p.id) === String(line.product_id));
     if (!product) {
-      showToast(`Produto não encontrado no catálogo: ${line.product_name || line.product_id}`, 'error');
-      return;
+      throw new Error(`Produto não encontrado no catálogo: ${line.product_name || line.product_id || 'sem produto'}`);
     }
     const catalogPrice = getProductBasePrice(product);
     let unitPrice = Number(line.unit_price);
@@ -2129,36 +2409,79 @@ async function confirmDiarioListReview() {
       loyalty_customer_id: line.loyalty_customer_id != null ? Number(line.loyalty_customer_id) : null
     });
   }
+  return prepared;
+}
 
-  const groups = groupDiarioListReviewByCustomer(prepared);
-  const saleDate = ensureDailySalesSelectedDate();
+async function confirmDiarioListReview() {
+  const confirmBtn = document.getElementById('diario-list-review-confirm-btn');
+  const sections = diarioListReviewSections;
+  if (!sections.length) {
+    showToast('Nenhuma linha para registrar.', 'error');
+    return;
+  }
+
+  // Valida todas as datas (o usuário pode ter voltado e editado etapas anteriores)
+  for (let i = 0; i < sections.length; i++) {
+    const sec = sections[i];
+    if (!sec.date || diarioReviewLinesToSave(sec).some((l) => !l.product_id)) {
+      goToDiarioListReviewStep(i);
+      showToast(`Revise a data ${fmtDiarioDdMm(sec.date)}: falta data ou produto.`, 'error');
+      return;
+    }
+  }
 
   await withButtonLoading(confirmBtn, async () => {
+    // Revalida duplicados com dados atuais (alguém pode ter lançado enquanto revisava)
+    const before = sections.map((sec) => diarioReviewLinesToSave(sec).length);
+    await Promise.all(sections.map((sec) => loadDiarioSectionExisting(sec, { fresh: true })));
+    const changedIdx = sections.findIndex((sec, i) => diarioReviewLinesToSave(sec).length !== before[i]);
+    if (changedIdx >= 0) {
+      goToDiarioListReviewStep(changedIdx);
+      showToast('Encontramos novos lançamentos já registrados. Revise antes de salvar.', 'error');
+      return;
+    }
+
     let okCount = 0;
     let failCount = 0;
+    let skipped = 0;
+    const savedDates = new Set();
     const errors = [];
 
-    for (const group of groups) {
+    for (const sec of sections) {
+      const toSave = diarioReviewLinesToSave(sec);
+      skipped += sec.lines.length - toSave.length;
+      if (!toSave.length) continue;
+      let prepared;
       try {
-        const payload = {
-          sale_date: saleDate,
-          // Importação: valor da imagem pode incluir adicionais acima do preço de tabela
-          allow_over_list_price: true,
-          items: group.items.map((item) => ({
-            product_id: item.product_id,
-            quantity: item.quantity,
-            unit_price: item.unit_price
-          }))
-        };
-        if (group.loyalty_customer_id != null) {
-          payload.loyalty_customer_id = group.loyalty_customer_id;
-        }
-        await DB.addDailySalesBatch(payload);
-        okCount += group.items.length;
+        prepared = prepareDiarioReviewItems(toSave);
       } catch (error) {
-        failCount += group.items.length;
-        errors.push(error.message || 'Erro ao registrar grupo');
-        if (handleAuthError(error)) return;
+        failCount += toSave.length;
+        errors.push(error.message);
+        continue;
+      }
+      for (const group of groupDiarioListReviewByCustomer(prepared)) {
+        try {
+          const payload = {
+            sale_date: sec.date,
+            // Importação: valor da imagem pode incluir adicionais acima do preço de tabela
+            allow_over_list_price: true,
+            items: group.items.map((item) => ({
+              product_id: item.product_id,
+              quantity: item.quantity,
+              unit_price: item.unit_price
+            }))
+          };
+          if (group.loyalty_customer_id != null) {
+            payload.loyalty_customer_id = group.loyalty_customer_id;
+          }
+          await DB.addDailySalesBatch(payload);
+          okCount += group.items.length;
+          savedDates.add(sec.date);
+        } catch (error) {
+          if (handleAuthError(error)) return;
+          failCount += group.items.length;
+          errors.push(error.message || 'Erro ao registrar grupo');
+        }
       }
     }
 
@@ -2167,8 +2490,11 @@ async function confirmDiarioListReview() {
       AdminRouter.loadDashboardStats?.();
     }
 
+    const skippedMsg = skipped ? ` (${skipped} ignorado(s) por já existirem)` : '';
     if (failCount === 0) {
-      showToast(`${okCount} item(ns) registrados no diário.`, 'success');
+      showToast(okCount
+        ? `${okCount} item(ns) registrados em ${savedDates.size} data(s)${skippedMsg}.`
+        : 'Nada para registrar — todos os itens já existem no Diário.', okCount ? 'success' : 'info');
       closeDiarioListReviewModal();
       return;
     }
@@ -2194,6 +2520,10 @@ function bindDiarioListImportEvents() {
   lines?.addEventListener('input', onDiarioListReviewChange);
   lines?.addEventListener('change', onDiarioListReviewChange);
   lines?.addEventListener('click', onDiarioListReviewClick);
+  document.getElementById('diario-list-review-steps')
+    ?.addEventListener('click', onDiarioListReviewStepClick);
+  document.getElementById('diario-list-review-date')
+    ?.addEventListener('change', onDiarioListReviewDateChange);
 }
 
 function bindDailySalesEvents() {

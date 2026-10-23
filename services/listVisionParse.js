@@ -1,6 +1,9 @@
 const { noopLog } = require('./ocrLog');
 
-const DEFAULT_MODEL = 'gemini-2.0-flash';
+// Modelos atuais (out/2026): a família 2.x foi desligada ou restrita a projetos antigos.
+const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
+// Tentados em ordem se o modelo principal estiver indisponível (aposentado/restrito)
+const DEFAULT_FALLBACK_MODELS = ['gemini-3.8-flash'];
 
 const EXTRACTION_PROMPT = `Você analisa a foto de uma lista manuscrita de vendas (português do Brasil).
 A lista tem colunas tipicamente: quantidade, produto, nome (cliente) e valor (R$).
@@ -109,7 +112,22 @@ class ListVisionError extends Error {
 function getGeminiConfig() {
   const apiKey = String(process.env.GEMINI_API_KEY || '').trim();
   const model = String(process.env.GEMINI_MODEL || '').trim() || DEFAULT_MODEL;
-  return { apiKey, model };
+  const rawFallback = String(process.env.GEMINI_FALLBACK_MODELS || '').trim();
+  const fallbacks = rawFallback.toLowerCase() === 'none'
+    ? []
+    : (rawFallback ? rawFallback.split(',').map((m) => m.trim()).filter(Boolean) : DEFAULT_FALLBACK_MODELS);
+  const models = [model, ...fallbacks].filter((m, i, arr) => arr.indexOf(m) === i);
+  return { apiKey, model, models };
+}
+
+// Modelos que responderam "indisponível" neste processo — pulados nas próximas chamadas
+const unavailableModels = new Set();
+
+function isModelUnavailableError(status, data) {
+  const msg = String(data?.error?.message || '');
+  if (status === 404) return true;
+  if (![400, 403].includes(status)) return false;
+  return /no longer available|not found|is not supported|deprecated|not available to new users|update your code to use/i.test(msg);
 }
 
 function isGeminiConfigured() {
@@ -207,57 +225,86 @@ function normalizeExtractedSections(payload, { today = todayYmdBrazil() } = {}) 
 }
 
 /**
- * Chama o Gemini com log de requisição/resposta. Devolve { data, textPart }.
+ * Chama o Gemini com log de requisição/resposta. Devolve { data, textPart, model }.
+ * Se o modelo estiver indisponível (aposentado ou restrito ao projeto), tenta o próximo da lista.
  * Lança ListVisionError com mensagem amigável em falhas.
  */
-async function callGeminiVision({ url, body, model, mime, bytes, log = noopLog }) {
-  log.info('gemini.request', { model, mime, bytes });
-  const t0 = Date.now();
-  let response;
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-  } catch (err) {
-    log.error('gemini.network_error', err, { model, gemMs: Date.now() - t0 });
-    throw new ListVisionError('Falha ao conectar ao serviço de visão.', 502);
+async function callGeminiVision({ apiKey, models, body, mime, bytes, log = noopLog }) {
+  const list = (Array.isArray(models) ? models : [models]).filter(Boolean);
+  const candidates = list.filter((m) => !unavailableModels.has(m));
+  if (!candidates.length) candidates.push(list[list.length - 1]);
+  if (candidates.length < list.length) {
+    log.info('gemini.skip_unavailable', { skipped: list.filter((m) => !candidates.includes(m)) });
   }
 
-  const data = await response.json().catch(() => ({}));
-  const candidate = data?.candidates?.[0];
-  const textPart = candidate?.content?.parts?.find((p) => p.text)?.text;
-  const info = {
-    model,
-    status: response.status,
-    gemMs: Date.now() - t0,
-    finishReason: candidate?.finishReason,
-    blockReason: data?.promptFeedback?.blockReason,
-    usage: data?.usageMetadata,
-    textChars: textPart ? textPart.length : 0
-  };
+  let lastUnavailable = null;
+  for (let attempt = 0; attempt < candidates.length; attempt++) {
+    const model = candidates[attempt];
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    log.info('gemini.request', { model, attempt: attempt + 1, mime, bytes });
+    const t0 = Date.now();
+    let response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+    } catch (err) {
+      log.error('gemini.network_error', err, { model, gemMs: Date.now() - t0 });
+      throw new ListVisionError('Falha ao conectar ao serviço de visão.', 502);
+    }
 
-  if (!response.ok) {
-    const apiMsg = data?.error?.message || data?.error?.status || `HTTP ${response.status}`;
-    log.error('gemini.failed', null, { ...info, apiStatus: data?.error?.status, apiMessage: String(apiMsg).slice(0, 500) });
-    throw new ListVisionError(
-      response.status === 429
-        ? 'Limite do serviço de visão atingido. Tente novamente em instantes.'
-        : `Falha ao analisar a imagem: ${apiMsg}`,
-      response.status === 401 || response.status === 403 ? 503 : 502
-    );
-  }
+    const data = await response.json().catch(() => ({}));
+    const candidate = data?.candidates?.[0];
+    const textPart = candidate?.content?.parts?.find((p) => p.text)?.text;
+    const info = {
+      model,
+      status: response.status,
+      gemMs: Date.now() - t0,
+      finishReason: candidate?.finishReason,
+      blockReason: data?.promptFeedback?.blockReason,
+      usage: data?.usageMetadata,
+      textChars: textPart ? textPart.length : 0
+    };
 
-  log.info('gemini.response', info);
-  if (!textPart) {
-    log.warn('gemini.empty_text', { finishReason: info.finishReason, blockReason: info.blockReason });
+    if (!response.ok) {
+      const apiMsg = data?.error?.message || data?.error?.status || `HTTP ${response.status}`;
+      const failInfo = { ...info, apiStatus: data?.error?.status, apiMessage: String(apiMsg).slice(0, 500) };
+
+      if (isModelUnavailableError(response.status, data)) {
+        unavailableModels.add(model);
+        lastUnavailable = { model, apiMsg };
+        const next = candidates[attempt + 1];
+        log.warn('gemini.model_unavailable', { ...failInfo, nextModel: next || null });
+        if (next) continue;
+        throw new ListVisionError(
+          `O modelo do Gemini "${model}" não está disponível para esta chave. `
+          + `Configure GEMINI_MODEL com um modelo atual (ex.: ${DEFAULT_MODEL}).`,
+          503
+        );
+      }
+
+      log.error('gemini.failed', null, failInfo);
+      throw new ListVisionError(
+        response.status === 429
+          ? 'Limite do serviço de visão atingido. Tente novamente em instantes.'
+          : `Falha ao analisar a imagem: ${apiMsg}`,
+        response.status === 401 || response.status === 403 ? 503 : 502
+      );
+    }
+
+    log.info('gemini.response', { ...info, fallbackFrom: lastUnavailable ? lastUnavailable.model : undefined });
+    if (!textPart) {
+      log.warn('gemini.empty_text', { finishReason: info.finishReason, blockReason: info.blockReason });
+    }
+    return { data, textPart, model };
   }
-  return { data, textPart };
+  throw new ListVisionError('Nenhum modelo do Gemini configurado.', 503);
 }
 
 async function extractListFromImage({ buffer, mimeType, today, log = noopLog }) {
-  const { apiKey, model } = getGeminiConfig();
+  const { apiKey, models } = getGeminiConfig();
   if (!apiKey) {
     throw new ListVisionError(
       'GEMINI_API_KEY não configurada. Defina a chave no .env para importar listas.',
@@ -272,7 +319,6 @@ async function extractListFromImage({ buffer, mimeType, today, log = noopLog }) 
     throw new ListVisionError('Envie uma imagem válida (JPG, PNG, WebP, HEIC ou RAW).', 400);
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const body = {
     contents: [
       {
@@ -294,7 +340,7 @@ async function extractListFromImage({ buffer, mimeType, today, log = noopLog }) 
     }
   };
 
-  const { data, textPart } = await callGeminiVision({ url, body, model, mime, bytes: buffer.length, log });
+  const { data, textPart, model } = await callGeminiVision({ apiKey, models, body, mime, bytes: buffer.length, log });
   const jsonText = extractJsonText(textPart);
   if (!jsonText) {
     log.warn('vision.invalid_json', { snippet: String(textPart || '').slice(0, 300) });
@@ -333,6 +379,8 @@ module.exports = {
   extractListFromImage,
   isGeminiConfigured,
   getGeminiConfig,
+  isModelUnavailableError,
+  DEFAULT_MODEL,
   parseMoneyValue,
   parseQuantity,
   normalizeExtractedLines,

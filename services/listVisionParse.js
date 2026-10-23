@@ -1,3 +1,5 @@
+const { noopLog } = require('./ocrLog');
+
 const DEFAULT_MODEL = 'gemini-2.0-flash';
 
 const EXTRACTION_PROMPT = `Você analisa a foto de uma lista manuscrita de vendas (português do Brasil).
@@ -204,7 +206,57 @@ function normalizeExtractedSections(payload, { today = todayYmdBrazil() } = {}) 
   return Array.from(byKey.values());
 }
 
-async function extractListFromImage({ buffer, mimeType, today }) {
+/**
+ * Chama o Gemini com log de requisição/resposta. Devolve { data, textPart }.
+ * Lança ListVisionError com mensagem amigável em falhas.
+ */
+async function callGeminiVision({ url, body, model, mime, bytes, log = noopLog }) {
+  log.info('gemini.request', { model, mime, bytes });
+  const t0 = Date.now();
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+  } catch (err) {
+    log.error('gemini.network_error', err, { model, gemMs: Date.now() - t0 });
+    throw new ListVisionError('Falha ao conectar ao serviço de visão.', 502);
+  }
+
+  const data = await response.json().catch(() => ({}));
+  const candidate = data?.candidates?.[0];
+  const textPart = candidate?.content?.parts?.find((p) => p.text)?.text;
+  const info = {
+    model,
+    status: response.status,
+    gemMs: Date.now() - t0,
+    finishReason: candidate?.finishReason,
+    blockReason: data?.promptFeedback?.blockReason,
+    usage: data?.usageMetadata,
+    textChars: textPart ? textPart.length : 0
+  };
+
+  if (!response.ok) {
+    const apiMsg = data?.error?.message || data?.error?.status || `HTTP ${response.status}`;
+    log.error('gemini.failed', null, { ...info, apiStatus: data?.error?.status, apiMessage: String(apiMsg).slice(0, 500) });
+    throw new ListVisionError(
+      response.status === 429
+        ? 'Limite do serviço de visão atingido. Tente novamente em instantes.'
+        : `Falha ao analisar a imagem: ${apiMsg}`,
+      response.status === 401 || response.status === 403 ? 503 : 502
+    );
+  }
+
+  log.info('gemini.response', info);
+  if (!textPart) {
+    log.warn('gemini.empty_text', { finishReason: info.finishReason, blockReason: info.blockReason });
+  }
+  return { data, textPart };
+}
+
+async function extractListFromImage({ buffer, mimeType, today, log = noopLog }) {
   const { apiKey, model } = getGeminiConfig();
   if (!apiKey) {
     throw new ListVisionError(
@@ -217,7 +269,7 @@ async function extractListFromImage({ buffer, mimeType, today }) {
   }
   const mime = String(mimeType || '').toLowerCase();
   if (!mime.startsWith('image/')) {
-    throw new ListVisionError('Envie uma imagem válida (JPG, PNG, WebP ou GIF).', 400);
+    throw new ListVisionError('Envie uma imagem válida (JPG, PNG, WebP, HEIC ou RAW).', 400);
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
@@ -242,50 +294,38 @@ async function extractListFromImage({ buffer, mimeType, today }) {
     }
   };
 
-  let response;
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-  } catch (err) {
-    console.error('Erro de rede ao chamar Gemini:', err);
-    throw new ListVisionError('Falha ao conectar ao serviço de visão.', 502);
-  }
-
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const apiMsg = data?.error?.message || data?.error?.status || `HTTP ${response.status}`;
-    console.error('Erro Gemini Vision:', apiMsg);
-    throw new ListVisionError(
-      response.status === 429
-        ? 'Limite do serviço de visão atingido. Tente novamente em instantes.'
-        : `Falha ao analisar a imagem: ${apiMsg}`,
-      response.status === 401 || response.status === 403 ? 503 : 502
-    );
-  }
-
-  const textPart = data?.candidates?.[0]?.content?.parts?.find((p) => p.text)?.text;
+  const { data, textPart } = await callGeminiVision({ url, body, model, mime, bytes: buffer.length, log });
   const jsonText = extractJsonText(textPart);
   if (!jsonText) {
+    log.warn('vision.invalid_json', { snippet: String(textPart || '').slice(0, 300) });
     throw new ListVisionError('A visão não retornou um JSON válido. Tente outra foto.', 422);
   }
 
   let parsed;
   try {
     parsed = JSON.parse(jsonText);
-  } catch {
+  } catch (err) {
+    log.warn('vision.invalid_json', { snippet: jsonText.slice(0, 300), parseError: err.message });
     throw new ListVisionError('Não foi possível interpretar o resultado da visão.', 422);
   }
 
+  const rawSections = Array.isArray(parsed?.sections) ? parsed.sections : null;
   const sections = normalizeExtractedSections(parsed, { today: today || todayYmdBrazil() });
   const lines = sections.flatMap((section) => section.lines);
+  log.info('vision.parsed', {
+    format: rawSections ? 'sections' : 'lines',
+    rawSections: rawSections ? rawSections.map((sec) => ({
+      date_text: sec?.date_text, day: sec?.day, month: sec?.month, year: sec?.year,
+      lines: Array.isArray(sec?.lines) ? sec.lines.length : 0
+    })) : undefined,
+    sections: sections.map((sec) => ({ date: sec.date, date_text: sec.date_text, lines: sec.lines.length })),
+    totalLines: lines.length
+  });
   if (lines.length === 0) {
     throw new ListVisionError('Nenhuma linha de item encontrada na imagem.', 422);
   }
 
-  return { sections, lines, model };
+  return { sections, lines, model, usage: data?.usageMetadata };
 }
 
 module.exports = {
@@ -297,6 +337,7 @@ module.exports = {
   parseQuantity,
   normalizeExtractedLines,
   normalizeExtractedSections,
+  callGeminiVision,
   resolveListDate,
   parseDateText,
   extractJsonText

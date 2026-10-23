@@ -1848,13 +1848,14 @@ async function processDiarioListFile(file) {
       if (!dailySalesProductsCache.length) {
         await fetchDailySalesCatalog();
       }
-      const result = await DB.parseDailySalesList(file);
+      const prepared = await OcrImagePrep.prepare(file);
+      const result = await DB.parseDailySalesList(prepared.file, prepared.meta);
       const lines = Array.isArray(result?.lines) ? result.lines : [];
       if (!lines.length) {
         showToast('Nenhuma linha encontrada na imagem.', 'error');
         return;
       }
-      openDiarioListReviewModal(result, file);
+      openDiarioListReviewModal(result, prepared.meta.action === 'converted' ? prepared.file : file);
     } catch (error) {
       if (handleAuthError(error)) return;
       showToast(error.message || 'Erro ao analisar a lista.', 'error');

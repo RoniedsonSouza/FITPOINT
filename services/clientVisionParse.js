@@ -1,4 +1,5 @@
-const { ListVisionError, getGeminiConfig, extractJsonText } = require('./listVisionParse');
+const { ListVisionError, getGeminiConfig, extractJsonText, callGeminiVision } = require('./listVisionParse');
+const { noopLog } = require('./ocrLog');
 
 const CLIENT_PROMPT = `Você analisa a foto de uma ficha/formulário de cadastro de cliente (português do Brasil),
 geralmente manuscrita, no formato "rótulo: valor", por exemplo:
@@ -53,7 +54,7 @@ function normalizeDate(raw) {
   return Number.isNaN(dt.getTime()) ? '' : out;
 }
 
-async function extractClientFromImage({ buffer, mimeType }) {
+async function extractClientFromImage({ buffer, mimeType, log = noopLog }) {
   const { apiKey, model } = getGeminiConfig();
   if (!apiKey) {
     throw new ListVisionError('GEMINI_API_KEY não configurada. Defina a chave no .env.', 503);
@@ -63,49 +64,27 @@ async function extractClientFromImage({ buffer, mimeType }) {
   }
   const mime = String(mimeType || '').toLowerCase();
   if (!mime.startsWith('image/')) {
-    throw new ListVisionError('Envie uma imagem válida (JPG, PNG, WebP ou GIF).', 400);
+    throw new ListVisionError('Envie uma imagem válida (JPG, PNG, WebP, HEIC ou RAW).', 400);
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-  let response;
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          role: 'user',
-          parts: [
-            { text: CLIENT_PROMPT },
-            { inline_data: { mime_type: mime, data: buffer.toString('base64') } }
-          ]
-        }],
-        generationConfig: { temperature: 0.1, responseMimeType: 'application/json' }
-      })
-    });
-  } catch (err) {
-    console.error('Erro de rede ao chamar Gemini:', err);
-    throw new ListVisionError('Falha ao conectar ao serviço de visão.', 502);
-  }
-
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const apiMsg = data?.error?.message || data?.error?.status || `HTTP ${response.status}`;
-    console.error('Erro Gemini Vision (cliente):', apiMsg);
-    throw new ListVisionError(
-      response.status === 429
-        ? 'Limite do serviço de visão atingido. Tente novamente em instantes.'
-        : `Falha ao analisar a imagem: ${apiMsg}`,
-      response.status === 401 || response.status === 403 ? 503 : 502
-    );
-  }
-
-  const textPart = data?.candidates?.[0]?.content?.parts?.find((p) => p.text)?.text;
+  const body = {
+    contents: [{
+      role: 'user',
+      parts: [
+        { text: CLIENT_PROMPT },
+        { inline_data: { mime_type: mime, data: buffer.toString('base64') } }
+      ]
+    }],
+    generationConfig: { temperature: 0.1, responseMimeType: 'application/json' }
+  };
+  const { textPart } = await callGeminiVision({ url, body, model, mime, bytes: buffer.length, log });
   const jsonText = extractJsonText(textPart);
   let parsed;
   try {
     parsed = JSON.parse(jsonText);
-  } catch {
+  } catch (err) {
+    log.warn('vision.invalid_json', { snippet: String(textPart || '').slice(0, 300), parseError: err.message });
     throw new ListVisionError('Não foi possível interpretar a ficha. Tente outra foto.', 422);
   }
   const src = Array.isArray(parsed) ? parsed[0] || {} : parsed || {};
@@ -116,6 +95,12 @@ async function extractClientFromImage({ buffer, mimeType }) {
     instagram: normalizeInstagram(src.instagram),
     date: normalizeDate(src.date ?? src.data)
   };
+  log.info('vision.parsed', {
+    hasName: Boolean(client.name),
+    phoneDigits: client.phone.length,
+    hasInstagram: Boolean(client.instagram),
+    date: client.date || null
+  });
   if (!client.name && !client.phone && !client.instagram) {
     throw new ListVisionError('Nenhum dado de cliente encontrado na imagem.', 422);
   }

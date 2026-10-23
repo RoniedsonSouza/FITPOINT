@@ -586,8 +586,9 @@ const DB = {
   },
 
   /** Analisa foto de lista manuscrita (Vision); não registra vendas. */
-  async parseClientImage(file) {
+  async parseClientImage(file, clientMeta) {
     const formData = new FormData();
+    if (clientMeta) formData.append('client_meta', JSON.stringify(clientMeta));
     formData.append('image', file);
     const response = await fetch(`${getApiBaseUrl()}/loyalty/customers/parse-image`, {
       method: 'POST',
@@ -603,8 +604,9 @@ const DB = {
     return response.json();
   },
 
-  async parseDailySalesList(file) {
+  async parseDailySalesList(file, clientMeta) {
     const formData = new FormData();
+    if (clientMeta) formData.append('client_meta', JSON.stringify(clientMeta));
     formData.append('image', file);
     const response = await fetch(`${getApiBaseUrl()}/daily-sales/parse-list`, {
       method: 'POST',

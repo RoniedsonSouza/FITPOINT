@@ -28,7 +28,7 @@ const {
   participantOrderSql,
   computeTotalPages
 } = require('./loyaltyHelpers');
-const { createImageUploadMiddleware, memoryImageUpload } = require('../middleware/imageUpload');
+const { createImageUploadMiddleware, ocrImageUpload } = require('../middleware/imageUpload');
 const { ListVisionError } = require('../services/listVisionParse');
 const { extractClientFromImage, normalizeInstagram, normalizeDate } = require('../services/clientVisionParse');
 const {
@@ -473,10 +473,11 @@ router.get('/customers/:id', authenticateToken, requirePermission('fidelidade'),
 
 // POST /api/loyalty/customers — admin (fidelidade ou cadastro rápido no diário)
 // POST /api/loyalty/customers/parse-image — lê ficha (Nome/Telefone/Instagram/Data) via visão; não grava
-router.post('/customers/parse-image', authenticateToken, requireAnyPermission('fidelidade', 'vendas'), memoryImageUpload, async (req, res) => {
+router.post('/customers/parse-image', authenticateToken, requireAnyPermission('fidelidade', 'vendas'), ocrImageUpload('cliente'), async (req, res) => {
+  const log = req.ocrLog;
   try {
     if (!req.file) return res.status(400).json({ error: 'Envie uma imagem.' });
-    const { client, model } = await extractClientFromImage({ buffer: req.file.buffer, mimeType: req.file.mimetype });
+    const { client, model } = await extractClientFromImage({ buffer: req.file.buffer, mimeType: req.file.mimetype, log });
     let existing = null;
     const phone = normalizePhone(client.phone);
     if (phone && phone.length >= 10) {
@@ -487,11 +488,13 @@ router.post('/customers/parse-image', authenticateToken, requireAnyPermission('f
       existing = found.rows[0] || null;
     }
     res.json({ client, existing, model });
+    log.info('request.done', { status: 200, existingCustomer: Boolean(existing) });
   } catch (error) {
     if (error instanceof ListVisionError) {
+      log.warn('request.failed', { status: error.statusCode || 500, message: error.message });
       return res.status(error.statusCode || 500).json({ error: error.message });
     }
-    console.error('Erro ao analisar ficha de cliente:', error);
+    log.error('request.error', error);
     res.status(500).json({ error: 'Erro ao analisar a ficha' });
   }
 });

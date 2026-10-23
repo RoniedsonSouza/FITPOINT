@@ -80,7 +80,8 @@ async function processClientImageFile(file) {
   if (!file) return;
   await withButtonLoading(document.getElementById('clients-import-camera-btn'), async () => {
     try {
-      const { client = {}, existing = null } = await DB.parseClientImage(file);
+      const prepared = await OcrImagePrep.prepare(file);
+      const { client = {}, existing = null } = await DB.parseClientImage(prepared.file, prepared.meta);
       if (existing) {
         await openClientsModal(existing.id);
         if (client.instagram && !existing.instagram) {
@@ -94,7 +95,7 @@ async function processClientImageFile(file) {
         document.getElementById('clients-instagram').value = client.instagram ? '@' + client.instagram : '';
         document.getElementById('clients-registered-at').value = client.date || todayYmdLocal();
       }
-      clientsImportPreviewUrl = URL.createObjectURL(file);
+      clientsImportPreviewUrl = URL.createObjectURL(prepared.meta.action === 'converted' ? prepared.file : file);
       document.getElementById('clients-import-preview').src = clientsImportPreviewUrl;
       document.getElementById('clients-import-msg').textContent = existing
         ? `Telefone já cadastrado para "${existing.name}". Revise e salve para atualizar.`

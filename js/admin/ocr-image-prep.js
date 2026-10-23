@@ -1,14 +1,14 @@
 // Prepara a foto antes de enviar para análise (OCR).
-// - Reduz fotos grandes para no máx. 2560 px no lado maior e converte para JPEG
+// - Reduz fotos grandes para no máx. 1600 px no lado maior e converte para JPEG
 //   (HEIC do iPhone, PNG gigante etc.) — envio mais rápido e dentro do limite do Gemini
 // - Se o navegador não conseguir abrir o arquivo (ex.: RAW/DNG), envia o original:
 //   o servidor extrai o JPEG de prévia embutido
 // Uso: const { file, meta } = await OcrImagePrep.prepare(original)
 
 const OcrImagePrep = (() => {
-  const MAX_SIDE = 2560;
+  const MAX_SIDE = 1600;
   const JPEG_QUALITY = 0.85;
-  const PASS_THROUGH_MAX_BYTES = 2.5 * 1024 * 1024;
+  const PASS_THROUGH_MAX_BYTES = 1.5 * 1024 * 1024;
   const PASS_THROUGH_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
   const DECODE_TIMEOUT_MS = 20000;
 

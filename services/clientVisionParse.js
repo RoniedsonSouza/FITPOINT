@@ -75,7 +75,21 @@ async function extractClientFromImage({ buffer, mimeType, log = noopLog }) {
         { inline_data: { mime_type: mime, data: buffer.toString('base64') } }
       ]
     }],
-    generationConfig: { temperature: 0.1, responseMimeType: 'application/json' }
+    generationConfig: {
+      temperature: 0.1,
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'OBJECT',
+        properties: {
+          name: { type: 'STRING' },
+          phone: { type: 'STRING' },
+          instagram: { type: 'STRING' },
+          date: { type: 'STRING' }
+        },
+        required: ['name', 'phone', 'instagram', 'date']
+      },
+      maxOutputTokens: 512
+    }
   };
   const { textPart, model } = await callGeminiVision({ apiKey, models, body, mime, bytes: buffer.length, log });
   const jsonText = extractJsonText(textPart);

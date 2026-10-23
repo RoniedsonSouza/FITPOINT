@@ -580,7 +580,8 @@ router.post(
   async (req, res) => {
     const log = req.ocrLog;
     try {
-      const [productsResult, customersResult] = await Promise.all([
+      // Catálogo e Gemini em paralelo
+      const catalogPromise = Promise.all([
         query(
           `SELECT id, name, price, promo_price, active
            FROM ${table('products')}
@@ -596,7 +597,7 @@ router.post(
         )
       ]);
 
-      log.info('catalog.loaded', { products: productsResult.rows.length, customers: customersResult.rows.length });
+      catalogPromise.catch(() => {}); // evita rejeição não tratada se o Gemini falhar antes
 
       const extracted = await extractListFromImage({
         buffer: req.file.buffer,
@@ -604,6 +605,9 @@ router.post(
         today: todayYmdBrazil(),
         log
       });
+
+      const [productsResult, customersResult] = await catalogPromise;
+      log.info('catalog.loaded', { products: productsResult.rows.length, customers: customersResult.rows.length });
 
       const catalog = {
         products: productsResult.rows,

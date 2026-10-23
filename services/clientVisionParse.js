@@ -55,7 +55,7 @@ function normalizeDate(raw) {
 }
 
 async function extractClientFromImage({ buffer, mimeType, log = noopLog }) {
-  const { apiKey, model } = getGeminiConfig();
+  const { apiKey, models } = getGeminiConfig();
   if (!apiKey) {
     throw new ListVisionError('GEMINI_API_KEY não configurada. Defina a chave no .env.', 503);
   }
@@ -67,7 +67,6 @@ async function extractClientFromImage({ buffer, mimeType, log = noopLog }) {
     throw new ListVisionError('Envie uma imagem válida (JPG, PNG, WebP, HEIC ou RAW).', 400);
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const body = {
     contents: [{
       role: 'user',
@@ -78,7 +77,7 @@ async function extractClientFromImage({ buffer, mimeType, log = noopLog }) {
     }],
     generationConfig: { temperature: 0.1, responseMimeType: 'application/json' }
   };
-  const { textPart } = await callGeminiVision({ url, body, model, mime, bytes: buffer.length, log });
+  const { textPart, model } = await callGeminiVision({ apiKey, models, body, mime, bytes: buffer.length, log });
   const jsonText = extractJsonText(textPart);
   let parsed;
   try {

@@ -14,6 +14,8 @@ e, para seguir uma análise do início ao fim, pelo valor de `"req"`.
 | `image.normalized` | formato real detectado (`jpeg`, `heic`, `dng`…), se converteu, dimensões da prévia RAW |
 | `image.rejected` | formato não suportado + primeiros bytes do arquivo (`firstBytes`) |
 | `gemini.request` / `gemini.response` | modelo, bytes, tempo (`gemMs`), `finishReason`, tokens |
+| `gemini.model_unavailable` | modelo aposentado/restrito para a chave; mostra o próximo modelo tentado (`nextModel`) |
+| `gemini.skip_unavailable` | modelos pulados por já terem falhado neste processo |
 | `gemini.failed` / `gemini.network_error` | erro da API do Gemini (status e mensagem) |
 | `vision.invalid_json` | resposta do Gemini que não virou JSON (trecho em `snippet`) |
 | `vision.parsed` | datas e quantidade de linhas lidas por seção |
@@ -33,3 +35,10 @@ e, para seguir uma análise do início ao fim, pelo valor de `"req"`.
 
 JPG, PNG, WebP, GIF, HEIC/HEIF e RAW baseado em TIFF (DNG do iPhone ProRAW). Do RAW é usado o
 JPEG de prévia embutido no arquivo. Limite de upload: 100 MB.
+
+## Modelo do Gemini
+
+- `GEMINI_MODEL` (padrão `gemini-3.5-flash-lite`).
+- `GEMINI_FALLBACK_MODELS`: reservas separadas por vírgula (padrão `gemini-3.8-flash`; `none` desativa).
+- Os modelos 2.x foram desligados ou restritos pelo Google a projetos que já os usavam. Se o principal
+  responder "no longer available", o servidor tenta o próximo e registra `gemini.model_unavailable`.

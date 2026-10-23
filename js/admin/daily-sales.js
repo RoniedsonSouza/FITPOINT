@@ -1824,17 +1824,21 @@ function diarioListStatusLabel(status) {
   }
 }
 
-function triggerDiarioListImport(source) {
-  const input = document.getElementById(
-    source === 'gallery' ? 'daily-diario-list-gallery-file' : 'daily-diario-list-file'
-  );
-  if (!input) return;
-  input.value = '';
-  input.click();
+function triggerDiarioListImport() {
+  PhotoCapture.open({
+    title: 'Fotografar lista',
+    onFile: processDiarioListFile,
+    galleryInputId: 'daily-diario-list-gallery-file',
+    fallbackInputId: 'daily-diario-list-file'
+  });
 }
 
-async function onDiarioListFileChange(event) {
+function onDiarioListFileChange(event) {
   const file = event.target?.files?.[0];
+  if (file) processDiarioListFile(file);
+}
+
+async function processDiarioListFile(file) {
   if (!file) return;
   const btn = document.getElementById('daily-diario-import-list-btn');
   await withButtonLoading(btn, async () => {

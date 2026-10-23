@@ -3821,3 +3821,21 @@ body.ticket-qr-open {
     font-size: 1.5rem;
   }
 }
+/* Diário: sem zoom automático no celular.
+   iOS dá zoom ao focar campos com fonte < 16px — força 16px em todos os campos do Diário
+   e dos seus modais em telas de toque; touch-action evita zoom por toque duplo. */
+#view-daily-diario,
+[id^="diario-"][id$="-modal"] {
+  touch-action: manipulation;
+}
+
+@media (hover: none) and (pointer: coarse), (max-width: 768px) {
+  #view-daily-diario input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]),
+  #view-daily-diario select,
+  #view-daily-diario textarea,
+  [id^="diario-"][id$="-modal"] input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]),
+  [id^="diario-"][id$="-modal"] select,
+  [id^="diario-"][id$="-modal"] textarea {
+    font-size: 16px !important;
+  }
+}

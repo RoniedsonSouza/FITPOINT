@@ -6,42 +6,18 @@ const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
 const DEFAULT_FALLBACK_MODELS = ['gemini-3.8-flash'];
 
 const EXTRACTION_PROMPT = `Você analisa a foto de uma lista manuscrita de vendas (português do Brasil).
-A lista tem colunas tipicamente: quantidade, produto, nome (cliente) e valor (R$).
-Geralmente há uma data (dia/mês, ex.: "21/10", "Seg 21/10", "21 de outubro") escrita ACIMA de um bloco de itens.
-Uma mesma foto pode ter mais de uma data, cada uma seguida dos seus itens.
+Colunas típicas: quantidade, produto, nome do cliente e valor (R$).
+Geralmente há uma data (ex.: "21/10", "Seg 21/10", "21 de outubro") ACIMA de um bloco de itens;
+a foto pode ter mais de uma data, cada uma seguida dos seus itens.
 
-Extraia TODAS as linhas de itens, agrupadas pela data escrita acima delas.
-Responda APENAS com JSON válido neste formato:
-{
-  "sections": [
-    {
-      "date_text": "21/10",
-      "day": 21,
-      "month": 10,
-      "year": null,
-      "lines": [
-        {
-          "quantity": 1,
-          "product": "nome do produto",
-          "customer_name": "nome do cliente",
-          "value": 18.5
-        }
-      ]
-    }
-  ]
-}
+Extraia TODAS as linhas de itens, agrupadas pela data escrita acima delas, no JSON:
+{"sections":[{"date":"21/10","day":21,"month":10,"year":null,"items":[{"q":1,"p":"produto","c":"cliente","v":18.5}]}]}
 
 Regras:
-- Datas no formato brasileiro: dia antes do mês (21/10 = dia 21 de outubro)
-- date_text: a data exatamente como escrita; day e month: inteiros; year: inteiro só se estiver escrito, senão null
-- Itens sem nenhuma data acima: uma seção com date_text "", day null e month null
-- Não crie seções sem itens; não repita itens em mais de uma seção
-- quantity: inteiro >= 1 (se ilegível, use 1)
-- product: texto do produto como aparece
-- customer_name: nome do cliente; string vazia se ausente
-- value: número em reais (aceite vírgula como decimal na leitura e converta para ponto)
-- Ignore cabeçalhos, totais e anotações que não sejam linhas de item
-- Não invente linhas que não existam na imagem`;
+- Datas no formato brasileiro (dia antes do mês). date: como escrita; day/month inteiros; year só se escrito, senão null
+- Itens sem data acima: seção com date "", day null, month null
+- q: quantidade inteira >= 1 (ilegível = 1); p: produto como aparece; c: cliente ou ""; v: valor em reais (número)
+- Ignore cabeçalhos, totais e anotações; não invente linhas; não repita itens`;
 
 const MONTHS_PT = {
   jan: 1, janeiro: 1, fev: 2, fevereiro: 2, mar: 3, marco: 3, abr: 4, abril: 4,
@@ -172,14 +148,15 @@ function extractJsonText(text) {
 }
 
 function normalizeExtractedLines(payload) {
-  const source = Array.isArray(payload?.lines) ? payload.lines : [];
+  const source = Array.isArray(payload?.lines) ? payload.lines
+    : (Array.isArray(payload?.items) ? payload.items : []);
   const lines = [];
   for (const row of source) {
     if (!row || typeof row !== 'object') continue;
-    const productText = String(row.product ?? row.product_text ?? '').trim();
-    const customerText = String(row.customer_name ?? row.customer_text ?? row.nome ?? '').trim();
-    const quantity = parseQuantity(row.quantity ?? row.qty ?? row.quantidade);
-    const value = parseMoneyValue(row.value ?? row.valor ?? row.price ?? row.unit_price);
+    const productText = String(row.p ?? row.product ?? row.product_text ?? '').trim();
+    const customerText = String(row.c ?? row.customer_name ?? row.customer_text ?? row.nome ?? '').trim();
+    const quantity = parseQuantity(row.q ?? row.quantity ?? row.qty ?? row.quantidade);
+    const value = parseMoneyValue(row.v ?? row.value ?? row.valor ?? row.price ?? row.unit_price);
     if (!productText && !customerText && value == null) continue;
     lines.push({
       quantity,
@@ -198,12 +175,12 @@ function normalizeExtractedLines(payload) {
 function normalizeExtractedSections(payload, { today = todayYmdBrazil() } = {}) {
   const rawSections = Array.isArray(payload?.sections)
     ? payload.sections
-    : [{ date_text: '', day: null, month: null, year: null, lines: payload?.lines }];
+    : [{ date_text: '', day: null, month: null, year: null, lines: payload?.lines ?? payload?.items }];
 
   const byKey = new Map();
   for (const section of rawSections) {
     if (!section || typeof section !== 'object') continue;
-    const lines = normalizeExtractedLines({ lines: section.lines });
+    const lines = normalizeExtractedLines({ lines: section.lines ?? section.items });
     if (!lines.length) continue;
 
     const dateText = String(section.date_text ?? section.date ?? '').trim();
@@ -224,6 +201,68 @@ function normalizeExtractedSections(payload, { today = todayYmdBrazil() } = {}) 
   return Array.from(byKey.values());
 }
 
+// Formato fixo da resposta (chaves curtas = menos texto gerado = resposta mais rápida)
+const LIST_RESPONSE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    sections: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          date: { type: 'STRING' },
+          day: { type: 'INTEGER', nullable: true },
+          month: { type: 'INTEGER', nullable: true },
+          year: { type: 'INTEGER', nullable: true },
+          items: {
+            type: 'ARRAY',
+            items: {
+              type: 'OBJECT',
+              properties: {
+                q: { type: 'INTEGER' },
+                p: { type: 'STRING' },
+                c: { type: 'STRING' },
+                v: { type: 'NUMBER' }
+              },
+              required: ['q', 'p', 'c', 'v']
+            }
+          }
+        },
+        required: ['date', 'items']
+      }
+    }
+  },
+  required: ['sections']
+};
+
+/** Nível de raciocínio: o mínimo que cada modelo aceita (Flash-Lite/3.6: minimal; 3.8 Flash: low). */
+function thinkingLevelFor(model) {
+  const env = String(process.env.GEMINI_THINKING_LEVEL || '').trim().toLowerCase();
+  if (env === 'off' || env === 'none') return null;
+  if (env) return env;
+  return /flash-lite|3\.6-flash|3-flash-preview/.test(model) ? 'minimal' : 'low';
+}
+
+/** Resolução da imagem na análise: low | medium | high (padrão medium = 560 tokens). */
+function mediaResolutionFor() {
+  const env = String(process.env.GEMINI_MEDIA_RESOLUTION || 'medium').trim().toLowerCase();
+  if (env === 'off' || env === 'none' || env === 'default') return null;
+  return `MEDIA_RESOLUTION_${env.toUpperCase()}`;
+}
+
+/** Acrescenta raciocínio mínimo e resolução de imagem ao corpo da requisição. */
+function withPerformanceConfig(body, model) {
+  const generationConfig = { ...(body.generationConfig || {}) };
+  const level = thinkingLevelFor(model);
+  if (level) generationConfig.thinkingConfig = { thinkingLevel: level };
+  const media = mediaResolutionFor();
+  if (media) generationConfig.mediaResolution = media;
+  return { ...body, generationConfig };
+}
+
+// Modelos que recusaram os parâmetros de desempenho — chamados sem eles nas próximas vezes
+const perfConfigRejected = new Set();
+
 /**
  * Chama o Gemini com log de requisição/resposta. Devolve { data, textPart, model }.
  * Se o modelo estiver indisponível (aposentado ou restrito ao projeto), tenta o próximo da lista.
@@ -241,21 +280,42 @@ async function callGeminiVision({ apiKey, models, body, mime, bytes, log = noopL
   for (let attempt = 0; attempt < candidates.length; attempt++) {
     const model = candidates[attempt];
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-    log.info('gemini.request', { model, attempt: attempt + 1, mime, bytes });
+    const usePerf = !perfConfigRejected.has(model);
+    const requestBody = usePerf ? withPerformanceConfig(body, model) : body;
+    const gc = requestBody.generationConfig || {};
+    log.info('gemini.request', {
+      model,
+      attempt: attempt + 1,
+      mime,
+      bytes,
+      thinkingLevel: gc.thinkingConfig?.thinkingLevel,
+      mediaResolution: gc.mediaResolution,
+      schema: Boolean(gc.responseSchema)
+    });
     const t0 = Date.now();
+    const post = (payload) => fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
     let response;
+    let data;
     try {
-      response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
+      response = await post(requestBody);
+      data = await response.json().catch(() => ({}));
+      // Parâmetro de desempenho não aceito por este modelo/API: repete sem eles
+      if (usePerf && response.status === 400
+        && /thinking|media_?resolution|mediaResolution|Unknown name|Invalid value|not supported/i.test(String(data?.error?.message || ''))) {
+        perfConfigRejected.add(model);
+        log.warn('gemini.config_rejected', { model, apiMessage: String(data?.error?.message || '').slice(0, 300) });
+        response = await post(body);
+        data = await response.json().catch(() => ({}));
+      }
     } catch (err) {
       log.error('gemini.network_error', err, { model, gemMs: Date.now() - t0 });
       throw new ListVisionError('Falha ao conectar ao serviço de visão.', 502);
     }
 
-    const data = await response.json().catch(() => ({}));
     const candidate = data?.candidates?.[0];
     const textPart = candidate?.content?.parts?.find((p) => p.text)?.text;
     const info = {
@@ -336,7 +396,9 @@ async function extractListFromImage({ buffer, mimeType, today, log = noopLog }) 
     ],
     generationConfig: {
       temperature: 0.1,
-      responseMimeType: 'application/json'
+      responseMimeType: 'application/json',
+      responseSchema: LIST_RESPONSE_SCHEMA,
+      maxOutputTokens: 4096
     }
   };
 
@@ -361,8 +423,8 @@ async function extractListFromImage({ buffer, mimeType, today, log = noopLog }) 
   log.info('vision.parsed', {
     format: rawSections ? 'sections' : 'lines',
     rawSections: rawSections ? rawSections.map((sec) => ({
-      date_text: sec?.date_text, day: sec?.day, month: sec?.month, year: sec?.year,
-      lines: Array.isArray(sec?.lines) ? sec.lines.length : 0
+      date_text: sec?.date_text ?? sec?.date, day: sec?.day, month: sec?.month, year: sec?.year,
+      lines: Array.isArray(sec?.lines ?? sec?.items) ? (sec.lines ?? sec.items).length : 0
     })) : undefined,
     sections: sections.map((sec) => ({ date: sec.date, date_text: sec.date_text, lines: sec.lines.length })),
     totalLines: lines.length
@@ -386,6 +448,8 @@ module.exports = {
   normalizeExtractedLines,
   normalizeExtractedSections,
   callGeminiVision,
+  withPerformanceConfig,
+  thinkingLevelFor,
   resolveListDate,
   parseDateText,
   extractJsonText

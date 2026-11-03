@@ -2028,29 +2028,58 @@ function buildDiarioListProductOptionsHtml(line) {
   return opts.join('');
 }
 
-function buildDiarioListCustomerOptionsHtml(line) {
-  const seen = new Set();
-  const options = [];
-  const pushCustomer = (id, name) => {
-    const key = String(id);
-    if (id == null || id === '' || seen.has(key)) return;
-    seen.add(key);
-    options.push({ id, name: name || String(id) });
-  };
+function buildDiarioListCustomerComboboxHtml(line, locked = false) {
+  const dis = locked ? ' disabled' : '';
   if (line.loyalty_customer_id != null) {
-    pushCustomer(line.loyalty_customer_id, line.customer_name);
+    return `
+      <div class="diario-combobox">
+        <div class="diario-combobox-selected">
+          <span class="diario-combobox-selected-name">${escapeHtml(line.customer_name || String(line.loyalty_customer_id))}</span>
+          <button type="button" class="diario-combobox-clear" data-review-customer-clear aria-label="Remover cliente"${dis}>&times;</button>
+        </div>
+      </div>`;
   }
-  (line.customer_candidates || []).forEach((c) => pushCustomer(c.id, c.name));
-  dailySalesCustomersCache.forEach((c) => pushCustomer(c.id, c.name));
+  return `
+    <div class="diario-combobox">
+      <input type="search" data-review-customer-search placeholder="Buscar cliente…" autocomplete="off"${dis}>
+      <div class="diario-combobox-results hidden" data-review-customer-results></div>
+    </div>`;
+}
 
-  const selected = line.loyalty_customer_id != null ? String(line.loyalty_customer_id) : '';
-  const opts = [
-    `<option value="">Sem cliente</option>`,
-    ...options.map((c) =>
-      `<option value="${escapeHtml(String(c.id))}"${String(c.id) === selected ? ' selected' : ''}>${escapeHtml(c.name)}</option>`
-    )
-  ];
-  return opts.join('');
+let diarioListCustomerSearchSeq = 0;
+
+async function showDiarioListCustomerResults(row, line, query) {
+  const container = row.querySelector('[data-review-customer-results]');
+  if (!container) return;
+  const q = String(query || '').trim();
+  const seq = ++diarioListCustomerSearchSeq;
+  container.innerHTML = '<p class="diario-combobox-empty">Buscando…</p>';
+  container.classList.remove('hidden');
+
+  let matches = await searchDiarioCustomersRemote(q);
+  if (seq !== diarioListCustomerSearchSeq) return;
+  if (!q && (line.customer_candidates || []).length) {
+    const seen = new Set(line.customer_candidates.map((c) => String(c.id)));
+    matches = [...line.customer_candidates, ...matches.filter((c) => !seen.has(String(c.id)))].slice(0, 12);
+  }
+
+  container.innerHTML = matches.length
+    ? matches.map((c) =>
+      `<button type="button" class="diario-combobox-result-item" data-review-customer-id="${escapeAttr(String(c.id))}"
+        data-review-customer-name="${escapeAttr(c.name || '')}">
+        <span class="diario-combobox-result-name">${escapeHtml(c.name)}</span>
+        <span class="diario-combobox-result-meta">${escapeHtml(formatDiarioPhoneDisplay(c.phone))}</span>
+      </button>`
+    ).join('')
+    : '<p class="diario-combobox-empty">Nenhum cliente encontrado.</p>';
+}
+
+function hideDiarioListCustomerResults(except) {
+  document.querySelectorAll('#diario-list-review-lines [data-review-customer-results]').forEach((el) => {
+    if (el === except) return;
+    el.classList.add('hidden');
+    el.innerHTML = '';
+  });
 }
 
 function renderDiarioListReviewSteps() {
@@ -2221,7 +2250,7 @@ function renderDiarioListReviewLines() {
         </div>
         <div class="form-group">
           <label>Cliente</label>
-          <select data-review-field="loyalty_customer_id"${dis}>${buildDiarioListCustomerOptionsHtml(line)}</select>
+          ${buildDiarioListCustomerComboboxHtml(line, locked)}
         </div>
         <div class="form-group">
           <label>Valor (R$)</label>
@@ -2305,6 +2334,13 @@ function onDiarioListReviewChange(event) {
   if (!row) return;
   const line = findDiarioListReviewLine(row.dataset.reviewKey);
   if (!line) return;
+  if (event.type === 'input' && event.target.hasAttribute('data-review-customer-search')) {
+    clearTimeout(diarioSearchTimers.reviewCustomer);
+    const query = event.target.value;
+    diarioSearchTimers.reviewCustomer = setTimeout(() => showDiarioListCustomerResults(row, line, query), 250);
+    return;
+  }
+
   const field = event.target.getAttribute('data-review-field');
   if (!field) return;
   const committed = event.type === 'change';
@@ -2333,25 +2369,6 @@ function onDiarioListReviewChange(event) {
     line.product_status = productId ? 'matched' : (line.product_text ? 'missing' : 'empty');
     // Mantém o valor lido da imagem (pode incluir adicionais acima do preço base)
     refreshDiarioReviewAfterLineEdit();
-    return;
-  }
-
-  if (field === 'loyalty_customer_id') {
-    if (!committed) return;
-    const raw = String(event.target.value || '').trim();
-    if (!raw) {
-      line.loyalty_customer_id = null;
-      line.customer_name = null;
-      line.customer_status = line.customer_text ? 'missing' : 'empty';
-    } else {
-      const id = parseInt(raw, 10);
-      line.loyalty_customer_id = Number.isInteger(id) ? id : null;
-      const customer = dailySalesCustomersCache.find((c) => String(c.id) === String(id))
-        || (line.customer_candidates || []).find((c) => String(c.id) === String(id));
-      line.customer_name = customer?.name || line.customer_name;
-      line.customer_status = line.loyalty_customer_id != null ? 'matched' : 'missing';
-    }
-    refreshDiarioReviewAfterLineEdit();
   }
 }
 
@@ -2366,11 +2383,42 @@ function onDiarioListReviewClick(event) {
     }
     return;
   }
+  const row = event.target.closest('[data-review-key]');
+  const line = row ? findDiarioListReviewLine(row.dataset.reviewKey) : null;
+
+  const search = event.target.closest('[data-review-customer-search]');
+  if (search && row && line) {
+    const results = row.querySelector('[data-review-customer-results]');
+    hideDiarioListCustomerResults(results);
+    if (results?.classList.contains('hidden')) showDiarioListCustomerResults(row, line, search.value);
+    return;
+  }
+
+  const pick = event.target.closest('[data-review-customer-id]');
+  if (pick && line) {
+    const id = parseInt(pick.dataset.reviewCustomerId, 10);
+    if (!Number.isInteger(id)) return;
+    line.loyalty_customer_id = id;
+    line.customer_name = pick.dataset.reviewCustomerName || null;
+    line.customer_status = 'matched';
+    refreshDiarioReviewAfterLineEdit();
+    return;
+  }
+
+  if (event.target.closest('[data-review-customer-clear]') && line) {
+    line.loyalty_customer_id = null;
+    line.customer_name = null;
+    line.customer_status = line.customer_text ? 'missing' : 'empty';
+    refreshDiarioReviewAfterLineEdit();
+    document.querySelector(`[data-review-key="${CSS.escape(line.key)}"] [data-review-customer-search]`)?.focus();
+    return;
+  }
+
+  hideDiarioListCustomerResults();
+
   const removeBtn = event.target.closest('[data-review-remove]');
-  if (!removeBtn) return;
-  const row = removeBtn.closest('[data-review-key]');
   const section = getDiarioReviewSection();
-  if (!row || !section) return;
+  if (!removeBtn || !row || !section) return;
   const key = row.dataset.reviewKey;
   section.lines = section.lines.filter((l) => l.key !== key);
   refreshDiarioReviewAfterLineEdit();
@@ -2531,6 +2579,9 @@ function bindDiarioListImportEvents() {
     ?.addEventListener('click', onDiarioListReviewStepClick);
   document.getElementById('diario-list-review-date')
     ?.addEventListener('change', onDiarioListReviewDateChange);
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('#diario-list-review-lines')) hideDiarioListCustomerResults();
+  });
 }
 
 function bindDailySalesEvents() {

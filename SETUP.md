@@ -53,23 +53,27 @@ cp .env.example .env
 
 Edite `.env` e configure:
 
-**Desenvolvimento local:**
+**Desenvolvimento local** (valores de exemplo — use os seus):
+
 ```env
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=nimu_pwa_db
 DB_USER=postgres
-DB_PASSWORD=***REMOVIDO***
+DB_PASSWORD=<your-local-password>
 DB_SCHEMA=fitpoint
 ```
 
-**Produção (Render.com):**
+**Produção:**
+
+Não grave host, usuário ou senha reais neste arquivo. Defina as mesmas variáveis no ambiente do provedor (por exemplo, Render) ou num `.env` local que não entra no Git. A lista completa está em [`.env.example`](.env.example).
+
 ```env
-DB_HOST=***REMOVIDO***
+DB_HOST=<your-database-host>
 DB_PORT=5432
-DB_NAME=nimu_pwa_db
-DB_USER=***REMOVIDO***
-DB_PASSWORD=***REMOVIDO***
+DB_NAME=<your-database-name>
+DB_USER=<your-database-user>
+DB_PASSWORD=<your-database-password>
 DB_SSL=true
 DB_SCHEMA=fitpoint
 ```

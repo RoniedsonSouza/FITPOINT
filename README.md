@@ -1,77 +1,19 @@
 # FitPoint Fitness
 
-FitPoint is the web system behind a fitness store that sells protein snacks and functional drinks. It serves the public site (menu, promotions, events, loyalty, and store locations) and a JWT-protected admin for inventory, daily sales, tickets, and customer outreach.
+Sistema da loja FitPoint Fitness (lanches proteicos e bebidas funcionais): site público e painel administrativo. O Express serve as páginas e a API; o PostgreSQL guarda os dados no schema `fitpoint`.
 
-The app is a single Node.js process: Express serves the static pages and the JSON API, and PostgreSQL stores the data in a dedicated `fitpoint` schema.
+## Funcionalidades
 
-## Features
+- Cardápio, promoções, mapa das unidades, fidelidade e eventos com ingressos (Pix e cartão via Mercado Pago, ingresso em QR por e-mail)
+- Admin com JWT: produtos, diário de vendas, relatórios, OCR de listas (Gemini), ingressos, campanhas de e-mail (Resend), WhatsApp e usuários
 
-**Public site**
+## Stack
 
-- Home, about, and contact pages
-- Product menu with categories, prices, and promotions
-- Events with ticket lots, including complimentary VIP tickets
-- Checkout inside the site (Pix and card via Mercado Pago) and QR-code tickets sent by email
-- Loyalty program
-- Store locations on a Google Map
+Node.js, Express, PostgreSQL, JWT, Mercado Pago, Resend, WhatsApp Cloud API, Gemini Vision e Google Maps. O frontend é HTML, Tailwind e JavaScript.
 
-**Admin** (`/admin.html`)
+## Como rodar
 
-- Sign-in with JWT, role-style permissions, and forced password change on first access
-- Products, categories, and image storage
-- Loyalty customers, rewards, and one-click WhatsApp reactivation for inactive customers
-- Daily sales diary, reports, and import of handwritten lists or customer cards with Gemini Vision (OCR)
-- Events: lots, ticket validation, VIP issue, and in-app refunds
-- Email campaigns (Resend) with unsubscribe links
-- Distributors and admin user management
-
-## Tech stack
-
-| Layer | Choice |
-| --- | --- |
-| Runtime | Node.js, Express 4 |
-| Database | PostgreSQL (`pg`), schema `fitpoint` |
-| Auth | JSON Web Tokens (`jsonwebtoken`) and bcrypt |
-| Payments | Mercado Pago (Pix and card, webhooks) |
-| Email | Resend (ticket delivery and campaigns) |
-| Messaging | WhatsApp Cloud API (Meta) |
-| OCR | Google Gemini Vision |
-| Maps | Google Maps JavaScript API |
-| Frontend | Static HTML, Tailwind (CDN), vanilla JavaScript |
-| Uploads | Multer, with images persisted in PostgreSQL |
-
-## Architecture
-
-```
-FITPOINT/
-├── server.js              # Express app, static files, API mount
-├── admin.html             # Admin shell
-├── index.html             # Public home
-├── cardapio.html          # Menu
-├── eventos.html           # Events and tickets
-├── fidelidade.html        # Loyalty
-├── config/
-│   ├── database.js        # PostgreSQL pool and schema bootstrap
-│   └── auth.js            # JWT and password hashing
-├── routes/                # Products, categories, loyalty, daily sales,
-│                          # events, tickets, distributors, media, auth, email
-├── services/              # Mercado Pago, Resend, WhatsApp, Gemini OCR, QR codes
-├── middleware/            # Image upload
-├── scripts/               # migrate.js and maintenance scripts
-├── js/                    # Public site scripts
-├── js/admin/              # Admin modules
-├── css/
-├── data/                  # Seed JSON used by the migration script
-├── assets/                # Brand and product images
-├── docs/                  # Notes for tickets, WhatsApp, and OCR
-└── .env.example           # Variable names only — copy to .env
-```
-
-`server.js` mounts the API under `/api/*` and serves the HTML from the project root. On startup it ensures the database schema exists. Secrets are read from the environment (`dotenv` in local development). `.env` is gitignored.
-
-## Run locally
-
-Requirements: Node.js 18 or later, npm, and PostgreSQL 12 or later.
+Node.js 18+, npm e PostgreSQL 12+.
 
 ```bash
 cp .env.example .env
@@ -80,58 +22,13 @@ npm run migrate
 npm start
 ```
 
-Edit `.env` before migrating. At minimum set the database variables and a long random `JWT_SECRET`. Set `ADMIN_USERNAME` and `ADMIN_PASSWORD` before `npm run migrate`; that script creates the first super-admin from those variables.
-
-Local PostgreSQL usually looks like this (values are placeholders — use your own):
-
-```env
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=nimu_pwa_db
-DB_USER=postgres
-DB_PASSWORD=<your-local-password>
-DB_SSL=false
-DB_SCHEMA=fitpoint
-JWT_SECRET=<long-random-string>
-ADMIN_USERNAME=<admin-username>
-ADMIN_PASSWORD=<strong-password>
-```
-
-The full list, including Mercado Pago, Resend, WhatsApp, Gemini, and Google Maps, is in [`.env.example`](.env.example). Do not commit `.env` or paste live credentials into this repository.
-
-| Command | What it does |
-| --- | --- |
-| `npm start` | Start the server (`PORT`, default 3000) |
-| `npm run dev` | Same, with auto-reload (nodemon) |
-| `npm run migrate` | Create the `fitpoint` schema, tables, and the first admin |
-| `npm run migrate:images` | Move legacy image files into the database |
-
-Then open:
+Preencha o `.env` com o seu ambiente. Os nomes das variáveis estão em [`.env.example`](.env.example). Não commite o `.env`.
 
 - Site: http://localhost:3000
 - Admin: http://localhost:3000/admin.html
-- Health check: http://localhost:3000/api/health
 
-For a longer setup walkthrough (PostgreSQL install, common errors, deploy checklist), see [SETUP.md](SETUP.md). Ticket, email, and WhatsApp keys are documented in [docs/INGRESSOS-CONFIG.md](docs/INGRESSOS-CONFIG.md) and [docs/WHATSAPP-CLOUD-API.md](docs/WHATSAPP-CLOUD-API.md).
+Instalação do banco e deploy: [SETUP.md](SETUP.md).
 
-### Production
-
-Set the same variable names in the host environment (for example Render). Use `DB_SSL=true` for managed PostgreSQL. Point `APP_URL` at the public HTTPS origin so Mercado Pago webhooks and email links resolve. Generate a unique `JWT_SECRET` and a strong `ADMIN_PASSWORD`. Never store production hostnames, usernames, or passwords in git.
-
-## API overview
-
-Public reads include products, categories, events, and ticket checkout. Writes, the daily sales diary, loyalty management, campaigns, and user administration require a Bearer token from `POST /api/auth/login`.
-
-`GET /api/health` returns `{ "status": "ok" }` when the process is up.
-
-## License
+## Licença
 
 ISC
-
----
-
-## Resumo (português)
-
-O FitPoint é o sistema da loja FitPoint Fitness (lanches proteicos e bebidas funcionais). O site público tem cardápio, promoções, eventos com ingressos, fidelidade e mapa das unidades. O painel administrativo (JWT) cobre estoque, diário de vendas, relatórios, OCR de listas manuscritas, ingressos (Mercado Pago, Pix e cartão, QR por e-mail), campanhas de e-mail, WhatsApp e usuários.
-
-Stack: Node.js/Express, PostgreSQL (schema `fitpoint`), JWT, Mercado Pago, Resend, WhatsApp Cloud API e Gemini Vision. Para rodar localmente, copie `.env.example` para `.env`, preencha as variáveis (sem commitar senhas) e execute `npm install`, `npm run migrate` e `npm start`.

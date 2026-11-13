@@ -199,8 +199,8 @@ psql -U postgres -d nimu_pwa_db
 - [ ] PostgreSQL instalado e acessível
 - [ ] Banco de dados criado
 - [ ] `.env` configurado com credenciais reais
-- [ ] `JWT_SECRET` alterado para string segura
-- [ ] `ADMIN_PASSWORD` alterado para senha forte
+- [ ] `JWT_SECRET` definido (não há valor padrão no código)
+- [ ] `ADMIN_PASSWORD` definido (não há senha padrão no código)
 - [ ] `CORS_ORIGIN` configurado (domínio do frontend)
 - [ ] `DB_SSL=true` se usar PostgreSQL gerenciado (Heroku, etc)
 - [ ] HTTPS configurado
@@ -230,7 +230,7 @@ npm start
 ## 🔐 Segurança
 
 ⚠️ **IMPORTANTE EM PRODUÇÃO:**
-- Altere todas as senhas padrão
+- Defina `JWT_SECRET` e `ADMIN_PASSWORD` no ambiente; o repositório não inclui esses valores
 - Use `JWT_SECRET` forte e único
 - Configure `CORS_ORIGIN` para seu domínio
 - Use HTTPS sempre

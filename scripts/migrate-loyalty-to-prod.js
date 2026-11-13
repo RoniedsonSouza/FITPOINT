@@ -39,7 +39,7 @@ const prodHost = process.env.PROD_DB_HOST;
 const prodPassword = process.env.PROD_DB_PASSWORD;
 
 if (!prodHost || !prodPassword) {
-  console.error('❌ Defina PROD_DB_HOST e PROD_DB_PASSWORD no .env (ou descomente credenciais de produção).');
+  console.error('❌ Defina PROD_DB_HOST e PROD_DB_PASSWORD no .env.');
   process.exit(1);
 }
 

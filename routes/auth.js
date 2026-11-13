@@ -7,7 +7,7 @@ const {
   hashPassword,
   authenticateToken,
   requireSuperAdmin,
-  DEFAULT_PASSWORD,
+  getDefaultPassword,
   normalizePermissions,
   publicUser,
   loadUserByLogin,
@@ -147,7 +147,7 @@ router.post('/users', authenticateToken, requireSuperAdmin, async (req, res) => 
 
     let password;
     if (useDefaultPassword) {
-      password = DEFAULT_PASSWORD;
+      password = getDefaultPassword();
     } else {
       if (!customPassword || String(customPassword).length < 6) {
         return res.status(400).json({ error: 'Senha deve ter pelo menos 6 caracteres' });
@@ -176,14 +176,15 @@ router.post('/users', authenticateToken, requireSuperAdmin, async (req, res) => 
     res.status(201).json({
       message: 'Usuário criado com sucesso',
       user: userResponse(result.rows[0]),
-      initialPasswordHint: useDefaultPassword ? DEFAULT_PASSWORD : '(senha personalizada)'
+      initialPasswordHint: useDefaultPassword ? 'senha padrão do sistema' : '(senha personalizada)'
     });
   } catch (error) {
     console.error('Erro ao criar usuário:', error);
     if (error.code === '23505') {
       return res.status(409).json({ error: 'Já existe um usuário com este e-mail' });
     }
-    res.status(500).json({ error: 'Erro ao criar usuário' });
+    const status = error.statusCode || 500;
+    res.status(status).json({ error: status === 500 ? 'Erro ao criar usuário' : error.message });
   }
 });
 
@@ -256,7 +257,7 @@ router.put('/users/:id', authenticateToken, requireSuperAdmin, async (req, res) 
       const useDefault = req.body.useDefaultPassword !== false;
       let newPass;
       if (useDefault) {
-        newPass = DEFAULT_PASSWORD;
+        newPass = getDefaultPassword();
       } else {
         if (!req.body.password || String(req.body.password).length < 6) {
           return res.status(400).json({ error: 'Senha deve ter pelo menos 6 caracteres' });
@@ -292,7 +293,8 @@ router.put('/users/:id', authenticateToken, requireSuperAdmin, async (req, res) 
     if (error.code === '23505') {
       return res.status(409).json({ error: 'Já existe um usuário com este e-mail' });
     }
-    res.status(500).json({ error: 'Erro ao atualizar usuário' });
+    const status = error.statusCode || 500;
+    res.status(status).json({ error: status === 500 ? 'Erro ao atualizar usuário' : error.message });
   }
 });
 

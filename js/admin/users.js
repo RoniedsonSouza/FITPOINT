@@ -1,7 +1,5 @@
 // Gestão de usuários admin (apenas super-admin)
 
-const DEFAULT_SYSTEM_PASSWORD = '***REMOVIDO***';
-
 let editingUserId = null;
 
 function emptyPermissionsForm() {
@@ -246,7 +244,7 @@ async function saveUser(event) {
         });
         showToast(
           useDefaultPassword
-            ? `Usuário criado. Senha inicial: ${DEFAULT_SYSTEM_PASSWORD}`
+            ? 'Usuário criado com a senha padrão do sistema'
             : 'Usuário criado com senha personalizada',
           'success'
         );
@@ -267,7 +265,7 @@ async function saveUser(event) {
 
 async function resetUserPassword(id) {
   const useDefault = confirm(
-    `Redefinir senha para o padrão do sistema (${DEFAULT_SYSTEM_PASSWORD})?\n\nOK = senha padrão\nCancelar = informar senha personalizada`
+    'Redefinir senha para o padrão do sistema?\n\nOK = senha padrão\nCancelar = informar senha personalizada'
   );
 
   let payload = { resetPassword: true, useDefaultPassword: true };
@@ -285,7 +283,7 @@ async function resetUserPassword(id) {
     await DB.updateAdminUser(id, payload);
     showToast(
       payload.useDefaultPassword
-        ? `Senha redefinida para ${DEFAULT_SYSTEM_PASSWORD}. Troca obrigatória no próximo login.`
+        ? 'Senha redefinida para o padrão do sistema. Troca obrigatória no próximo login.'
         : 'Senha redefinida. Troca obrigatória no próximo login.',
       'success'
     );

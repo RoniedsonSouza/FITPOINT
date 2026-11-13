@@ -373,7 +373,7 @@ RESEND_FROM=FitPoint <ingressos@seudominio.com>
 - Não commit o arquivo `.env`
 - Não compartilhe Access Token do Mercado Pago nem API Key do Resend
 - Em produção use tokens de **produção**, HTTPS e domínio verificado no Resend
-- Troque `JWT_SECRET` e a senha do admin se ainda estiverem nos valores de exemplo
+- Defina `JWT_SECRET` e `ADMIN_PASSWORD` no ambiente; o código não tem fallback
 
 ---
 

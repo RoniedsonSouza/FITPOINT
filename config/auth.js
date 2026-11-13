@@ -2,8 +2,20 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { query, table } = require('./database');
 
-const JWT_SECRET = process.env.JWT_SECRET || '***REMOVIDO***';
-const DEFAULT_PASSWORD = '***REMOVIDO***';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET é obrigatório. Defina a variável de ambiente JWT_SECRET.');
+}
+
+function getDefaultPassword() {
+  const password = process.env.DEFAULT_USER_PASSWORD;
+  if (!password) {
+    const error = new Error('Senha padrão do sistema não está configurada no servidor');
+    error.statusCode = 503;
+    throw error;
+  }
+  return password;
+}
 
 const EMPTY_PERMISSIONS = {
   produtos: false,
@@ -203,7 +215,7 @@ module.exports = {
   comparePassword,
   generateToken,
   JWT_SECRET,
-  DEFAULT_PASSWORD,
+  getDefaultPassword,
   EMPTY_PERMISSIONS,
   normalizePermissions,
   publicUser,

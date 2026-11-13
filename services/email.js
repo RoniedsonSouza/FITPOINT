@@ -115,11 +115,11 @@ function getAppBaseUrl() {
 }
 
 function getUnsubscribeSecret() {
-  return (
-    process.env.RESEND_UNSUBSCRIBE_SECRET ||
-    process.env.JWT_SECRET ||
-    '***REMOVIDO***'
-  );
+  const secret = process.env.RESEND_UNSUBSCRIBE_SECRET || process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('Defina RESEND_UNSUBSCRIBE_SECRET ou JWT_SECRET.');
+  }
+  return secret;
 }
 
 function createUnsubscribeToken(email) {

@@ -24,6 +24,8 @@ npm start
 
 Preencha o `.env` com o seu ambiente. Os nomes das variáveis estão em [`.env.example`](.env.example). Não commite o `.env`.
 
+`JWT_SECRET` e `ADMIN_PASSWORD` são obrigatórios: o código não traz fallback. A senha padrão de novos usuários do painel, quando usada, vem de `DEFAULT_USER_PASSWORD` e não fica no frontend.
+
 - Site: http://localhost:3000
 - Admin: http://localhost:3000/admin.html
 

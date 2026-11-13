@@ -18,6 +18,12 @@ const PRODUCTS_JSON = path.join(__dirname, '../data/products.json');
 const RECIPES_JSON = path.join(__dirname, '../data/recipes.json');
 
 async function migrate() {
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminPassword) {
+    console.error('❌ ADMIN_PASSWORD é obrigatório. Defina a variável de ambiente. Não há senha padrão.');
+    process.exit(1);
+  }
+
   const client = await pool.connect();
   
   try {
@@ -703,9 +709,8 @@ async function migrate() {
 
     console.log('✅ Tabelas criadas no schema\n');
 
-    // Criar usuário admin padrão
+    // Criar usuário admin inicial com a senha vinda só do ambiente
     const adminUsername = process.env.ADMIN_USERNAME || 'admin';
-    const adminPassword = process.env.ADMIN_PASSWORD || '***REMOVIDO***';
 
     const existingAdmin = await client.query(
       `SELECT id FROM ${SCHEMA}.admin_users WHERE username = $1`,
@@ -721,8 +726,8 @@ async function migrate() {
          VALUES ($1, $2, $3, true, false, true, '{}'::jsonb)`,
         [adminUsername, adminEmail, passwordHash]
       );
-      console.log(`👤 Usuário admin criado: ${adminEmail} / ${adminPassword}`);
-      console.log('⚠️  ALTERE A SENHA PADRÃO EM PRODUÇÃO!\n');
+      console.log(`👤 Usuário admin criado: ${adminEmail}`);
+      console.log('⚠️  A senha ficou apenas no ambiente. Troque-a após o primeiro acesso, se necessário.\n');
     } else {
       await client.query(`
         UPDATE ${SCHEMA}.admin_users
